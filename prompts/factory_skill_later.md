@@ -46,3 +46,7 @@ Ideas and requirements not in the current build. Move them to `factory_skill_cre
   - Checks the dashboard rejects a request without a token or with a wrong `Origin`.
 - The dry run removes the test task, its worktree and its Herdr test session at the end.
 - The dry run writes its output to `VERIFICATION_DIR`.
+
+## Ideas
+
+- Schedule a pipeline.

@@ -66,7 +66,27 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
 
 #### Pipelines
 
-- A pipeline is a manifest file with an ordered list of steps.
+- A pipeline is one YAML file in `pipelines/<id>.yaml`. It contains:
+  - `id`: unique lowercase id
+  - `description`: one line, shown in the launch menu
+  - `inputs`: values asked to the user at launch, each with a description. They are saved in the task state, so steps read them with `reads`.
+  - `steps`: ordered list of step ids. Each entry can set config values for this pipeline with `with`.
+- Example:
+
+```yaml
+id: fix-crash
+description: Fix a production crash from its Crashlytics link
+inputs:
+  crash_url:
+    description: Crashlytics link of the crash
+steps:
+  - id: fix-crash
+  - id: commit
+  - id: create-merge-request
+    with:
+      target_branch: release
+```
+
 - First pipelines (examples):
   - `new-feature`: <TODO: steps>
   - `fix-bug`: <TODO: steps>
@@ -148,6 +168,17 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - At the end, it lists the pipelines and asks if the new step should be added to some of them. It updates a pipeline only after approval.
 - When a local step and a generic step have the same id, the local step is used.
 
+#### Step configuration
+
+- Config values for a repository are saved in `.factory/config.yaml`, in one section per step. This file is never committed.
+- When a step runs, each config key gets its value from the first source that has it:
+  1. The `with` block of the step in the current pipeline
+  2. `.factory/config.yaml`
+  3. The default value in the step manifest
+- If no source has a value, `factory next` tells the agent to ask the user, then to save the answer with `factory config set <step> <key> <value>`. The next runs do not ask again.
+- `factory next` prints the resolved config values with the step instructions.
+- No secrets in config files. Tokens stay in the tools' own configuration.
+
 #### Tasks
 
 ##### Task properties
@@ -191,6 +222,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory skip`: skips the current step, refused for required steps.
   - `factory state get <key>` and `factory state set <key> <value>`: read and write the task state.
   - `factory status`: prints the task id, the pipeline and the current step path.
+  - `factory config get <step> <key>` and `factory config set <step> <key> <value>`: read and write the repository config.
 
 ### File organization
 
