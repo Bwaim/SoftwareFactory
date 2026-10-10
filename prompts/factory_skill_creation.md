@@ -56,10 +56,12 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
 - The `nextry-factory` skill is an orchestrator launched on the root repository.
 - It can do the following actions:
   - Init the factory, this action is available only when the factory was never initialized on the repository
-  - Launch a new pipeline
+  - Launch a new pipeline, from scratch or from a backlog entry
   - Start the dashboard
   - Create a new pipeline: this is a special pipeline
   - Create a new step: runs the built-in pipeline `new-step-assistant`
+  - Add a backlog entry: runs the built-in step `backlog-add`
+  - Remove a backlog entry: runs the built-in step `backlog-remove`
   - Exit: That will also turn down the dashboard.
 
 ### Factory elements
@@ -234,6 +236,16 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - A step file changed during a task applies from the next step.
 - A step with `required: true` cannot be skipped. Other steps can be skipped with `factory skip`, only after user approval.
 
+#### Backlog
+
+- `.factory/backlog.md` holds the tasks not started yet. The user can also edit it by hand.
+- One entry per line: `- <description>`, with an optional pipeline id at the end: `[pipeline: <id>]`.
+- Built-in steps, run in the orchestrator session:
+  - `backlog-add`: asks for the description and the optional pipeline, then adds the entry.
+  - `backlog-remove`: lists the entries and removes the one the user selects.
+- When the user launches a pipeline, the orchestrator offers to start from a backlog entry. The entry gives the description and the pipeline. The entry is removed once the task is created.
+- At the end of Init, the orchestrator asks if the user wants to import backlog entries. The user pastes a list or gives a file path. The orchestrator shows the parsed entries and adds them with `backlog-add` after approval.
+
 ### Orchestrator
 
 - when the factory is started, the orchestrator always displays the menu with the available actions.
@@ -252,6 +264,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory state get <key>` and `factory state set <key> <value>`: read and write the task state.
   - `factory status`: prints the task id, the pipeline and the current step path.
   - `factory config get <step> <key>` and `factory config set <step> <key> <value>`: read and write the repository config.
+  - `factory backlog list`, `factory backlog add <description> [--pipeline <id>]` and `factory backlog remove <number>`: read and change the backlog.
 
 ### File organization
 
