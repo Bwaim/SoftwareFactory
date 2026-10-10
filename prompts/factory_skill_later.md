@@ -2,14 +2,6 @@
 
 Ideas and requirements not in the current build. Move them to `factory_skill_creation.md` when needed.
 
-- For each task, the orchestrator:
-  - Builds one slug used for the branch, the Herdr agent name and the Claude session name. It matches `[a-z][a-z0-9_-]{0,31}`.
-  - Creates a git worktree and a Herdr workspace with `herdr worktree create`.
-  - Starts Claude in the new pane with `herdr agent start <slug> --kind claude --pane <pane_id> -- --name <slug> --session-id <uuid>`.
-  - Writes the first prompt in a brief file and sends a short prompt that points to it with `herdr agent prompt`.
-  - Creates the task state file.
-- The Herdr pane id is read from the JSON response, never guessed.
-
 ### Dashboard
 
 - The orchestrator starts the dashboard with one command and opens it in the browser.

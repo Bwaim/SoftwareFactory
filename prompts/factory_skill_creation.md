@@ -150,7 +150,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 #### Step creation
 
-- The `new-step-assistant` pipeline runs as a task in a new Herdr tab, without a worktree.
+- The `new-step-assistant` pipeline runs as a task in the main repository, without a worktree. It starts Claude with `--add-dir <FACTORY_SOURCE>`, so it can write generic steps.
 - It first asks where to save the step:
   - Generic: in `FACTORY_SOURCE/steps/`, reusable in any repository.
   - Local: in `.factory/steps/` of the main repository, only for this repository.
@@ -183,7 +183,8 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 ##### Task properties
 
-- an internal id while there is not affected Jira Ticket, and it becomes a JiraTicket ID once one is affected.
+- a fixed id, created at launch.
+- an optional Jira ticket key, set when a ticket is assigned.
 - a short description.
 - an optional branch name.
 - a Claude session id.
@@ -196,7 +197,35 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 ##### Task creation / delete
 
-- they are special steps embedded by default with the factory
+- Task creation and task delete are built-in steps shipped with the factory.
+
+##### Task launch
+
+- Launching a pipeline runs the built-in step `create-task` in the orchestrator session.
+- It asks the user for a short description and for the pipeline `inputs`.
+- It builds the task id from the description: lowercase, matching `[a-z][a-z0-9_-]{0,31}`, unique among the tasks. The id never changes.
+- The same id is used for the task folder, the Herdr agent name and the Claude session name.
+- It runs the `create-worktree` step. For the built-in pipelines `new-step-assistant` and `new-pipeline-assistant`, it creates a Herdr tab in the main repository instead.
+- It starts Claude in the task pane with `herdr agent start <id> --kind claude --pane <pane_id> -- --name <id> --session-id <uuid>`. The pane id is read from the JSON response, never guessed.
+- It creates the task folder and the task state file, with the inputs.
+- It sends the first prompt with `herdr agent prompt` (see Task execution).
+- The orchestrator goes back to its menu without waiting for the task.
+
+##### Worktree creation
+
+- Every task runs in its own worktree, except the built-in pipelines `new-step-assistant` and `new-pipeline-assistant`. They change only factory files, so they run in the main repository.
+- To explore without a branch, the user starts a Claude session manually, outside the factory.
+- Every other pipeline starts with the built-in step `create-worktree`. The factory adds it when the pipeline does not list it.
+- A pipeline lists `create-worktree` only to set `with` values, and only as its first step. The factory refuses a pipeline that lists it anywhere else.
+- It runs in the orchestrator session at launch, before the task session starts.
+- Config keys:
+  - `worktree_root`: the folder where worktrees are created
+  - `base_ref`: the branch the worktree starts from, default `main`
+- It always runs `git fetch origin <base_ref>` first, so the worktree starts from the latest version. It never changes the local `<base_ref>` branch. If the fetch fails, it stops and asks the user.
+- If the pipeline has an input named `branch`, the worktree is created on that new branch, from `origin/<base_ref>`.
+- Otherwise, the worktree starts in detached HEAD on `origin/<base_ref>`. A later step creates the branch with `git switch -c <name>` and saves it with `factory state set branch <name>`.
+- It creates the worktree and a Herdr workspace with `herdr worktree create --branch <branch> --base origin/<base_ref> --path <worktree_root>/<id>`.
+- Check that `herdr worktree create` supports a detached worktree. If it does not, use `git worktree add --detach`, then `herdr worktree open --path`.
 
 ##### Task execution
 
