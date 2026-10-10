@@ -78,9 +78,43 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
 
 #### Steps
 
-- A step is a markdown file with instructions for the task session.
-- A step has also a file manifest that allows the factory to know which steps are available when creating a pipeline.
-- Each step declares what it reads and what it writes in the task state file.
+- A step is one markdown file. Its YAML frontmatter is the step manifest. Its body holds the instructions.
+- The manifest contains:
+  - `id`: unique lowercase id
+  - `description`: one line, shown when the user builds a pipeline
+  - `type`: `prompt`, `skill` or `script`
+  - `reads`: task state keys the step needs
+  - `writes`: task state keys the step sets
+  - `done_when`: the condition that ends the step, in plain text
+  - `done_check`: optional shell command. Exit code 0 means the step is done. When present, the factory checks it before moving to the next step.
+  - `config`: config keys, each with a description and an optional default value
+  - `required`: `true` if the step must never be skipped
+- The body depends on the type:
+  - `prompt`: the instructions the agent follows
+  - `skill`: the skill to call and how to use its result
+  - `script`: the path of the shell script to run
+- Example:
+
+```markdown
+---
+id: create-merge-request
+description: Create a GitLab merge request for the task branch
+type: skill
+reads: [branch, jira_ticket]
+writes: [mr_url]
+done_when: The merge request exists and its URL is saved in the task state.
+done_check: test -n "$(factory state get mr_url)"
+config:
+  target_branch:
+    description: Branch the merge request targets
+    default: main
+required: false
+---
+
+Run `/nextory-create-merge-request` for the task branch, targeting `config.target_branch`.
+Save the merge request URL with `factory state set mr_url <url>`.
+```
+
 - A step can be used by many pipelines.
 - First steps:
   - User validation: the session stops and waits for the user to approve.
