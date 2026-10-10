@@ -53,16 +53,15 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
 
 ### General concept
 
-- The `nextry-factory` skill is an orchestrator launched on the root repository.
+- The `nextory-factory` skill is an orchestrator launched in the main repository.
 - It can do the following actions:
-  - Init the factory, this action is available only when the factory was never initialized on the repository
+  - Init the factory. When the factory is not initialized in the repository, this is the only action shown. After init, it is never shown.
   - Launch a new pipeline, from scratch or from a backlog entry
-  - Start the dashboard
-  - Create a new pipeline: this is a special pipeline
+  - Create a new pipeline: runs the built-in pipeline `new-pipeline-assistant`
   - Create a new step: runs the built-in pipeline `new-step-assistant`
   - Add a backlog entry: runs the built-in step `backlog-add`
   - Remove a backlog entry: runs the built-in step `backlog-remove`
-  - Exit: That will also turn down the dashboard.
+  - Exit: stops the menu. Running tasks are not affected.
 
 ### Factory elements
 
@@ -248,8 +247,9 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 ### Orchestrator
 
-- when the factory is started, the orchestrator always displays the menu with the available actions.
-- when an action is selected, it does the action and then displays again the menu.
+- When the factory starts, the orchestrator always shows the menu with the available actions.
+- The menu is a numbered text list. The user answers with a number. Do not use the `AskUserQuestion` tool for the menu, because it allows at most 4 options.
+- When an action is done, the orchestrator shows the menu again.
 
 ### Factory CLI
 

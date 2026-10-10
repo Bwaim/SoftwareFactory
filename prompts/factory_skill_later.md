@@ -4,6 +4,7 @@ Ideas and requirements not in the current build. Move them to `factory_skill_cre
 
 ### Dashboard
 
+- Menu actions: "Start the dashboard". "Exit" also stops the dashboard.
 - The orchestrator starts the dashboard with one command and opens it in the browser.
 - The dashboard is served by a local HTTP server.
 - It shows one card per task, in Kanban columns:
