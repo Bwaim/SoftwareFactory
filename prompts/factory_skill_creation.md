@@ -23,6 +23,8 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
     - Save your work here.
 - `VERIFICATION_DIR: <PROJECT_ROOT>/verification/nextory-factory/`
     - Save your verification artifacts here.
+- `FACTORY_SOURCE: <PROJECT_ROOT>/nextory-factory/`
+    - Source of the generic factory: generic steps and pipelines. The factory reads them from here, not from the installed plugin.
 - `NEXTORY_REPO: /Users/fabienboismoreau/Documents/Projects/Nextory/Nextory_ai/nextory`
 - `TASKS_DIR: <TODO: where the task state files live at runtime>`
 
@@ -57,6 +59,7 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
   - Launch a new pipeline
   - Start the dashboard
   - Create a new pipeline: this is a special pipeline
+  - Create a new step: runs the built-in pipeline `new-step-assistant`
   - Exit: That will also turn down the dashboard.
 
 ### Factory elements
@@ -69,6 +72,7 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
   - `fix-bug`: <TODO: steps>
   - `fix-crash`: <TODO: steps>
   - `new-pipeline-assistant`: <TODO: steps>
+  - `new-step-assistant`: built-in, creates a new step
 - Adding a new pipeline needs only a new manifest file, with no change in the orchestrator.
 - A pipeline under the hood creates a task that will be followed by the dashboard.
 
@@ -82,6 +86,26 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
   - User validation: the session stops and waits for the user to approve.
   - <TODO: other steps, for example brainstorm, plan, implement, commit, create merge request, review>
 - Steps that must never be skipped are enforced by a hook or a script, not only by text. <TODO: list them>
+
+#### Step creation
+
+- The `new-step-assistant` pipeline runs as a task in a new Herdr tab, without a worktree.
+- It first asks where to save the step:
+  - Generic: in `FACTORY_SOURCE/steps/`, reusable in any repository.
+  - Local: in `.factory/steps/` of the main repository, only for this repository.
+- It asks the user:
+  - The goal of the step
+  - Its type: prompt, skill or script
+  - What it reads from and writes to the task state file
+  - Its done condition
+  - Its config keys, with a description and an optional default value
+  - If it must never be skipped
+- Before writing, it checks the existing generic and local steps. If a similar step exists, it proposes to reuse or update it.
+- It gives the step a unique lowercase id.
+- It shows the full step file to the user and writes it only after approval.
+- If the step must never be skipped, it also creates the hook or script that enforces it.
+- At the end, it lists the pipelines and asks if the new step should be added to some of them. It updates a pipeline only after approval.
+- When a local step and a generic step have the same id, the local step is used.
 
 #### Tasks
 
