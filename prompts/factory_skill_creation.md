@@ -153,7 +153,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 - The `new-step-assistant` pipeline runs as a task in the main repository, without a worktree. It starts Claude with `--add-dir <FACTORY_SOURCE>`, so it can write generic steps.
 - It first asks where to save the step:
-  - Generic: in `FACTORY_SOURCE/steps/`, reusable in any repository.
+  - Generic: in `FACTORY_SOURCE/library/steps/`, reusable in any repository.
   - Local: in `.factory/steps/` of the main repository, only for this repository.
 - It asks the user:
   - The goal of the step
@@ -265,6 +265,28 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory status`: prints the task id, the pipeline and the current step path.
   - `factory config get <step> <key>` and `factory config set <step> <key> <value>`: read and write the repository config.
   - `factory backlog list`, `factory backlog add <description> [--pipeline <id>]` and `factory backlog remove <number>`: read and change the backlog.
+
+### Versioning and migration
+
+- The factory has a data format version: one integer, starting at 1. It covers everything the factory reads and writes: the `.factory/` layout, the task state, the step and pipeline manifests, the config and the backlog.
+- `.factory/factory.yaml` stores the version of the repository data. `FACTORY_SOURCE/library/factory.yaml` stores the version of the generic library.
+- Every `factory` command checks the data version. It refuses to run when the version is different from its own.
+- A build that changes the data format increases the version by 1 and adds a migration script `migrations/<from>-to-<to>`. The builder finds the previous format in the git history of `FACTORY_SOURCE`.
+- At start, the orchestrator compares the data version with its own version:
+  - Same: it shows the menu.
+  - Older: it runs the built-in step `migrate`. The menu is shown only after the migration.
+  - Newer: it stops and tells the user to update the factory.
+- The `migrate` step:
+  - Backs up `.factory/` to `.factory.backup-<date>/`.
+  - Requires a clean git status in `FACTORY_SOURCE/library/`, so the change can be reviewed and reverted with git.
+  - Runs the migration scripts in order, on the repository data, the active tasks and the generic library.
+  - Shows a summary and the backup path.
+
+### Rebuild
+
+- Built-in steps and pipelines are in `FACTORY_SOURCE/builtin/`.
+- Steps and pipelines created by the user are in `FACTORY_SOURCE/library/`.
+- A rebuild can replace everything in `FACTORY_SOURCE` except `library/`. It changes files in `library/` only through a migration script.
 
 ### File organization
 
