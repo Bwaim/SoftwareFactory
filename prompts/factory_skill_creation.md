@@ -82,7 +82,7 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
 - The manifest contains:
   - `id`: unique lowercase id
   - `description`: one line, shown when the user builds a pipeline
-  - `type`: `prompt`, `skill` or `script`
+  - `type`: `prompt`, `skill`, `script` or `composite`
   - `reads`: task state keys the step needs
   - `writes`: task state keys the step sets
   - `done_when`: the condition that ends the step, in plain text
@@ -93,6 +93,7 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
   - `prompt`: the instructions the agent follows
   - `skill`: the skill to call and how to use its result
   - `script`: the path of the shell script to run
+  - `composite`: no body. The manifest has a `steps` list with the ids of the child steps, run in order.
 - Example:
 
 ```markdown
@@ -115,6 +116,12 @@ Run `/nextory-create-merge-request` for the task branch, targeting `config.targe
 Save the merge request URL with `factory state set mr_url <url>`.
 ```
 
+- A composite step groups existing steps. Example: `rebase-and-commit` runs `rebase`, then `commit`.
+  - Its `reads` and `writes` are computed from its child steps, not written by hand.
+  - Each child step keeps its own done check, config and `required` flag.
+  - A composite step cannot include itself, directly or through another composite step. The factory checks this when it loads the steps.
+  - The current step is shown with its full path, for example `rebase-and-commit > commit`.
+
 - A step can be used by many pipelines.
 - First steps:
   - User validation: the session stops and waits for the user to approve.
@@ -129,7 +136,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - Local: in `.factory/steps/` of the main repository, only for this repository.
 - It asks the user:
   - The goal of the step
-  - Its type: prompt, skill or script
+  - Its type: prompt, skill, script or composite. For a composite, it lists the existing steps and asks which ones to use, in order.
   - What it reads from and writes to the task state file
   - Its done condition
   - Its config keys, with a description and an optional default value
