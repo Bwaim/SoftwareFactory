@@ -167,10 +167,30 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 - they are special steps embedded by default with the factory
 
+##### Task execution
+
+- The task session runs one step at a time. It never reads the pipeline or step files directly.
+- The first prompt of a task is short: "You run factory task `<id>`. Run `factory next` and follow its instructions. When the step is done, run `factory done`. Repeat until `factory next` says the pipeline is finished."
+- A step file changed during a task applies from the next step.
+- A step with `required: true` cannot be skipped. Other steps can be skipped with `factory skip`, only after user approval.
+
 ### Orchestrator
 
 - when the factory is started, the orchestrator always displays the menu with the available actions.
 - when an action is selected, it does the action and then displays again the menu.
+
+### Factory CLI
+
+- The factory ships a `factory` CLI. It is the only way the orchestrator and the task sessions read and write `.factory/`.
+- It finds the main repository from any worktree with `git rev-parse --git-common-dir`. Task sessions in a worktree always use the `.factory/` of the main repository.
+- It finds the current task from the worktree path. A task without a worktree passes `--task <id>`.
+- It merges the generic steps and pipelines from `FACTORY_SOURCE` with the local ones. A local step or pipeline wins when the id is the same.
+- Commands:
+  - `factory next`: prints the current step instructions, with the task state keys it reads.
+  - `factory done`: runs the step `done_check` if present. If it passes, it saves the step end and prints the next step. If it fails, it prints why and stays on the step.
+  - `factory skip`: skips the current step, refused for required steps.
+  - `factory state get <key>` and `factory state set <key> <value>`: read and write the task state.
+  - `factory status`: prints the task id, the pipeline and the current step path.
 
 ### File organization
 
