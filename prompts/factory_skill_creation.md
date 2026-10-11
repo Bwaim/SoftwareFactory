@@ -360,6 +360,31 @@ library/
 migrations/          # One script per format version change
 ```
 
+### Verification
+
+- The build is verified with an automated test run. Its report goes to `VERIFICATION_DIR`.
+- Test setup, all inside `VERIFICATION_DIR`:
+  - A test git repository. Its `origin` remote is a local bare repository, so nothing is pushed to a real remote.
+  - A test factory source with an empty `library/`. The tests never change the real `FACTORY_SOURCE/library/`.
+  - `worktree_root` points inside `VERIFICATION_DIR`.
+- CLI tests, without Herdr or Claude:
+  - Init creates `.factory/` and `factory.yaml` with the version and the source, and adds the `.git/info/exclude` entries. `.gitignore` is unchanged.
+  - A local step overrides a generic step, which overrides a built-in step.
+  - Config values follow the order `with`, then `config.yaml`, then default. A missing value makes `factory next` ask for it.
+  - `next`, `done` and `skip` on a test pipeline: `done_check` passes and fails, and `skip` is refused for a required step.
+  - Composite steps: the full path is shown, `reads` and `writes` are computed, and a loop is refused.
+  - A pipeline that lists `create-worktree` but not as its first step is refused.
+  - Backlog add, list and remove.
+  - The event log contains the expected events.
+  - A command refuses data with another version. A test migration from version 1 to a fake version 2 runs and creates the backup.
+- End-to-end test with Herdr and Claude, on the test repository:
+  - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main` and the Herdr workspace, and starts Claude with the task id as its name. Claude receives the first prompt.
+  - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
+  - The test Claude session starts with a settings file that allows the `factory` commands, so it never waits on a permission prompt.
+  - Deleting the task asks for approval when there are uncommitted changes, removes the worktree and the Herdr workspace, and archives the task folder.
+- The tests close only the Herdr workspaces, tabs and panes they created.
+- At the end, the tests remove the test repository and the test source. The report stays.
+
 ## How You're Graded
 
 - You'll be graded on a continuous basis based on every completed bullet in the Definition Of Done.
