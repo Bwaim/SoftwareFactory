@@ -241,6 +241,21 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - Check that `herdr worktree remove` also stops the Claude session. If it does not, stop the session first.
 - It moves the task folder to `.factory/tasks/archive/<id>/`. It does not delete it.
 
+##### Event log
+
+- The `factory` CLI appends one JSON line per event to `.factory/tasks/<id>/events.jsonl`. Only the CLI writes this file, never the agent.
+- Each line has a timestamp, an event type, the step path and details.
+- Event types:
+  - `task_created`
+  - `step_started`
+  - `step_done`
+  - `step_skipped`
+  - `done_check_failed`, with the command output
+  - `config_asked`, with the key
+  - `migrated`, with the versions
+  - `task_deleted`
+- With the Claude session id from the task state, this log is enough to split the session transcript by step later.
+
 ##### Task execution
 
 - The task session runs one step at a time. It never reads the pipeline or step files directly.
@@ -325,6 +340,7 @@ In the main repository, never committed:
   tasks/
     <id>/
       task.json      # Task state
+      events.jsonl   # Event log, written by the factory CLI
     archive/         # Deleted tasks, kept for history
 ```
 

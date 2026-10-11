@@ -43,3 +43,4 @@ Ideas and requirements not in the current build. Move them to `factory_skill_cre
 ## Ideas
 
 - Schedule a pipeline.
+- Analyze a finished task: split the Claude transcript by step with the event log, find failed commands, retries and user corrections, and propose step improvements in the right location (generic or local).
