@@ -58,7 +58,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
   - Init the factory. When the factory is not initialized in the repository, this is the only action shown. After init, it is never shown.
   - Launch a new pipeline, from scratch or from a backlog entry
   - Delete a task: runs the built-in step `delete-task`
-  - Create a new pipeline: runs the built-in pipeline `new-pipeline-assistant`
+  - Create or edit a pipeline: opens the pipeline editor in a new Herdr pane
   - Create a new step: runs the built-in pipeline `new-step-assistant`
   - Add a backlog entry: runs the built-in step `backlog-add`
   - Remove a backlog entry: runs the built-in step `backlog-remove`
@@ -89,7 +89,7 @@ steps:
       target_branch: release
 ```
 
-- Built-in pipelines: `new-pipeline-assistant` and `new-step-assistant`. This build ships no other pipeline. The user creates them with the factory.
+- Built-in pipeline: `new-step-assistant`. This build ships no other pipeline. The user creates them with the pipeline editor.
 - Adding a new pipeline needs only a new pipeline file, with no change in the orchestrator.
 - Each pipeline run is a task.
 
@@ -99,6 +99,7 @@ steps:
 - The manifest contains:
   - `id`: unique lowercase id
   - `description`: one line, shown when the user builds a pipeline
+  - `category`: one word to group steps, for example `git`, `jira`, `gitlab`, `review`
   - `type`: `prompt`, `skill`, `script` or `composite`
   - `reads`: task state keys the step needs
   - `writes`: task state keys the step sets
@@ -117,6 +118,7 @@ steps:
 ---
 id: create-merge-request
 description: Create a GitLab merge request for the task branch
+category: gitlab
 type: skill
 reads: [branch, jira_ticket]
 writes: [mr_url]
@@ -146,13 +148,14 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 #### Step creation
 
-- The `new-step-assistant` pipeline runs as a task in the main repository, without a worktree. It starts Claude with `--add-dir <FACTORY_SOURCE>`, so it can write generic steps.
+- The `new-step-assistant` pipeline runs as a task in the main repository, without a worktree. It starts Claude with `--add-dir <source>`, so it can write generic steps.
 - It first asks where to save the step:
-  - Generic: in `FACTORY_SOURCE/library/steps/`, reusable in any repository.
+  - Generic: in `<source>/library/steps/`, reusable in any repository.
   - Local: in `.factory/steps/` of the main repository, only for this repository.
 - It asks the user:
   - The goal of the step
   - Its type: prompt, skill, script or composite. For a composite, it lists the existing steps and asks which ones to use, in order.
+  - Its category. It shows the existing categories first, so the user reuses one when it fits.
   - What it reads from and writes to the task state file
   - Its done condition
   - Its config keys, with a description and an optional default value
@@ -174,6 +177,31 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - `factory next` prints the resolved config values with the step instructions.
 - No secrets in config files. Tokens stay in the tools' own configuration.
 
+#### Pipeline editor
+
+- Pipelines are created and changed with an interactive terminal editor: `factory pipeline edit [<id>]`. It does not use Claude.
+- The orchestrator opens it in a new Herdr pane with `herdr pane split` and `herdr pane run`, because a Claude session cannot run an interactive program.
+- It is written in Python with the standard `curses` module, so it needs no install.
+- Start options:
+  - Create an empty pipeline
+  - Copy an existing pipeline as a starting point
+  - Edit an existing pipeline
+- It shows the pipeline steps on one side and the available steps on the other. Keyboard actions:
+  - Add, remove and reorder steps
+  - Edit the `with` values of a step
+  - Edit the id, the description and the inputs
+  - Filter the available steps by category or by text
+  - Reload the available steps, to see a step created in another task
+- Each available step shows its id, category, description and level: local, generic or built-in.
+- It runs the pipeline checks live and shows the problems:
+  - Error: `create-worktree` is listed, but not as the first step
+  - Error: a step id does not exist
+  - Warning: a `reads` key is not a pipeline input and is not written by an earlier step
+  - Warning: a generic pipeline uses a local step
+- It can save with warnings, never with errors.
+- On save, it asks where to save: generic in `<source>/library/pipelines/`, or local in `.factory/pipelines/`. When the user edits a generic pipeline, they can save a local override instead.
+- If a needed step does not exist, the user creates it with "Create a new step" from the orchestrator, then reloads the list in the editor.
+
 #### Tasks
 
 ##### Task properties
@@ -186,7 +214,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - The current step path.
 - A status: `active` while the pipeline runs, `finished` when the last step is done.
 - An optional branch name.
-- An optional worktree path. It is empty for the two assistant pipelines.
+- An optional worktree path. It is empty for `new-step-assistant`.
 - The Claude session id.
 - The creation and last update dates.
 
@@ -196,7 +224,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - It asks the user for a short description and for the pipeline `inputs`.
 - It builds the task id from the description: lowercase, matching `[a-z][a-z0-9_-]{0,31}`, unique among the tasks. The id never changes.
 - The same id is used for the task folder, the Herdr agent name and the Claude session name.
-- It runs the `create-worktree` step. For the built-in pipelines `new-step-assistant` and `new-pipeline-assistant`, it creates a Herdr tab in the main repository instead.
+- It runs the `create-worktree` step. For the built-in pipeline `new-step-assistant`, it creates a Herdr tab in the main repository instead.
 - It starts Claude in the task pane with `herdr agent start <id> --kind claude --pane <pane_id> -- --name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json`. The pane id is read from the JSON response, never guessed.
 - It creates the task folder and the task state file, with the inputs.
 - It sends the first prompt with `herdr agent prompt` (see Task execution).
@@ -204,7 +232,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 ##### Worktree creation
 
-- Every task runs in its own worktree, except the built-in pipelines `new-step-assistant` and `new-pipeline-assistant`. They change only factory files, so they run in the main repository.
+- Every task runs in its own worktree, except the built-in pipeline `new-step-assistant`. It changes only factory files, so it runs in the main repository.
 - To explore without a branch, the user starts a Claude session manually, outside the factory.
 - Every other pipeline starts with the built-in step `create-worktree`. The factory adds it when the pipeline does not list it.
 - A pipeline lists `create-worktree` only to set `with` values, and only as its first step. The factory refuses a pipeline that lists it anywhere else.
@@ -297,6 +325,8 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory status`: prints the task id, the pipeline and the current step path.
   - `factory config get <step> <key>` and `factory config set <step> <key> <value>`: read and write the repository config.
   - `factory backlog list`, `factory backlog add <description> [--pipeline <id>]` and `factory backlog remove <number>`: read and change the backlog.
+  - `factory pipeline edit [<id>]`: opens the pipeline editor.
+  - `factory pipeline check <id>`: runs the pipeline checks and prints the errors and warnings.
 
 ### Versioning and migration
 
@@ -369,6 +399,8 @@ migrations/          # One script per format version change
   - Backlog add, list and remove.
   - The event log contains the expected events.
   - A command refuses data with another version. A test migration from version 1 to a fake version 2 runs and creates the backup.
+  - `factory pipeline check` reports each error and warning type on test pipelines.
+  - The pipeline editor load, copy, check and save functions are tested without the screen.
 - End-to-end test with Herdr and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main` and the Herdr workspace, and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
