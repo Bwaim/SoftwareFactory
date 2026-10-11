@@ -331,7 +331,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 ### Versioning and migration
 
 - The factory has a data format version: one integer, starting at 1. It covers everything the factory reads and writes: the `.factory/` layout, the task state, the step and pipeline manifests, the config and the backlog.
-- `.factory/factory.yaml` stores the version of the repository data. `FACTORY_SOURCE/library/factory.yaml` stores the version of the generic library.
+- `.factory/factory.yaml` stores the version of the repository data. `<source>/library/factory.yaml` stores the version of the generic library.
 - Every `factory` command checks the data version. It refuses to run when the version is different from its own.
 - A build that changes the data format increases the version by 1 and adds a migration script `migrations/<from>-to-<to>`. The builder finds the previous format in the git history of `FACTORY_SOURCE`.
 - At start, the orchestrator compares the data version with its own version:
@@ -340,7 +340,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - Newer: it stops and tells the user to update the factory.
 - The `migrate` step:
   - Backs up `.factory/` to `.factory.backup-<date>/`.
-  - Requires a clean git status in `FACTORY_SOURCE/library/`, so the change can be reviewed and reverted with git.
+  - Requires a clean git status in `<source>/library/`, so the change can be reviewed and reverted with git.
   - Runs the migration scripts in order, on the repository data, the active tasks and the generic library.
   - Shows a summary and the backup path.
 
