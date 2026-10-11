@@ -55,6 +55,7 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
 - It can do the following actions:
   - Init the factory. When the factory is not initialized in the repository, this is the only action shown. After init, it is never shown.
   - Launch a new pipeline, from scratch or from a backlog entry
+  - Delete a task: runs the built-in step `delete-task`
   - Create a new pipeline: runs the built-in pipeline `new-pipeline-assistant`
   - Create a new step: runs the built-in pipeline `new-step-assistant`
   - Add a backlog entry: runs the built-in step `backlog-add`
@@ -226,6 +227,20 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - It creates the worktree and a Herdr workspace with `herdr worktree create --branch <branch> --base origin/<base_ref> --path <worktree_root>/<id>`.
 - Check that `herdr worktree create` supports a detached worktree. If it does not, use `git worktree add --detach`, then `herdr worktree open --path`.
 
+##### Task delete
+
+- The built-in step `delete-task` runs in the orchestrator session.
+- It lists the tasks and the user selects one.
+- It shows what it will remove: the Claude session, the Herdr workspace or tab, the worktree and the local branch.
+- It checks the worktree:
+  - Uncommitted changes
+  - Commits not pushed to `origin`
+- If there are any, it shows them and continues only after explicit user approval.
+- It deletes the local branch only if it is pushed or merged. It never deletes a remote branch.
+- It removes the worktree and its Herdr workspace with `herdr worktree remove --workspace <id>`. For a task without a worktree, it closes its Herdr tab.
+- Check that `herdr worktree remove` also stops the Claude session. If it does not, stop the session first.
+- It moves the task folder to `.factory/tasks/archive/<id>/`. It does not delete it.
+
 ##### Task execution
 
 - The task session runs one step at a time. It never reads the pipeline or step files directly.
@@ -310,6 +325,7 @@ In the main repository, never committed:
   tasks/
     <id>/
       task.json      # Task state
+    archive/         # Deleted tasks, kept for history
 ```
 
 In `FACTORY_SOURCE`:
