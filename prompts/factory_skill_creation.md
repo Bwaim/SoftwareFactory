@@ -47,7 +47,9 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 
 - The orchestrator is a Claude session started inside a Herdr pane (`HERDR_ENV=1`).
 - If it is not running inside Herdr, it says so and stops.
-- The `herdr` commands it needs are documented, so the user can add them to the Bash allowlist.
+- The `factory` command can be called by name in every Claude session the factory starts, in the main repository and in worktrees. Init makes this work, for example with a link in `~/.local/bin`.
+- Init writes `.factory/claude-settings.json` with allow rules for the `factory` commands. Every task session starts with `--settings <main repository>/.factory/claude-settings.json`, so it never asks for permission on a `factory` command.
+- The README lists the `herdr`, `git` and `factory` commands the orchestrator uses, so the user can add them to the Bash allowlist.
 
 ### General concept
 
@@ -195,7 +197,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - It builds the task id from the description: lowercase, matching `[a-z][a-z0-9_-]{0,31}`, unique among the tasks. The id never changes.
 - The same id is used for the task folder, the Herdr agent name and the Claude session name.
 - It runs the `create-worktree` step. For the built-in pipelines `new-step-assistant` and `new-pipeline-assistant`, it creates a Herdr tab in the main repository instead.
-- It starts Claude in the task pane with `herdr agent start <id> --kind claude --pane <pane_id> -- --name <id> --session-id <uuid>`. The pane id is read from the JSON response, never guessed.
+- It starts Claude in the task pane with `herdr agent start <id> --kind claude --pane <pane_id> -- --name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json`. The pane id is read from the JSON response, never guessed.
 - It creates the task folder and the task state file, with the inputs.
 - It sends the first prompt with `herdr agent prompt` (see Task execution).
 - The orchestrator goes back to its menu without waiting for the task.
@@ -326,6 +328,7 @@ In the main repository, never committed:
 .factory/
   factory.yaml       # Data format version and factory source path
   config.yaml        # Step config values for this repository
+  claude-settings.json  # Permission rules for task sessions
   backlog.md         # Tasks not started yet
   pipelines/         # Local pipelines, one <id>.yaml file each
   steps/             # Local steps, one <id>.md file each
@@ -369,7 +372,7 @@ migrations/          # One script per format version change
 - End-to-end test with Herdr and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main` and the Herdr workspace, and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
-  - The test Claude session starts with a settings file that allows the `factory` commands, so it never waits on a permission prompt.
+  - The test Claude session starts with `.factory/claude-settings.json` and never waits on a permission prompt.
   - Deleting the task asks for approval when there are uncommitted changes, removes the worktree and the Herdr workspace, and archives the task folder.
 - The tests close only the Herdr workspaces, tabs and panes they created.
 - At the end, the tests remove the test repository and the test source. The report stays.
