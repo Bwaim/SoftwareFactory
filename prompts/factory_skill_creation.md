@@ -25,8 +25,6 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
     - Save your verification artifacts here.
 - `FACTORY_SOURCE: <PROJECT_ROOT>/nextory-factory/`
     - Source of the generic factory: generic steps and pipelines. The factory reads them from here, not from the installed plugin.
-- `NEXTORY_REPO: /Users/fabienboismoreau/Documents/Projects/Nextory/Nextory_ai/nextory`
-- `TASKS_DIR: <TODO: where the task state files live at runtime>`
 
 ## Workflow
 
@@ -251,6 +249,16 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - The menu is a numbered text list. The user answers with a number. Do not use the `AskUserQuestion` tool for the menu, because it allows at most 4 options.
 - When an action is done, the orchestrator shows the menu again.
 
+### Init
+
+- Init checks the prerequisites and reports each one as OK or failing with the fix:
+  - Running inside Herdr
+  - The current folder is a git repository with an `origin` remote
+  - `FACTORY_SOURCE` exists
+- It creates `.factory/` with its files and empty folders (see File organization). It never overwrites an existing file.
+- It adds `.factory/` and `.factory.backup-*/` to `.git/info/exclude`. It never changes `.gitignore`, because the repository can be shared.
+- It ends with the backlog import (see Backlog).
+
 ### Factory CLI
 
 - The factory ships a `factory` CLI. It is the only way the orchestrator and the task sessions read and write `.factory/`.
@@ -290,11 +298,32 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 ### File organization
 
+In the main repository, never committed:
+
+```
 .factory/
-  pipelines/       # One manifest file by pipelines available
-  steps/           # One manifest file by steps available
-  tasks/           # One folder by started tasks, each folder contains at least one <TASK_ID>.json for the properties of the task
-  backlog.md       # Queue of not started tasks
+  factory.yaml       # Data format version
+  config.yaml        # Step config values for this repository
+  backlog.md         # Tasks not started yet
+  pipelines/         # Local pipelines, one <id>.yaml file each
+  steps/             # Local steps, one <id>.md file each
+  tasks/
+    <id>/
+      task.json      # Task state
+```
+
+In `FACTORY_SOURCE`:
+
+```
+builtin/
+  pipelines/         # Built-in pipelines
+  steps/             # Built-in steps
+library/
+  factory.yaml       # Data format version of the library
+  pipelines/         # Generic pipelines created by the user
+  steps/             # Generic steps created by the user
+migrations/          # One script per format version change
+```
 
 ## How You're Graded
 
