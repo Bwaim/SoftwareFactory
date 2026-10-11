@@ -45,11 +45,10 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 
 ### Runtime
 
-- The orchestrator is a Claude session started inside a Herdr pane (`HERDR_ENV=1`).
-- If it is not running inside Herdr, it says so and stops.
+- The orchestrator is a Claude session started inside the configured terminal. At start, it runs `factory terminal check`. If the check fails, it says why and stops.
 - The `factory` command can be called by name in every Claude session the factory starts, in the main repository and in worktrees. Init makes this work, for example with a link in `~/.local/bin`.
 - Init writes `.factory/claude-settings.json` with allow rules for the `factory` commands. Every task session starts with `--settings <main repository>/.factory/claude-settings.json`, so it never asks for permission on a `factory` command.
-- The README lists the `herdr`, `git` and `factory` commands the orchestrator uses, so the user can add them to the Bash allowlist.
+- The README lists the `git` and `factory` commands, and the commands of each adapter, so the user can add them to the Bash allowlist.
 
 ### General concept
 
@@ -58,7 +57,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
   - Init the factory. When the factory is not initialized in the repository, this is the only action shown. After init, it is never shown.
   - Launch a new pipeline, from scratch or from a backlog entry
   - Delete a task: runs the built-in step `delete-task`
-  - Create or edit a pipeline: opens the pipeline editor in a new Herdr pane
+  - Create or edit a pipeline: opens the pipeline editor next to the orchestrator
   - Create a new step: runs the built-in pipeline `new-step-assistant`
   - Add a backlog entry: runs the built-in step `backlog-add`
   - Remove a backlog entry: runs the built-in step `backlog-remove`
@@ -180,7 +179,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 #### Pipeline editor
 
 - Pipelines are created and changed with an interactive terminal editor: `factory pipeline edit [<id>]`. It does not use Claude.
-- The orchestrator opens it in a new Herdr pane with `herdr pane split` and `herdr pane run`, because a Claude session cannot run an interactive program.
+- The orchestrator opens it with `factory terminal run`, because a Claude session cannot run an interactive program.
 - It is written in Python with the standard `curses` module, so it needs no install.
 - Start options:
   - Create an empty pipeline
@@ -216,6 +215,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - An optional branch name.
 - An optional worktree path. It is empty for `new-step-assistant`.
 - The Claude session id.
+- The terminal handle returned by the terminal adapter.
 - The creation and last update dates.
 
 ##### Task launch
@@ -223,11 +223,11 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - Launching a pipeline runs the built-in step `create-task` in the orchestrator session.
 - It asks the user for a short description and for the pipeline `inputs`.
 - It builds the task id from the description: lowercase, matching `[a-z][a-z0-9_-]{0,31}`, unique among the tasks. The id never changes.
-- The same id is used for the task folder, the Herdr agent name and the Claude session name.
-- It runs the `create-worktree` step. For the built-in pipeline `new-step-assistant`, it creates a Herdr tab in the main repository instead.
-- It starts Claude in the task pane with `herdr agent start <id> --kind claude --pane <pane_id> -- --name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json`. The pane id is read from the JSON response, never guessed.
-- It creates the task folder and the task state file, with the inputs.
-- It sends the first prompt with `herdr agent prompt` (see Task execution).
+- The same id is used for the task folder, the terminal name and the Claude session name.
+- It runs the `create-worktree` step. The built-in pipeline `new-step-assistant` runs in the main repository instead.
+- It creates the task folder and the task state file, with the inputs, before the session starts.
+- It starts the task session with `factory terminal start-session`, in the worktree or in the main repository. Claude starts with `--name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json` and receives the first prompt (see Task execution).
+- It saves the terminal handle in the task state.
 - The orchestrator goes back to its menu without waiting for the task.
 
 ##### Worktree creation
@@ -243,21 +243,21 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - It always runs `git fetch origin <base_ref>` first, so the worktree starts from the latest version. It never changes the local `<base_ref>` branch. If the fetch fails, it stops and asks the user.
 - If the pipeline has an input named `branch`, the worktree is created on that new branch, from `origin/<base_ref>`.
 - Otherwise, the worktree starts in detached HEAD on `origin/<base_ref>`. A later step creates the branch with `git switch -c <name>` and saves it with `factory state set branch <name>`.
-- It creates the worktree and a Herdr workspace with `herdr worktree create --branch <branch> --base origin/<base_ref> --path <worktree_root>/<id>`.
-- Check that `herdr worktree create` supports a detached worktree. If it does not, use `git worktree add --detach`, then `herdr worktree open --path`.
+- It creates the worktree with git only:
+  - With a branch: `git worktree add -b <branch> <worktree_root>/<id> origin/<base_ref>`
+  - Without a branch: `git worktree add --detach <worktree_root>/<id> origin/<base_ref>`
 
 ##### Task delete
 
 - The built-in step `delete-task` runs in the orchestrator session.
 - It lists the tasks and the user selects one.
-- It shows what it will remove: the Claude session, the Herdr workspace or tab, the worktree and the local branch.
+- It shows what it will remove: the Claude session, its terminal, the worktree and the local branch.
 - It checks the worktree:
   - Uncommitted changes
   - Commits not pushed to `origin`
 - If there are any, it shows them and continues only after explicit user approval.
 - It deletes the local branch only if it is pushed or merged. It never deletes a remote branch.
-- It removes the worktree and its Herdr workspace with `herdr worktree remove --workspace <id>`. For a task without a worktree, it closes its Herdr tab.
-- Check that `herdr worktree remove` also stops the Claude session. If it does not, stop the session first.
+- It closes the task terminal with `factory terminal close`, then removes the worktree with `git worktree remove`.
 - It moves the task folder to `.factory/tasks/archive/<id>/`. It does not delete it.
 
 ##### Event log
@@ -301,8 +301,9 @@ Save the merge request URL with `factory state set mr_url <url>`.
 ### Init
 
 - Init checks the prerequisites and reports each one as OK or failing with the fix:
-  - Running inside Herdr
+  - The terminal adapter check passes
   - The current folder is a git repository with an `origin` remote
+- It saves the terminal as `terminal` in `.factory/factory.yaml`. This build has only the `herdr` adapter, so Init selects it without asking.
 - It asks for the path of the factory source, with `FACTORY_SOURCE` as the default, and saves it as `source` in `.factory/factory.yaml`. It checks that `<source>/library/` exists.
 - It creates `.factory/` with its files and empty folders (see File organization). It never overwrites an existing file.
 - It adds `.factory/` and `.factory.backup-*/` to `.git/info/exclude`. It never changes `.gitignore`, because the repository can be shared.
@@ -327,6 +328,30 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory backlog list`, `factory backlog add <description> [--pipeline <id>]` and `factory backlog remove <number>`: read and change the backlog.
   - `factory pipeline edit [<id>]`: opens the pipeline editor.
   - `factory pipeline check <id>`: runs the pipeline checks and prints the errors and warnings.
+
+### Terminal adapter
+
+- The factory never calls a terminal tool directly. All terminal actions go through `factory terminal` commands, which call the adapter configured in `.factory/factory.yaml`.
+- Adding a terminal means adding one adapter, with no change in the steps or the orchestrator.
+- An adapter implements:
+  - `check`: checks that the terminal is available, and gives the fix if not
+  - `start-session <name> <cwd> <prompt> -- <claude args>`: opens a new terminal in `cwd`, starts Claude with the args and the first prompt, and returns a handle
+  - `run <cwd> <command>`: opens a terminal next to the caller for an interactive program, like the pipeline editor
+  - `close <handle>`: stops the Claude session and closes its terminal
+  - Optional: `send-prompt <handle> <text>` and `focus <handle>`. An adapter that does not support them says so, and the factory hides the actions that need them.
+- This build ships one adapter: `herdr`.
+
+#### Herdr adapter
+
+- `check`: `HERDR_ENV=1`.
+- `start-session`:
+  - In a worktree: `herdr worktree open --path <cwd>`. In the main repository: `herdr tab create`.
+  - Then `herdr agent start <name> --kind claude --pane <pane_id> -- <claude args>`, then `herdr agent prompt <name> <prompt>`.
+  - The pane id is read from the JSON response, never guessed.
+  - The handle is the Herdr agent name and the workspace or tab id.
+- `run`: `herdr pane split`, then `herdr pane run`.
+- `close`: closes the workspace or the tab. Check that this also stops the Claude process. If it does not, stop it first.
+- `send-prompt`: `herdr agent prompt`. `focus`: `herdr agent focus`.
 
 ### Versioning and migration
 
@@ -356,7 +381,7 @@ In the main repository, never committed:
 
 ```
 .factory/
-  factory.yaml       # Data format version and factory source path
+  factory.yaml       # Data format version, factory source path and terminal
   config.yaml        # Step config values for this repository
   claude-settings.json  # Permission rules for task sessions
   backlog.md         # Tasks not started yet
@@ -401,11 +426,12 @@ migrations/          # One script per format version change
   - A command refuses data with another version. A test migration from version 1 to a fake version 2 runs and creates the backup.
   - `factory pipeline check` reports each error and warning type on test pipelines.
   - The pipeline editor load, copy, check and save functions are tested without the screen.
-- End-to-end test with Herdr and Claude, on the test repository:
-  - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main` and the Herdr workspace, and starts Claude with the task id as its name. Claude receives the first prompt.
+  - With a fake test adapter that records its calls, launch and delete call only the adapter, never `herdr` directly.
+- End-to-end test with the Herdr adapter and Claude, on the test repository:
+  - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
   - The test Claude session starts with `.factory/claude-settings.json` and never waits on a permission prompt.
-  - Deleting the task asks for approval when there are uncommitted changes, removes the worktree and the Herdr workspace, and archives the task folder.
+  - Deleting the task asks for approval when there are uncommitted changes, closes the task terminal, removes the worktree and archives the task folder.
 - The tests close only the Herdr workspaces, tabs and panes they created.
 - At the end, the tests remove the test repository and the test source. The report stays.
 
