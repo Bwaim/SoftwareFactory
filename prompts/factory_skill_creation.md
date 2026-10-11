@@ -24,7 +24,7 @@ A local dashboard shows all tasks as a Kanban board and lets me act on each task
 - `VERIFICATION_DIR: <PROJECT_ROOT>/verification/nextory-factory/`
     - Save your verification artifacts here.
 - `FACTORY_SOURCE: <PROJECT_ROOT>/nextory-factory/`
-    - Source of the generic factory: generic steps and pipelines. The factory reads them from here, not from the installed plugin.
+    - Source of the factory. At runtime, the factory reads the generic library from `<FACTORY_SOURCE>/library/`, never from the installed plugin.
 
 ## Workflow
 
@@ -284,7 +284,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - Init checks the prerequisites and reports each one as OK or failing with the fix:
   - Running inside Herdr
   - The current folder is a git repository with an `origin` remote
-  - `FACTORY_SOURCE` exists
+- It asks for the path of the factory source, with `FACTORY_SOURCE` as the default, and saves it as `source` in `.factory/factory.yaml`. It checks that `<source>/library/` exists.
 - It creates `.factory/` with its files and empty folders (see File organization). It never overwrites an existing file.
 - It adds `.factory/` and `.factory.backup-*/` to `.git/info/exclude`. It never changes `.gitignore`, because the repository can be shared.
 - It ends with the backlog import (see Backlog).
@@ -294,7 +294,10 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - The factory ships a `factory` CLI. It is the only way the orchestrator and the task sessions read and write `.factory/`.
 - It finds the main repository from any worktree with `git rev-parse --git-common-dir`. Task sessions in a worktree always use the `.factory/` of the main repository.
 - It finds the current task from the worktree path. A task without a worktree passes `--task <id>`.
-- It merges the generic steps and pipelines from `FACTORY_SOURCE` with the local ones. A local step or pipeline wins when the id is the same.
+- It merges steps and pipelines from three levels. When two have the same id, the first level wins:
+  1. Local: `.factory/` of the main repository
+  2. Generic: `<source>/library/`, with `source` read from `.factory/factory.yaml`
+  3. Built-in: read from the installed plugin, next to the CLI, so they always match the CLI version
 - Commands:
   - `factory next`: prints the current step instructions, with the task state keys it reads.
   - `factory done`: runs the step `done_check` if present. If it passes, it saves the step end and prints the next step. If it fails, it prints why and stays on the step.
@@ -332,7 +335,7 @@ In the main repository, never committed:
 
 ```
 .factory/
-  factory.yaml       # Data format version
+  factory.yaml       # Data format version and factory source path
   config.yaml        # Step config values for this repository
   backlog.md         # Tasks not started yet
   pipelines/         # Local pipelines, one <id>.yaml file each
