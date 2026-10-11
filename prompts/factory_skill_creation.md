@@ -10,7 +10,7 @@ When many tasks run in parallel, I have no single view to follow them and act on
 
 Create a software factory skill. It starts each task in its own worktree, Herdr tab and named Claude session.
 Each type of task is a pipeline. A pipeline is an ordered list of reusable steps.
-A local dashboard shows all tasks as a Kanban board and lets me act on each task.
+Later, a local dashboard will show all tasks as a Kanban board. It is not part of this build.
 
 ## Variables
 
@@ -87,14 +87,9 @@ steps:
       target_branch: release
 ```
 
-- First pipelines (examples):
-  - `new-feature`: <TODO: steps>
-  - `fix-bug`: <TODO: steps>
-  - `fix-crash`: <TODO: steps>
-  - `new-pipeline-assistant`: <TODO: steps>
-  - `new-step-assistant`: built-in, creates a new step
-- Adding a new pipeline needs only a new manifest file, with no change in the orchestrator.
-- A pipeline under the hood creates a task that will be followed by the dashboard.
+- Built-in pipelines: `new-pipeline-assistant` and `new-step-assistant`. This build ships no other pipeline. The user creates them with the factory.
+- Adding a new pipeline needs only a new pipeline file, with no change in the orchestrator.
+- Each pipeline run is a task.
 
 #### Steps
 
@@ -143,10 +138,9 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - The current step is shown with its full path, for example `rebase-and-commit > commit`.
 
 - A step can be used by many pipelines.
-- First steps:
-  - User validation: the session stops and waits for the user to approve.
-  - <TODO: other steps, for example brainstorm, plan, implement, commit, create merge request, review>
-- Steps that must never be skipped are enforced by a hook or a script, not only by text. <TODO: list them>
+- Built-in steps: `create-task`, `create-worktree`, `delete-task`, `backlog-add`, `backlog-remove`, `migrate` and `user-validation`.
+- `user-validation`: the session stops and waits for the user to approve.
+- Required steps are enforced by the factory CLI: `factory skip` refuses them, and `factory done` runs their `done_check`.
 
 #### Step creation
 
@@ -164,7 +158,6 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - Before writing, it checks the existing generic and local steps. If a similar step exists, it proposes to reuse or update it.
 - It gives the step a unique lowercase id.
 - It shows the full step file to the user and writes it only after approval.
-- If the step must never be skipped, it also creates the hook or script that enforces it.
 - At the end, it lists the pipelines and asks if the new step should be added to some of them. It updates a pipeline only after approval.
 - When a local step and a generic step have the same id, the local step is used.
 
@@ -183,21 +176,17 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 ##### Task properties
 
-- a fixed id, created at launch.
-- an optional Jira ticket key, set when a ticket is assigned.
-- a short description.
-- an optional branch name.
-- a Claude session id.
-- the type of pipeline that launched it.
-- the step id from the pipeline.
-- the worktree path.
-- a list of actions that could be launched from the dashboard. An action will be a step.
-- Creation and last update dates
-- The status is updated by Claude Code hooks (`Stop`, `Notification`), not only by instructions in the step files.
-
-##### Task creation / delete
-
-- Task creation and task delete are built-in steps shipped with the factory.
+- A fixed id, created at launch.
+- An optional Jira ticket key, set when a ticket is assigned.
+- A short description.
+- The pipeline id.
+- The pipeline inputs.
+- The current step path.
+- A status: `active` while the pipeline runs, `finished` when the last step is done.
+- An optional branch name.
+- An optional worktree path. It is empty for the two assistant pipelines.
+- The Claude session id.
+- The creation and last update dates.
 
 ##### Task launch
 
