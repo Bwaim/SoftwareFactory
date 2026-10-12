@@ -1,2 +1,517 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Software factory</title></head><body></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Software factory</title>
+<style>
+:root { --bg: #fafafa; --fg: #1d1d1f; --muted: #6e6e73; --line: #d2d2d7; --err: #c62828; --warn: #b26a00; --accent: #0a62c9; --panel: #ffffff;
+  --active: #e3f4e4; --blocked: #fde4e4; --awaiting_approval: #fff1cc; --waiting_external: #e0edff; --paused: #e8e8ec; --finished: #f4f4f6; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161618; --fg: #f2f2f7; --muted: #a1a1a6; --line: #3a3a3c; --err: #ff6b6b; --warn: #ffb74d; --accent: #64a8ff; --panel: #1f1f22;
+  --active: #1f3a22; --blocked: #4a2323; --awaiting_approval: #47391a; --waiting_external: #1d3350; --paused: #2e2e32; --finished: #232326; } }
+body { margin: 0; font: 14px/1.4 -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+[hidden] { display: none !important; }
+header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+header .grow { flex: 1; }
+main { padding: 16px; }
+input, select, button, textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+textarea { width: 100%; box-sizing: border-box; min-height: 70px; }
+button { cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+button.danger { color: var(--err); border-color: var(--err); }
+button.tab.on { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+button.toggle.off { opacity: 0.5; text-decoration: line-through; }
+a, .link { color: var(--accent); cursor: pointer; }
+.muted { color: var(--muted); font-size: 12px; }
+#error { display: none; background: var(--err); color: white; padding: 8px 16px; }
+#banner { background: var(--warn); color: white; padding: 8px 16px; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; }
+.column { flex: 0 0 280px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; min-height: 120px; }
+.column h3 { margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 6px 0; background: var(--panel); word-break: break-word; }
+.card.s-active { background: var(--active); }
+.card.s-blocked { background: var(--blocked); }
+.card.s-awaiting_approval { background: var(--awaiting_approval); }
+.card.s-waiting_external { background: var(--waiting_external); }
+.card.s-paused { background: var(--paused); }
+.card.s-finished { background: var(--finished); }
+.card .title { font-weight: 600; margin: 2px 0; }
+.card.backlog { cursor: grab; }
+.card.dragging { opacity: 0.4; }
+.card.dropbefore { border-top: 3px solid var(--accent); }
+.card.dropafter { border-bottom: 3px solid var(--accent); }
+.status { margin: 4px 0; }
+.gone { display: inline-block; border: 1px solid var(--err); color: var(--err); border-radius: 10px; padding: 0 8px; font-size: 12px; font-weight: 600; margin: 2px 0; }
+.buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.artifacts { margin: 4px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.check { margin: 6px 0; font-size: 13px; }
+#modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 10; }
+#modal .box { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 16px; width: min(720px, 92vw); max-height: 86vh; overflow: auto; box-sizing: border-box; }
+#modal h3 { margin: 0 0 10px; }
+pre { white-space: pre-wrap; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--panel); margin: 8px 0; }
+.field { display: grid; grid-template-columns: 130px 1fr; gap: 8px; margin: 6px 0; align-items: start; }
+.field input, .field select { width: 100%; box-sizing: border-box; }
+.row { display: flex; gap: 6px; margin: 4px 0; align-items: center; flex-wrap: wrap; }
+.report { border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin: 8px 0; background: var(--panel); }
+.report .bad { color: var(--err); }
+.report .good { color: var(--active); }
+.footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div id="error"></div>
+<div id="banner" hidden></div>
+<header>
+  <strong>Software factory</strong>
+  <button class="tab" id="tab-tasks">Tasks</button>
+  <button class="tab" id="tab-backlog">Backlog</button>
+  <span class="grow"></span>
+  <span id="updated" class="muted"></span>
+</header>
+<main id="main"></main>
+<div id="modal" hidden></div>
+<script>
+const TOKEN = new URLSearchParams(location.search).get("token");
+const REFRESH_MS = 5000;
+const JOB_POLL_MS = 1000;
+const HIDDEN_KEY = "factory.hiddenColumns";
+const ICONS = { active: "▶", blocked: "⛔", awaiting_approval: "✋", waiting_external: "⏳", paused: "⏸", finished: "✓" };
+const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
+const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), dragging: false, dragId: null };
+const byId = (id) => document.getElementById(id);
+
+async function api(path, body, quiet) {
+  const opts = { headers: { "X-Factory-Token": TOKEN } };
+  if (body !== undefined) { opts.method = "POST"; opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+  let data;
+  try {
+    const r = await fetch(path, opts);
+    data = await r.json();
+    if (!r.ok) throw new Error(data.error || r.statusText);
+  } catch (e) {
+    showError(e.message);
+    throw e;
+  }
+  if (!quiet) hideError();
+  return data;
+}
+function showError(text) { const e = byId("error"); e.textContent = text; e.style.display = "block"; }
+function hideError() { byId("error").style.display = "none"; }
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === false || v === null || v === undefined) continue;
+    if (k.startsWith("on")) node.addEventListener(k.slice(2), v); else node.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of children) node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return node;
+}
+function clear(node) { node.replaceChildren(); return node; }
+function loadHidden() {
+  try { const v = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+function saveHidden() {
+  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(state.hidden)); } catch (e) {}
+}
+function modalOpen() { return !byId("modal").hidden; }
+function closeModal() { const m = byId("modal"); m.hidden = true; clear(m); }
+function openModal(title, ...content) {
+  const m = clear(byId("modal"));
+  m.append(el("div", { class: "box" }, el("h3", {}, title), ...content));
+  m.hidden = false;
+  return m;
+}
+function closeButton(label = "Close") { return el("button", { onclick: closeModal }, label); }
+function button(label, onclick, opts = {}) {
+  const b = el("button", { class: opts.cls || "", disabled: !!opts.disabled, title: opts.disabled && opts.hint ? opts.hint : null }, label);
+  b.addEventListener("click", async () => {
+    b.disabled = true;
+    try { await onclick(); } catch (e) {}
+    if (b.isConnected) b.disabled = !!opts.disabled;
+  });
+  return b;
+}
+function action(fn) { return async () => { await fn(); await refresh(true); }; }
+function field(label, node) { return el("div", { class: "field" }, el("label", {}, label), node); }
+function ago(iso) {
+  const ms = Date.now() - Date.parse(iso);
+  if (!iso || isNaN(ms)) return "";
+  const min = Math.max(0, Math.floor(ms / 60000));
+  if (min < 1) return "less than 1 min";
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  return h < 48 ? `${h} h` : `${Math.floor(h / 24)} d`;
+}
+function adapterDown() { return !state.info.adapter.ok; }
+function can(cap) { return state.info.adapter.ok && state.info.capabilities.includes(cap); }
+
+async function refresh(force) {
+  if (!force && (state.dragging || modalOpen())) return;
+  try {
+    const [info, tasks, backlog] = await Promise.all([api("/api/info", undefined, true), api("/api/tasks", undefined, true), api("/api/backlog", undefined, true)]);
+    Object.assign(state, { info, tasks, backlog });
+  } catch (e) { return; }
+  if (modalOpen() || state.dragging) return;
+  render();
+}
+function render() {
+  const banner = byId("banner");
+  banner.hidden = !adapterDown();
+  banner.textContent = adapterDown() ? state.info.adapter.message : "";
+  byId("tab-tasks").classList.toggle("on", state.view === "tasks");
+  byId("tab-backlog").classList.toggle("on", state.view === "backlog");
+  byId("updated").textContent = "Updated " + new Date().toLocaleTimeString();
+  const main = clear(byId("main"));
+  main.append(state.view === "tasks" ? tasksView() : backlogView());
+}
+
+function allColumns() { return [...state.info.columns, "Done"]; }
+function columnOf(t) {
+  if (t.status === "finished") return "Done";
+  return state.info.columns.includes(t.column) ? t.column : state.info.columns[0];
+}
+function tasksView() {
+  const root = el("div");
+  const toolbar = el("div", { class: "toolbar" });
+  toolbar.append(button("Launch", () => openLaunch({}), { cls: "primary", disabled: adapterDown(), hint: ADAPTER_BUTTONS }), el("span", { class: "muted" }, "Columns:"));
+  for (const name of allColumns()) {
+    const off = state.hidden.includes(name);
+    toolbar.append(button(name, () => toggleColumn(name), { cls: "toggle" + (off ? " off" : "") }));
+  }
+  const board = el("div", { class: "board" });
+  for (const name of allColumns()) {
+    if (state.hidden.includes(name)) continue;
+    const head = el("h3", {}, el("span", {}, name));
+    if (name === "Done") head.append(button("Clean", openClean));
+    const col = el("div", { class: "column" }, head);
+    for (const t of state.tasks.filter((x) => columnOf(x) === name)) col.append(taskCard(t));
+    board.append(col);
+  }
+  root.append(toolbar, board);
+  return root;
+}
+function toggleColumn(name) {
+  state.hidden = state.hidden.includes(name) ? state.hidden.filter((n) => n !== name) : [...state.hidden, name];
+  saveHidden();
+  render();
+}
+function ticketNode(t) {
+  const url = state.info.ticket_url;
+  if (!t.ticket) return null;
+  if (url && /^https?:/.test(url)) return el("a", { href: url.replace("{key}", encodeURIComponent(t.ticket)), target: "_blank", rel: "noopener" }, t.ticket);
+  return el("strong", {}, t.ticket);
+}
+function approvalArtifact(t) {
+  const a = t.approval;
+  const base = a.artifact ? String(a.artifact).split("/").pop() : "";
+  return [base, a.artifact_key, a.artifact_key + ".md"].find((n) => n && t.artifacts.includes(n)) || null;
+}
+function taskCard(t) {
+  const card = el("div", { class: "card s-" + t.status });
+  const top = el("div", { class: "row" });
+  const ticket = ticketNode(t);
+  if (ticket) top.append(ticket);
+  top.append(el("span", { class: "muted" }, t.id));
+  card.append(top, el("div", { class: "title" }, t.description), el("div", { class: "muted" }, `${t.pipeline} › ${t.step}`));
+  const since = ago(t.status_since);
+  const label = t.status.replace("_", " ");
+  card.append(el("div", { class: "status" }, `${ICONS[t.status] || ""} ${label}${since && t.status !== "finished" ? " for " + since : ""}`));
+  if (t.status_reason) card.append(el("div", { class: "muted" }, t.status_reason));
+  if (t.session_state === "gone" && t.status !== "paused" && t.status !== "finished") card.append(el("div", { class: "gone" }, "Session gone"));
+  if (t.artifacts.length) {
+    const list = el("div", { class: "artifacts" });
+    for (const name of t.artifacts) list.append(el("span", { class: "link", onclick: () => openArtifact(t.id, name).catch(() => {}) }, name));
+    card.append(list);
+  }
+  if (t.approval) card.append(approvalBlock(t));
+  card.append(taskButtons(t));
+  return card;
+}
+function approvalBlock(t) {
+  const box = el("div", { class: "check" }, "To validate: ");
+  if (t.approval.target === "artifact") {
+    const name = approvalArtifact(t);
+    box.append(name ? el("span", { class: "link", onclick: () => openArtifact(t.id, name).catch(() => {}) }, name) : el("span", {}, t.approval.artifact || t.approval.artifact_key || "the artifact"));
+  } else {
+    box.append(button("Open in IDE", async () => { await api(`/api/tasks/${t.id}/open-ide`, {}); }));
+  }
+  return box;
+}
+function taskButtons(t) {
+  const row = el("div", { class: "buttons" });
+  const down = adapterDown();
+  const live = t.session_state !== "gone";
+  const paused = t.status === "paused";
+  const finished = t.status === "finished";
+  if (live && can("focus") && !finished) row.append(button("Focus", () => api(`/api/tasks/${t.id}/focus`, {})));
+  if (t.mr_url && /^https?:/.test(t.mr_url)) row.append(el("a", { href: t.mr_url, target: "_blank", rel: "noopener" }, "Show MR"));
+  if (t.status === "awaiting_approval") {
+    row.append(button("Approve", action(() => api(`/api/tasks/${t.id}/approve`, {}))), button("Request changes", () => openRequestChanges(t)));
+  }
+  if (t.status === "waiting_external" && t.wait_has_check === false) row.append(button("Mark done", action(() => api(`/api/tasks/${t.id}/external-done`, {}))));
+  if (!finished) {
+    row.append(button("Send prompt", () => openSendPrompt(t), { disabled: down || !can("send_prompt"), hint: ADAPTER_BUTTONS }));
+    if (state.pausing.has(t.id)) row.append(el("span", { class: "muted" }, "Pausing..."));
+    else if (!paused && live) row.append(button("Pause", () => openPause(t), { disabled: down, hint: ADAPTER_BUTTONS }));
+    if (paused || !live) row.append(button("Resume", action(() => api(`/api/tasks/${t.id}/resume`, {})), { disabled: down, hint: ADAPTER_BUTTONS }));
+  }
+  return row;
+}
+async function openArtifact(tid, name) {
+  const data = await api(`/api/tasks/${tid}/artifacts/${encodeURIComponent(name)}`);
+  openModal(`${tid} / ${name}`, el("pre", {}, data.text), el("div", { class: "footer" }, closeButton()));
+}
+function openRequestChanges(t) {
+  const text = el("textarea", { placeholder: "What should change?" });
+  openModal(`Request changes: ${t.id}`, text, el("div", { class: "footer" }, closeButton("Cancel"),
+    button("Send", async () => { await api(`/api/tasks/${t.id}/request-changes`, { text: text.value }); closeModal(); await refresh(true); }, { cls: "primary" })));
+}
+async function waitJob(id) {
+  for (;;) {
+    const job = await api(`/api/jobs/${id}`, undefined, true);
+    if (job.status !== "running") {
+      if (job.status === "error") showError(job.error);
+      return job;
+    }
+    await new Promise((r) => setTimeout(r, JOB_POLL_MS));
+  }
+}
+async function runJob(tid, path, body) {
+  const res = await api(path, body);
+  if (!res.job) return;
+  state.pausing.add(tid);
+  closeModal();
+  render();
+  try { await waitJob(res.job); } finally { state.pausing.delete(tid); await refresh(true); }
+}
+function choice(title, tid, question, options) {
+  const row = el("div", { class: "footer" }, closeButton("Cancel"));
+  for (const [label, fn] of options) row.append(button(label, fn, { cls: "primary" }));
+  openModal(title, el("p", {}, question), row);
+}
+function openPause(t) {
+  const post = (wait) => async () => {
+    if (!wait) { await api(`/api/tasks/${t.id}/pause`, {}); closeModal(); await refresh(true); return; }
+    await runJob(t.id, `/api/tasks/${t.id}/pause`, { wait: true });
+  };
+  choice(`Pause ${t.id}`, t.id, "Wait until the session is idle, or stop it now?", [["Wait until idle", post(true)], ["Stop now", post(false)]]);
+}
+function openSendPrompt(t) {
+  const text = el("textarea", { placeholder: "Prompt for the session" });
+  const send = (wait) => async () => {
+    if (!text.value.trim()) { showError("The prompt is empty."); return; }
+    const res = await api(`/api/tasks/${t.id}/send-prompt`, { text: text.value, wait });
+    closeModal();
+    if (res.job) await waitJob(res.job);
+    await refresh(true);
+  };
+  const footer = el("div", { class: "footer" }, closeButton("Cancel"));
+  if (t.session_state === "working") {
+    footer.append(el("span", { class: "muted" }, "The session is working."), button("Wait until idle", send(true), { cls: "primary" }), button("Send now", send(false)));
+  } else {
+    footer.append(button("Send", send(false), { cls: "primary" }));
+  }
+  openModal(`Send prompt: ${t.id}`, text, footer);
+}
+
+async function openLaunch(prefill) {
+  const pipelines = await api("/api/pipelines");
+  if (!pipelines.length) { showError("No pipeline found."); return; }
+  const form = { inputs: {}, inputNames: [], checked: null };
+  const select = el("select");
+  for (const p of pipelines) select.append(el("option", { value: p.id }, p.id));
+  if (prefill.pipeline && pipelines.some((p) => p.id === prefill.pipeline)) select.value = prefill.pipeline;
+  const description = el("textarea", { placeholder: "What should the task do?" });
+  description.value = prefill.description || "";
+  const inputsBox = el("div");
+  const reportBox = el("div");
+  const launchButton = button("Launch", async () => {
+    const res = await api("/api/launch", payload());
+    closeModal();
+    await refresh(true);
+    return res;
+  }, { cls: "primary", disabled: true });
+  const checkButton = button("Check", check, { disabled: adapterDown(), hint: ADAPTER_BUTTONS });
+  const payload = () => {
+    const inputs = {};
+    for (const [k, node] of Object.entries(form.inputs)) inputs[k] = node.value;
+    const body = { pipeline: select.value, description: description.value, inputs };
+    if (prefill.from_backlog) body.from_backlog = prefill.from_backlog;
+    return body;
+  };
+  const invalidate = () => { launchButton.disabled = true; form.checked = null; };
+  async function check() {
+    const report = await api("/api/launch/dry-run", payload());
+    form.checked = report;
+    showReport(report);
+    launchButton.disabled = !(report.ok && state.info.adapter.ok);
+  }
+  function showReport(report) {
+    clear(reportBox);
+    const box = el("div", { class: "report" });
+    const line = (label, value) => value ? box.append(el("div", {}, `${label}: ${value}`)) : null;
+    line("Task id", report.task_id);
+    line("Worktree", report.worktree);
+    line("Branch", report.branch ? `${report.branch} (${report.branch_case})` : report.branch_case);
+    line("Base", report.base_ref);
+    for (const k of report.missing_inputs) box.append(el("div", { class: "bad" }, `Missing input: ${k}`));
+    for (const m of report.missing_config) box.append(configRow(m));
+    for (const e of report.errors) box.append(el("div", { class: "bad" }, `Error: ${e}`));
+    if (report.ok) box.append(el("div", { class: "good" }, "Ready to launch."));
+    reportBox.append(box);
+  }
+  function configRow(m) {
+    const value = el("input", { type: "text", placeholder: m.description || m.key });
+    const row = el("div", { class: "row" }, el("span", { class: "bad" }, `Missing config: ${m.step}.${m.key}`), value);
+    row.append(button("Save", async () => { await api("/api/config/set", { step: m.step, key: m.key, value: value.value }); await check(); }));
+    return row;
+  }
+  async function loadInputs() {
+    const detail = await api(`/api/pipelines/${select.value}`);
+    const names = Object.keys((detail.data && detail.data.inputs) || {});
+    clear(inputsBox);
+    form.inputs = {};
+    for (const name of names) {
+      const node = el("input", { type: "text" });
+      node.value = (prefill.inputs && prefill.inputs[name]) || "";
+      node.addEventListener("input", invalidate);
+      form.inputs[name] = node;
+      const hint = detail.data.inputs[name] && detail.data.inputs[name].description;
+      inputsBox.append(field(name, el("div", {}, node, hint ? el("div", { class: "muted" }, hint) : "")));
+    }
+  }
+  select.addEventListener("change", async () => { invalidate(); clear(reportBox); await loadInputs().catch(() => {}); });
+  description.addEventListener("input", invalidate);
+  await loadInputs();
+  openModal(prefill.from_backlog ? "Start from backlog" : "Launch a task", field("Pipeline", select), field("Description", description), inputsBox, reportBox,
+    el("div", { class: "footer" }, closeButton("Cancel"), checkButton, launchButton));
+}
+
+async function openClean() {
+  const rows = await api("/api/clean");
+  const plans = {};
+  const accept = {};
+  const boxes = {};
+  const detail = el("div");
+  const list = el("div");
+  const deleteButton = button("Delete selected", deleteSelected, { cls: "danger", disabled: true });
+  const selected = () => rows.filter((r) => boxes[r.id].checked);
+  const reset = () => { deleteButton.disabled = true; clear(detail); for (const k of Object.keys(plans)) delete plans[k]; };
+  for (const r of rows) {
+    const box = el("input", { type: "checkbox" });
+    box.checked = r.selected;
+    box.addEventListener("change", reset);
+    boxes[r.id] = box;
+    list.append(el("div", { class: "row" }, box, el("strong", {}, r.id), el("span", {}, r.description), el("span", { class: "muted" }, `${r.branch || "no branch"}: ${r.reason}`)));
+  }
+  async function checkSelected() {
+    reset();
+    for (const r of selected()) {
+      const plan = await api("/api/delete/dry-run", { id: r.id });
+      plans[r.id] = plan;
+      detail.append(planBlock(r.id, plan));
+    }
+    deleteButton.disabled = Object.keys(plans).length === 0;
+  }
+  function planBlock(id, plan) {
+    const box = el("div", { class: "report" }, el("strong", {}, id));
+    const lines = (title, items) => { if (items.length) box.append(el("div", { class: "bad" }, title), el("pre", {}, items.join("\n"))); };
+    lines("Uncommitted changes", plan.uncommitted);
+    lines("Unpushed commits", plan.unpushed);
+    lines("Checks that failed", plan.check_errors);
+    if (plan.needs_confirm) {
+      const ok = el("input", { type: "checkbox" });
+      ok.addEventListener("change", () => { accept[id] = ok.checked; });
+      accept[id] = false;
+      box.append(el("label", {}, ok, " I accept losing these changes"));
+    } else {
+      box.append(el("div", { class: "good" }, "Nothing to lose."));
+    }
+    return box;
+  }
+  async function deleteSelected() {
+    const skipped = [];
+    for (const r of selected()) {
+      const plan = plans[r.id];
+      if (!plan || (plan.needs_confirm && !accept[r.id])) { skipped.push(r.id); continue; }
+      const body = { id: r.id };
+      if (plan.needs_confirm) body.confirm_unpushed = true;
+      await api("/api/delete", body);
+    }
+    closeModal();
+    await refresh(true);
+    if (skipped.length) showError(`Not deleted, tick the box to accept the loss: ${skipped.join(", ")}`);
+  }
+  openModal("Clean finished tasks", rows.length ? list : el("p", { class: "muted" }, "No finished task."), detail,
+    el("div", { class: "footer" }, closeButton(), button("Check selected", checkSelected), deleteButton));
+}
+
+function backlogView() {
+  const root = el("div");
+  root.append(el("div", { class: "toolbar" }, button("Add", openAdd, { cls: "primary" }), el("span", { class: "muted" }, "Drag a card to change its priority.")));
+  const list = el("div");
+  state.backlog.forEach((e, i) => list.append(backlogCard(e, i)));
+  if (!state.backlog.length) list.append(el("p", { class: "muted" }, "The backlog is empty."));
+  root.append(list);
+  return root;
+}
+function backlogCard(entry, index) {
+  const card = el("div", { class: "card backlog", draggable: "true" });
+  card.append(el("div", { class: "title" }, `${index + 1}. ${entry.title}`));
+  if (entry.summary) card.append(el("div", {}, entry.summary));
+  card.append(el("div", { class: "muted" }, entry.pipeline ? `Pipeline: ${entry.pipeline}` : "No pipeline"));
+  card.append(el("div", { class: "buttons" },
+    button("Start", () => openLaunch({ description: entry.title, from_backlog: entry.id, pipeline: entry.pipeline }), { disabled: adapterDown(), hint: ADAPTER_BUTTONS }),
+    button("Delete", () => openDelete(entry), { cls: "danger" })));
+  card.addEventListener("dragstart", (ev) => { state.dragging = true; state.dragId = entry.id; card.classList.add("dragging"); ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", entry.id); });
+  const isLowerHalf = (ev) => ev.offsetY > card.offsetHeight / 2;
+  card.addEventListener("dragover", (ev) => {
+    if (!state.dragId) return;
+    ev.preventDefault();
+    card.classList.toggle("dropbefore", !isLowerHalf(ev));
+    card.classList.toggle("dropafter", isLowerHalf(ev));
+  });
+  card.addEventListener("dragleave", () => card.classList.remove("dropbefore", "dropafter"));
+  card.addEventListener("dragend", () => { state.dragging = false; state.dragId = null; render(); });
+  card.addEventListener("drop", async (ev) => {
+    ev.preventDefault();
+    const id = state.dragId;
+    state.dragging = false;
+    state.dragId = null;
+    if (id && id !== entry.id) {
+      const others = state.backlog.filter((e) => e.id !== id);
+      const to = others.findIndex((e) => e.id === entry.id) + (isLowerHalf(ev) ? 1 : 0) + 1;
+      try { await api("/api/backlog/move", { id, to }); } catch (e) {}
+    }
+    await refresh(true);
+  });
+  return card;
+}
+function openAdd() {
+  const title = el("input", { type: "text" });
+  const summary = el("textarea");
+  const pipeline = el("input", { type: "text", placeholder: "optional" });
+  openModal("Add to the backlog", field("Title", title), field("Summary", summary), field("Pipeline", pipeline), el("div", { class: "footer" }, closeButton("Cancel"),
+    button("Add", async () => {
+      const body = { title: title.value, summary: summary.value };
+      if (pipeline.value.trim()) body.pipeline = pipeline.value.trim();
+      await api("/api/backlog/add", body);
+      closeModal();
+      await refresh(true);
+    }, { cls: "primary" })));
+}
+function openDelete(entry) {
+  openModal("Delete from the backlog", el("p", {}, `Delete "${entry.title}"?`), el("div", { class: "footer" }, closeButton("Cancel"),
+    button("Delete", async () => { await api("/api/backlog/remove", { id: entry.id }); closeModal(); await refresh(true); }, { cls: "danger" })));
+}
+
+function setView(view) { state.view = view; render(); }
+byId("tab-tasks").addEventListener("click", () => setView("tasks"));
+byId("tab-backlog").addEventListener("click", () => setView("backlog"));
+refresh(true);
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>
