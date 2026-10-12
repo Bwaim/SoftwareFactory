@@ -325,12 +325,14 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `task_paused`
   - `task_resumed`
   - `step_goto`, with the from step, the to step and the reason
+  - `task_finished`
 - With the Claude session id from the task state, this log is enough to split the session transcript by step later.
 
 ##### Task execution
 
 - The task session runs one step at a time. It never reads the pipeline or step files directly.
 - The first prompt of a task is short: "You run factory task `<id>`. Run `factory next` and follow its instructions. When the step is done, run `factory done`. Repeat until `factory next` says the pipeline is finished."
+- When the last step is done, `factory done` sets the task to `finished`. It sends a notification if the adapter supports `notify`. The session tells the user that the task is finished.
 - A step file changed during a task applies from the next step.
 - A step with `required: true` cannot be skipped. Other steps can be skipped with `factory skip`, only after user approval.
 - `factory goto <step-path> --reason <text>` moves the task back to an earlier step, only after user approval. The path can point inside a composite step, for example `rebase-and-commit > commit`.
@@ -410,7 +412,11 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 - The factory ships a `factory` CLI. It is the only way the orchestrator and the task sessions read and write `.factory/`.
 - It finds the main repository from any worktree with `git rev-parse --git-common-dir`. Task sessions in a worktree always use the `.factory/` of the main repository.
-- It finds the current task from the worktree path. A task without a worktree passes `--task <id>`.
+- It finds the current task from the worktree path. A task without a worktree passes `--task <id>`:
+  - Its first prompt and its resume prompt say to add `--task <id>` to every `factory` command.
+  - `factory next` prints every `factory` command with `--task <id>` already in it, also in the subagent prompt.
+  - When the task cannot be found, the error message says to add `--task <id>`.
+- It writes every file atomically: it writes a temporary file, then renames it. It holds a lock while it changes a shared file (`config.yaml`, `backlog.md`), so parallel sessions never lose a write.
 - It merges steps and pipelines from three levels. When two have the same id, the first level wins:
   1. Local: `.factory/` of the main repository
   2. Generic: `<source>/library/`, with `source` read from `.factory/factory.yaml`
@@ -560,6 +566,9 @@ migrations/          # One script per format version change
   - `factory pipeline check` warns about `model` or `effort` on a step that runs in the session.
   - Installing a catalog pipeline copies it and offers its missing steps. The status shows not installed, installed, and installed and changed since.
   - Every `factory` command written in the README exists in the CLI.
+  - Two processes writing `config.yaml` and `backlog.md` at the same time lose no write.
+  - For a task without a worktree, `factory next` prints commands with `--task <id>`, and a command without it fails with a message that says to add it.
+  - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
