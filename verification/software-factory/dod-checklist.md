@@ -1,6 +1,6 @@
 # Definition Of Done checklist
 
-Source: "Definition Of Done" in `prompts/factory_skill_creation.md`. Test names are in `report.md` (163 pytest tests and 12 e2e checks, all pass).
+Source: "Definition Of Done" in `prompts/factory_skill_creation.md`. Test names are in `report.md` (203 pytest tests and 12 e2e checks, all pass).
 Legend: PASS = proven by a test, an e2e check or a file. PARTIAL = built and scripted-checked, but a part is not proven. FAIL = not met.
 
 Two PARTIAL reasons recur:
@@ -159,7 +159,7 @@ Two PARTIAL reasons recur:
 
 ## Terminal adapter
 
-- PASS: All terminal actions go through `factory terminal`; launch and delete call only the adapter, never `herdr`. Evidence: `test_delete::test_launch_and_delete_never_call_herdr`, `test_adapters::test_fake_records_calls`.
+- PASS: Terminal actions are real `factory terminal` commands (`check`, `start-session`, `close`, `state`, `wait-idle`, `notify`, `focus`, `send-prompt`) that call the configured adapter; in-process callers use the same adapter boundary, and launch and delete never call `herdr`. Evidence: `test_terminal_cli::*`, `test_delete::test_launch_and_delete_never_call_herdr`, `test_adapters::test_fake_records_calls`.
 - PASS: Adapter interface (`check`, `start-session`, `close`; optional `send-prompt`, `focus`, `state`, `wait-idle`, `notify`) with unsupported actions hidden; adding a terminal means one adapter. Evidence: `test_adapters::test_capabilities_and_check`, `software-factory/lib/factory/adapters/`.
 - PASS: Herdr adapter: `check` is `HERDR_ENV=1`; worktree open or tab create; `agent start` and `agent prompt`; pane id from JSON; handle; `close` stops Claude and closes workspace or tab; other commands. Evidence: `test_herdr_adapter::*`, `herdr-probe.md`, e2e "Claude runs in Herdr named with the task id", "pause closes the task terminal", "no Herdr workspace or tab is left open after the run".
 

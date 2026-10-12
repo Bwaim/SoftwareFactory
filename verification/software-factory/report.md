@@ -1,8 +1,8 @@
 # Software factory verification report
 
-Date: 2026-10-12 21:13
+Date: 2026-10-12 21:41
 
-Total: 175 of 175 checks pass.
+Total: 215 of 215 checks pass.
 
 ## Milestone 1. Core
 
@@ -50,6 +50,11 @@ Total: 175 of 175 checks pass.
 | `test_herdr_adapter::test_unreadable_tab_list_closes_only_our_tab[{}]` | PASS |
 | `test_herdr_adapter::test_unreadable_tab_list_closes_only_our_tab[{"result": {}}]` | PASS |
 | `test_herdr_adapter::test_missing_key_after_open_still_cleans_up` | PASS |
+| `test_herdr_adapter::test_taken_agent_name_refused_and_untouched` | PASS |
+| `test_herdr_adapter::test_failed_start_does_not_send_keys_to_agent` | PASS |
+| `test_herdr_adapter::test_actions_refused_when_agent_in_other_tab` | PASS |
+| `test_herdr_adapter::test_state_gone_when_agent_in_other_tab` | PASS |
+| `test_herdr_adapter::test_actions_allowed_in_own_tab_or_workspace` | PASS |
 | `test_init_menu::test_init_creates_files_and_exclude` | PASS |
 | `test_init_menu::test_init_never_overwrites` | PASS |
 | `test_init_menu::test_init_needs_existing_library_or_flag` | PASS |
@@ -107,6 +112,7 @@ Total: 175 of 175 checks pass.
 | `test_backlog::test_failed_launch_keeps_entry` | PASS |
 | `test_backlog::test_import` | PASS |
 | `test_backlog::test_two_processes_lose_no_write` | PASS |
+| `test_backlog::test_listing_a_file_with_ids_does_not_rewrite_it` | PASS |
 | `test_board::test_block_unblock_and_order` | PASS |
 | `test_board::test_session_state_column` | PASS |
 | `test_board::test_columns_follow_steps` | PASS |
@@ -144,6 +150,10 @@ Total: 175 of 175 checks pass.
 | `test_editor_api::test_load_copy_check_save` | PASS |
 | `test_editor_api::test_cli_lists` | PASS |
 | `test_editor_api::test_save_drops_empty_nested_fields` | PASS |
+| `test_editor_api::test_copy_to_existing_id_refused` | PASS |
+| `test_editor_api::test_new_pipeline_over_existing_file_refused_then_replaced` | PASS |
+| `test_editor_api::test_editing_the_same_pipeline_at_the_same_level_is_allowed` | PASS |
+| `test_editor_api::test_editing_another_pipeline_or_level_over_existing_refused` | PASS |
 | `test_library::test_commit_only_given_files` | PASS |
 | `test_library::test_refuses_paths_outside_library` | PASS |
 | `test_library::test_disabled_without_git` | PASS |
@@ -191,6 +201,41 @@ Total: 175 of 175 checks pass.
 | `test_dashboard_api::test_artifact_for_unknown_task_creates_nothing` | PASS |
 | `test_dashboard_api::test_artifact_symlink_outside_is_refused` | PASS |
 | `test_dashboard_api::test_confirm_unpushed_must_be_true` | PASS |
+
+## Other tests
+
+| Test | Result |
+|---|---|
+| `test_minor_fixes::test_poll_survives_a_task_with_a_missing_folder` | PASS |
+| `test_minor_fixes::test_poll_reports_a_broken_task_and_goes_on` | PASS |
+| `test_minor_fixes::test_run_check_reports_missing_folder` | PASS |
+| `test_minor_fixes::test_herdr_missing_binary_is_adapter_error` | PASS |
+| `test_minor_fixes::test_end_wait_on_last_step_only_notifies` | PASS |
+| `test_minor_fixes::test_list_tasks_skips_a_folder_that_vanished` | PASS |
+| `test_minor_fixes::test_create_refuses_an_existing_task_folder` | PASS |
+| `test_minor_fixes::test_goto_and_block_refuse_finished_tasks` | PASS |
+| `test_minor_fixes::test_block_refuses_paused_tasks` | PASS |
+| `test_minor_fixes::test_artifact_name_must_be_a_plain_string[plan.md\n]` | PASS |
+| `test_minor_fixes::test_artifact_name_must_be_a_plain_string[]` | PASS |
+| `test_minor_fixes::test_artifact_name_must_be_a_plain_string[5]` | PASS |
+| `test_minor_fixes::test_artifact_name_must_be_a_plain_string[None]` | PASS |
+| `test_minor_fixes::test_artifact_name_must_be_a_plain_string[bad4]` | PASS |
+| `test_minor_fixes::test_pipeline_id_must_be_a_plain_string[ab\n]` | PASS |
+| `test_minor_fixes::test_pipeline_id_must_be_a_plain_string[5]` | PASS |
+| `test_minor_fixes::test_pipeline_id_must_be_a_plain_string[bad2]` | PASS |
+| `test_minor_fixes::test_api_rejects_non_string_values_with_400` | PASS |
+| `test_minor_fixes::test_approve_send_with_delivery_failure_keeps_approval` | PASS |
+| `test_minor_fixes::test_cli_approve_send_warns_and_exits_zero` | PASS |
+| `test_minor_fixes::test_api_approve_returns_delivery_error` | PASS |
+| `test_races::test_second_advance_with_same_position_refused` | PASS |
+| `test_races::test_done_racing_with_skip_advances_once` | PASS |
+| `test_races::test_approve_after_request_changes_race_is_factory_error` | PASS |
+| `test_races::test_request_changes_after_approve_race_is_factory_error` | PASS |
+| `test_races::test_unblock_racing_with_unblock_refused` | PASS |
+| `test_races::test_end_wait_twice_ends_once` | PASS |
+| `test_terminal_cli::test_start_session_close_state_notify_wait_idle` | PASS |
+| `test_terminal_cli::test_start_session_without_worktree_flag_or_args` | PASS |
+| `test_terminal_cli::test_bad_handle_json_is_an_error` | PASS |
 
 ## End-to-end (Herdr and Claude)
 
