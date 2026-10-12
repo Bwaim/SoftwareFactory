@@ -71,6 +71,11 @@ def register(sub, common):
     m = bs.add_parser("move", parents=[common]); m.add_argument("id"); m.add_argument("--to", type=int, required=True)
     i = bs.add_parser("import", parents=[common]); i.add_argument("--file", default=None); i.add_argument("--dry-run", action="store_true")
     sub.add_parser("menu", parents=[common])
+    sub.add_parser("serve", parents=[common])
+    sub.add_parser("dashboard", parents=[common])
+    p = sub.add_parser("server")
+    svs = p.add_subparsers(dest="action", required=True)
+    svs.add_parser("stop", parents=[common])
 
 
 @cli.command("next")
@@ -452,3 +457,24 @@ def backlog_import(args):
         cli.emit(titles, True) if args.json else print("\n".join(titles))
         return
     print_entries(backlog.import_titles(ctx_of(args), titles), args.json)
+
+
+@cli.command("serve")
+def serve_cmd(args):
+    from . import server
+    server.Server(ctx_of(args)).run()
+
+
+@cli.command("dashboard")
+def dashboard_cmd(args):
+    from . import server
+    info = server.ensure_server(ctx_of(args))
+    url = server.page_url(info, "dashboard")
+    server.open_page(url)
+    print(f"Dashboard: {url}")
+
+
+@cli.command("server stop")
+def server_stop_cmd(args):
+    from . import server
+    print("Server stopped." if server.stop_server(ctx_of(args)) else "The server was not running.")
