@@ -122,22 +122,10 @@ class Inited:
         self.worktrees = work / "worktrees"
 
 
-def bootstrap_factory_dir(repo, library, worktree_root):
-    f = repo / ".factory"
-    for d in ("steps", "pipelines", "tasks/archive"):
-        (f / d).mkdir(parents=True, exist_ok=True)
-    (f / "factory.yaml").write_text(yaml.safe_dump({"version": 1, "library": str(library), "terminal": "fake", "poll_minutes": 5}))
-    (f / "config.yaml").write_text(yaml.safe_dump({"create-worktree": {"worktree_root": str(worktree_root)}}))
-    (f / "backlog.md").write_text("# Backlog\n")
-    (f / "claude-settings.json").write_text('{"permissions": {"allow": ["Bash(factory:*)", "Bash(factory *)"]}}\n')
-    for d in ("steps", "pipelines"):
-        (library / d).mkdir(parents=True, exist_ok=True)
-    (library / "factory.yaml").write_text(yaml.safe_dump({"version": 1}))
-
-
 @pytest.fixture
 def inited(factory, origin_repo, library_path, work):
-    bootstrap_factory_dir(origin_repo, library_path, work / "worktrees")
+    factory("init", "--library", library_path, "--create-library")
+    factory("config", "set", "create-worktree", "worktree_root", work / "worktrees")
     return Inited(origin_repo, library_path, factory, work)
 
 

@@ -38,6 +38,11 @@ def register(sub, common):
     p.add_argument("id")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--confirm-unpushed", action="store_true")
+    p = sub.add_parser("init", parents=[common])
+    p.add_argument("--library", required=True)
+    p.add_argument("--create-library", action="store_true")
+    sub.add_parser("link", parents=[common])
+    sub.add_parser("menu", parents=[common])
 
 
 @cli.command("next")
@@ -120,6 +125,42 @@ def delete_cmd(args):
         return
     delete.delete(ctx, args.id, args.confirm_unpushed)
     print(f"Task {args.id} deleted and archived.")
+
+
+@cli.command("init")
+def init_cmd(args):
+    from . import init
+    report = init.init(".", args.library, args.create_library)
+    if args.json:
+        cli.emit(report, True)
+        return
+    for check in report["checks"]:
+        print(f"{'OK' if check['ok'] else 'FAILED'}: {check['name']}: {check['message']}")
+    print(f"Created: {len(report['created'])} files. Kept: {len(report['kept'])} files.")
+    if not report["library_git"]:
+        print("Warning: the library is not in a git repository. Library commits are disabled.")
+
+
+@cli.command("link")
+def link_cmd(args):
+    from . import init
+    info = init.ensure_link()
+    if args.json:
+        cli.emit(info, True)
+        return
+    print(f"{info['path']} -> {info['target']}" + (" (updated)" if info["changed"] else ""))
+    if not info["on_path"]:
+        print(f"Warning: {init.link_dir()} is not in PATH.")
+
+
+@cli.command("menu")
+def menu_cmd(args):
+    from . import menu, repo
+    model = menu.build(repo.load_ctx(task_opt=args.task))
+    if args.json:
+        cli.emit(model, True)
+    else:
+        print(menu.render(model))
 
 
 @cli.command("version check")
