@@ -82,6 +82,7 @@ Snapshot (D4):
 
 - At launch, the pipeline is expanded into a flat list of leaf steps. Composite steps are opened up at this point. `create-worktree` is added first when the pipeline does not list it (not for `new-step-assistant`).
 - Each entry stores the leaf step id, its path (ids from the pipeline entry down to the leaf) and the pipeline entry overrides: `with`, `column`, `model`, `effort`.
+- At the end of a successful launch, `create-worktree` is marked done and `position` points to the next step.
 - `position` is the index in this snapshot. It is shown as a name path, for example `rebase-and-commit > commit`.
 - At each `next`, only the step file content is loaded again. A changed step file applies from the next step. A changed pipeline file, or a changed child list of a composite step, applies only to new tasks.
 
@@ -109,6 +110,12 @@ Other commands:
 - `factory approval check`: exits 0 only when the current position is approved. It is the `done_check` of `user-validation`.
 - `factory poll`: runs the `done_check` of every `waiting_external` task, with a 60 second timeout. Paused tasks are skipped. When a check passes, the step is done and the message goes through `session.deliver`.
 
+`requires` check:
+
+- A tool (a name without `/`) is found with `which`.
+- A skill (`/<plugin>:<skill>` or `/<skill>`) is found in the installed plugins under `~/.claude/plugins/`, and in the skills folders `~/.claude/skills/` and `<main repository>/.claude/skills/`.
+- `factory catalog list` shows the missing items.
+
 ## 8. Concurrency (D5)
 
 - The session, the server poll and the dashboard can write the same files.
@@ -124,7 +131,7 @@ Launch order:
 3. Create the worktree.
 4. Create the task folder and `task.json`.
 5. `start-session`.
-6. Save the terminal handle.
+6. Save the terminal handle, mark `create-worktree` done, set `position` to the next step, and log `task_created`.
 7. Remove the backlog entry.
 
 - On failure, the done steps are undone in reverse order.
@@ -197,8 +204,11 @@ Behavior:
 
 At start, in order:
 
-1. `factory terminal check`. If it fails, say why and stop.
-2. Check and fix the `~/.local/bin/factory` link.
+- The skill knows its own base directory, so it knows the absolute path of `bin/factory` in the plugin.
+- Until the link is fixed, it calls `factory` only by this absolute path. Otherwise the first run, and the first run after a plugin update, fail.
+
+1. Check and fix the `~/.local/bin/factory` link, with the absolute path. Init, when shown, also runs with the absolute path.
+2. From here, call `factory` by name. `factory terminal check`. If it fails, say why and stop.
 3. `factory version check`. Same: continue. Older: run `migrate`. Newer: stop and ask the user to update the factory.
 4. If paused tasks exist, offer to resume all, some or none.
 
@@ -226,7 +236,7 @@ Menu:
 ## 15. Versioning and migration (D6)
 
 - Data format version 1. `.factory/factory.yaml` and `<library>/factory.yaml` each store their own version.
-- Every command checks the repository version. Commands that load the library also check the library version. A different version is refused.
+- Every command checks the repository version, except `factory init`, `factory version check` and `factory migrate`. Commands that load the library also check the library version. A different version is refused.
 - `migrations/<n>-to-<n+1>.py` scripts expose `migrate_repo(factory_dir)` and `migrate_library(library_dir)`.
 - `migrate` brings each target from its own version to the current version. A library already at the current version, for example one shared with another migrated repository, is not migrated again.
 - Backups and the clean-git check follow the prompt. The library is backed up or checked only when it is migrated.
