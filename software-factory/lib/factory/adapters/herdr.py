@@ -46,11 +46,16 @@ class HerdrAdapter(Adapter):
     def workspaces(self, check=True):
         return parse(run(["workspace", "list"], check=check)).get("result", {}).get("workspaces", [])
 
-    def tabs(self, workspace_id):
+    def tabs(self, workspace_id, own_tab=None):
         r = run(["tab", "list", "--workspace", workspace_id], check=False)
         if r.returncode != 0:
             return None
-        return parse(r).get("result", {}).get("tabs", [])
+        tabs = parse(r).get("result", {}).get("tabs")
+        if not isinstance(tabs, list) or not all(isinstance(t, dict) and "tab_id" in t for t in tabs):
+            return None
+        if own_tab is not None and own_tab not in {t["tab_id"] for t in tabs}:
+            return None
+        return tabs
 
     def main_repo_workspace_ids(self, workspaces):
         ids = []
@@ -60,30 +65,34 @@ class HerdrAdapter(Adapter):
                 ids.append(workspace["workspace_id"])
         return ids
 
-    def create_tab(self, name, workspace_id, cwd):
-        result = parse(run(["tab", "create", "--workspace", workspace_id, "--cwd", str(cwd), "--label", name, "--no-focus"]))["result"]
-        return {"agent": name, "tab": result["tab"]["tab_id"]}, result["root_pane"]["pane_id"]
+    def create_tab(self, handle, workspace_id, cwd):
+        result = parse(run(["tab", "create", "--workspace", workspace_id, "--cwd", str(cwd), "--label", handle["agent"], "--no-focus"]))["result"]
+        handle["tab"] = result["tab"]["tab_id"]
+        return result["root_pane"]["pane_id"]
 
-    def open_worktree(self, name, cwd):
-        result = parse(run(["worktree", "open", "--cwd", str(self.ctx.main), "--path", str(cwd), "--label", name, "--no-focus"]))["result"]
+    def open_worktree(self, handle, cwd):
+        result = parse(run(["worktree", "open", "--cwd", str(self.ctx.main), "--path", str(cwd), "--label", handle["agent"], "--no-focus"]))["result"]
         pane = result["root_pane"]
         if result.get("already_open"):
-            return self.create_tab(name, pane["workspace_id"], cwd)
-        handle = {"agent": name, "workspace": pane["workspace_id"], "tab": pane["tab_id"]}
-        return handle, pane["pane_id"]
+            return self.create_tab(handle, pane["workspace_id"], cwd)
+        handle["workspace"] = pane["workspace_id"]
+        handle["tab"] = pane["tab_id"]
+        return pane["pane_id"]
 
     def find_extra_workspaces(self, before, handle):
         after = self.main_repo_workspace_ids(self.workspaces(check=False))
         return [w for w in after if w not in before and w != handle.get("workspace")]
 
-    def open_main_repo(self, name, cwd):
+    def open_main_repo(self, handle, cwd):
         existing = self.main_repo_workspace_ids(self.workspaces())
         if existing:
-            return self.create_tab(name, existing[0], cwd)
-        result = parse(run(["workspace", "create", "--cwd", str(cwd), "--label", name, "--no-focus"]))["result"]
+            return self.create_tab(handle, existing[0], cwd)
+        result = parse(run(["workspace", "create", "--cwd", str(cwd), "--label", handle["agent"], "--no-focus"]))["result"]
         pane = result["root_pane"]
-        handle = {"agent": name, "workspace": pane["workspace_id"], "tab": pane["tab_id"], "created_workspace": True}
-        return handle, pane["pane_id"]
+        handle["workspace"] = pane["workspace_id"]
+        handle["created_workspace"] = True
+        handle["tab"] = pane["tab_id"]
+        return pane["pane_id"]
 
     def screen(self, name):
         r = run(["agent", "read", name, "--source", "recent-unwrapped", "--lines", "60"], check=False)
@@ -91,8 +100,9 @@ class HerdrAdapter(Adapter):
 
     def start_session(self, name, cwd, prompt, claude_args, in_worktree):
         before = set(self.main_repo_workspace_ids(self.workspaces())) if in_worktree else set()
-        handle, pane = self.open_worktree(name, cwd) if in_worktree else self.open_main_repo(name, cwd)
+        handle = {"agent": name}
         try:
+            pane = self.open_worktree(handle, cwd) if in_worktree else self.open_main_repo(handle, cwd)
             if in_worktree and "workspace" in handle:
                 extra = self.find_extra_workspaces(before, handle)
                 if extra:
@@ -102,7 +112,7 @@ class HerdrAdapter(Adapter):
             run(["agent", "prompt", name, prompt], timeout=60)
         except Exception as e:
             screen = self.screen(name).lower()
-            self.close(handle)
+            self.close_quietly(handle)
             if any(marker in screen for marker in TRUST_MARKERS):
                 raise AdapterError(
                     f"Claude asks to trust the folder {cwd}. "
@@ -113,15 +123,20 @@ class HerdrAdapter(Adapter):
             raise AdapterError(f"Herdr start failed: {e}")
         return handle
 
+    def close_quietly(self, handle):
+        try:
+            self.close(handle)
+        except Exception:
+            pass
+
     def stop_agent(self, handle):
         run(["agent", "send-keys", handle["agent"], "ctrl+c", "ctrl+c"], check=False)
 
     def close_own(self, handle):
         workspace_id, tab_id = handle.get("workspace"), handle.get("tab")
         if workspace_id:
-            tabs = self.tabs(workspace_id)
-            others = [t for t in tabs if t["tab_id"] != tab_id] if tabs is not None else [None]
-            if not others:
+            tabs = self.tabs(workspace_id, tab_id)
+            if tabs is not None and (len(tabs) <= 1 if tab_id is None else all(t["tab_id"] == tab_id for t in tabs)):
                 run(["workspace", "close", workspace_id], check=False)
                 return
         if tab_id:

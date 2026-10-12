@@ -42,6 +42,8 @@ def workspace_list():
 
 
 if args[:2] == ["worktree", "open"]:
+    if os.environ.get("FAKE_HERDR_NO_TAB_ID") == "1":
+        del pane["tab_id"]
     already_open = os.environ.get("FAKE_HERDR_ALREADY_OPEN") == "1"
     print(json.dumps({"result": {"already_open": already_open, "type": "worktree_opened", "workspace": {"workspace_id": "w9"}, "tab": {"tab_id": "w9:t1"}, "root_pane": pane}}))
 elif args[:2] == ["tab", "list"]:
@@ -56,7 +58,8 @@ elif args[:2] == ["tab", "list"]:
             tabs.append({"tab_id": f"{ws}:t2", "workspace_id": ws, "agent_status": "idle"})
         if os.environ.get("FAKE_HERDR_OTHER_TAB") == "1":
             tabs.append({"tab_id": f"{ws}:t9", "workspace_id": ws, "agent_status": "unknown"})
-    print(json.dumps({"result": {"type": "tab_list", "tabs": tabs}}))
+    forced = os.environ.get("FAKE_HERDR_TAB_LIST_OUTPUT")
+    print(forced if forced else json.dumps({"result": {"type": "tab_list", "tabs": tabs}}))
 elif args[:2] == ["workspace", "list"]:
     print(json.dumps({"result": {"type": "workspace_list", "workspaces": workspace_list()}}))
 elif args[:2] == ["workspace", "create"]:

@@ -100,7 +100,7 @@ def test_preexisting_workspace_never_closed(herdr_env, origin_repo, monkeypatch)
     adapter, calls = herdr_env
     monkeypatch.setenv("FAKE_HERDR_EXISTING_WS", "1")
     handle = adapter.start_session("t1", origin_repo / "wt", "p", [], True)
-    assert "extra_workspace" not in handle
+    assert "extra_workspaces" not in handle
     adapter.close(handle)
     assert closed(calls()) == ["w9"]
 
@@ -148,3 +148,21 @@ def test_check_outside_herdr(herdr_env, monkeypatch):
     monkeypatch.setenv("HERDR_ENV", "0")
     ok, message = adapter.check()
     assert not ok and "Herdr" in message
+
+
+@pytest.mark.parametrize("output", ["not json", "{}", '{"result": {}}'])
+def test_unreadable_tab_list_closes_only_our_tab(herdr_env, origin_repo, monkeypatch, output):
+    adapter, calls = herdr_env
+    handle = adapter.start_session("t1", origin_repo / "wt", "p", [], True)
+    monkeypatch.setenv("FAKE_HERDR_TAB_LIST_OUTPUT", output)
+    adapter.close(handle)
+    assert closed(calls()) == []
+    assert calls()[-1] == ["tab", "close", "w9:t1"]
+
+
+def test_missing_key_after_open_still_cleans_up(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_NO_TAB_ID", "1")
+    with pytest.raises(AdapterError):
+        adapter.start_session("t1", origin_repo / "wt", "p", [], True)
+    assert closed(calls()) == ["w9"]
