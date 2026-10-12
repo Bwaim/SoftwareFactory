@@ -31,7 +31,11 @@ def test_dry_run_shows_changes_and_changes_nothing(started):
 
 def test_delete_refuses_without_confirm_then_archives(started):
     inited, ctx, task = started
-    (inited.worktrees / task["id"] / "new.txt").write_text("x")
+    wt = inited.worktrees / task["id"]
+    (wt / "kept.txt").write_text("k")
+    git("add", "kept.txt", cwd=wt)
+    git("commit", "-m", "kept", cwd=wt)
+    (wt / "new.txt").write_text("x")
     with pytest.raises(FactoryError, match="--confirm-unpushed"):
         delete.delete(ctx, task["id"])
     delete.delete(ctx, task["id"], confirm_unpushed=True)
@@ -61,5 +65,19 @@ def test_launch_and_delete_never_call_herdr(inited, tmp_path):
 def test_pushed_branch_is_deleted(started):
     inited, ctx, task = started
     git("push", "-u", "origin", "feat/del", cwd=task["worktree"])
+    delete.delete(ctx, task["id"])
+    assert not git("branch", "--list", "feat/del", cwd=inited.repo)
+
+
+def test_branch_merged_then_deleted_on_origin_is_deleted(started):
+    inited, ctx, task = started
+    wt = task["worktree"]
+    (inited.worktrees / task["id"] / "m.txt").write_text("m")
+    git("add", "m.txt", cwd=wt)
+    git("commit", "-m", "merged work", cwd=wt)
+    git("push", "origin", "HEAD:main", cwd=wt)
+    git("push", "origin", "feat/del", cwd=wt)
+    git("push", "origin", "--delete", "feat/del", cwd=wt)
+    git("fetch", "--prune", "origin", cwd=inited.repo)
     delete.delete(ctx, task["id"])
     assert not git("branch", "--list", "feat/del", cwd=inited.repo)

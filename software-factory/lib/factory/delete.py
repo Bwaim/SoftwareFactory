@@ -20,9 +20,14 @@ def is_ancestor(cwd, a, b):
     return repo.git(["merge-base", "--is-ancestor", a, b], cwd, check=False).returncode == 0
 
 
-def branch_pushed(ctx, branch):
-    remote = f"refs/remotes/origin/{branch}"
-    return ref_exists(ctx.main, remote) and is_ancestor(ctx.main, f"refs/heads/{branch}", remote)
+def branch_merged_or_pushed(ctx, branch, base_ref):
+    local = f"refs/heads/{branch}"
+    if not ref_exists(ctx.main, local):
+        return False
+    for target in (f"refs/remotes/origin/{branch}", f"refs/remotes/origin/{base_ref}"):
+        if ref_exists(ctx.main, target) and is_ancestor(ctx.main, local, target):
+            return True
+    return False
 
 
 def current_branch(worktree):
@@ -45,7 +50,7 @@ def plan_delete(ctx, tid):
         upstream = f"origin/{branch}" if branch and ref_exists(worktree, f"refs/remotes/origin/{branch}") else f"origin/{base_ref}"
         plan["unpushed"] = git_lines(["log", "--oneline", f"{upstream}..HEAD"], worktree)
         if branch:
-            plan["delete_branch"] = not plan["unpushed"] and branch_pushed(ctx, branch)
+            plan["delete_branch"] = not plan["unpushed"] and branch_merged_or_pushed(ctx, branch, base_ref)
     plan["needs_confirm"] = bool(plan["uncommitted"] or plan["unpushed"])
     return plan
 
