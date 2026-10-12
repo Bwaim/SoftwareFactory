@@ -58,3 +58,16 @@ def notify(ctx, text):
         adapter.notify(text)
     except AdapterError:
         pass
+
+
+def live_state(ctx, task):
+    handle = task.get("terminal_handle")
+    if not handle:
+        return "gone"
+    try:
+        adapter = adapters.get_adapter(ctx)
+        if "state" not in adapter.capabilities():
+            return "unknown"
+        return adapter.state(handle)
+    except AdapterError:
+        return "unknown"

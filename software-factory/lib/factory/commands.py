@@ -19,6 +19,9 @@ def register(sub, common):
     g = ss.add_parser("get", parents=[common]); g.add_argument("key")
     s = ss.add_parser("set", parents=[common]); s.add_argument("key"); s.add_argument("value")
     sub.add_parser("status", parents=[common])
+    p = sub.add_parser("block", parents=[common]); p.add_argument("reason")
+    sub.add_parser("unblock", parents=[common])
+    sub.add_parser("tasks", parents=[common])
     for name in ("next", "done", "skip", "run-script"):
         sub.add_parser(name, parents=[common])
     p = sub.add_parser("artifact")
@@ -78,6 +81,30 @@ def status_cmd(args):
     from . import engine
     ctx, tid = task_of(args)
     print(engine.status_text(ctx, tid))
+
+
+@cli.command("block")
+def block_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.block(ctx, tid, args.reason))
+
+
+@cli.command("unblock")
+def unblock_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.unblock(ctx, tid))
+
+
+@cli.command("tasks")
+def tasks_cmd(args):
+    from . import board
+    rows = board.task_rows(ctx_of(args))
+    if args.json:
+        cli.emit(rows, True)
+    else:
+        print(board.render_rows(rows))
 
 
 @cli.command("terminal check")

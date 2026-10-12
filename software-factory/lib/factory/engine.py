@@ -58,7 +58,12 @@ def require_running(task):
 
 
 def on_start(ctx, task, entry, step):
-    return []
+    pending = []
+    column = entry.get("column") or step.column
+    if column and column != task["column"]:
+        pending.append(("column_changed", {"from": task["column"], "to": column}))
+        task["column"] = column
+    return pending
 
 
 def start(ctx, tid, entry, step):
@@ -172,6 +177,21 @@ def next_step(ctx, tid):
     if task.get("started") != task["position"]:
         task = start(ctx, tid, entry, step)
     return render(ctx, task, entry, step, values)
+
+
+def block(ctx, tid, reason):
+    task = state.update(ctx, tid, lambda t: state.set_status(t, "blocked", reason))
+    events.log(ctx, tid, "task_blocked", state.step_path_str(task), reason=reason)
+    session.notify(ctx, f"Task {tid} is blocked: {reason}")
+    return f"Task {tid} is blocked. Ask the user, then run `{cmd(task, 'unblock')}` when the user has answered."
+
+
+def unblock(ctx, tid):
+    if state.load(ctx, tid)["status"] != "blocked":
+        raise FactoryError(f"Task {tid} is not blocked.")
+    task = state.update(ctx, tid, lambda t: state.set_status(t, "active"))
+    events.log(ctx, tid, "task_unblocked", state.step_path_str(task))
+    return f"Task {tid} is active again."
 
 
 def advance(ctx, tid, event_type):
