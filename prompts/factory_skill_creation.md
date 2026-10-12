@@ -290,6 +290,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `task_unblocked`
   - `task_paused`
   - `task_resumed`
+  - `step_goto`, with the from step, the to step and the reason
 - With the Claude session id from the task state, this log is enough to split the session transcript by step later.
 
 ##### Task execution
@@ -298,6 +299,10 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - The first prompt of a task is short: "You run factory task `<id>`. Run `factory next` and follow its instructions. When the step is done, run `factory done`. Repeat until `factory next` says the pipeline is finished."
 - A step file changed during a task applies from the next step.
 - A step with `required: true` cannot be skipped. Other steps can be skipped with `factory skip`, only after user approval.
+- `factory goto <step-path> --reason <text>` moves the task back to an earlier step, only after user approval. The path can point inside a composite step, for example `rebase-and-commit > commit`.
+  - It refuses a step that is not before the current step. Moving forward is a skip.
+  - State keys keep their values. Steps that run again overwrite the keys they write.
+  - After 3 jumps back to the same step, the task is blocked for the user, with the reason "loop on <step>".
 
 ##### Task list
 
@@ -380,6 +385,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory block <reason>` and `factory unblock`: change the blocked status of the task.
   - `factory tasks`: prints the task list.
   - `factory pause <id>`, `factory pause --all` and `factory resume <id>`: pause and resume tasks.
+  - `factory goto <step-path> --reason <text>`: moves the task back to an earlier step.
 
 ### Terminal adapter
 
@@ -482,6 +488,7 @@ migrations/          # One script per format version change
   - `factory block` and `factory unblock` change the status, and `factory tasks` lists blocked tasks first.
   - With the fake test adapter, pause saves the status and closes the terminal, and resume restores the status with the same session id.
   - Worktree creation on the test repository, with git only: new branch, existing local branch behind `origin` (fast-forwarded), branch only on `origin`, diverged branch (stops), and branch used by another worktree (stops).
+  - `factory goto` moves back to an earlier step, refuses a later step, and blocks the task on the 3rd jump back to the same step.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
