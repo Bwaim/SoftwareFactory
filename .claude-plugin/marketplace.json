@@ -1,0 +1,11 @@
+{
+  "name": "software-factory",
+  "owner": { "name": "Fabien Boismoreau" },
+  "plugins": [
+    {
+      "name": "software-factory",
+      "source": "./software-factory",
+      "description": "Run each task in its own worktree, Herdr tab and Claude session, through pipelines of reusable steps."
+    }
+  ]
+}

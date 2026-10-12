@@ -1,0 +1,175 @@
+import json
+import os
+import shutil
+import subprocess
+import sys
+import uuid
+from pathlib import Path
+
+import pytest
+import yaml
+
+SF = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = SF.parent
+VERIF = PROJECT_ROOT / "verification" / "software-factory"
+WORK = VERIF / "work"
+BIN = SF / "bin" / "factory"
+sys.path.insert(0, str(SF / "lib"))
+
+
+def git(*args, cwd):
+    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise AssertionError(f"git {args} failed: {r.stderr}")
+    return r.stdout.strip()
+
+
+def commit_all(repo, message):
+    git("add", "-A", cwd=repo)
+    git("commit", "-m", message, cwd=repo)
+
+
+@pytest.fixture
+def work(request):
+    d = WORK / f"{request.node.name[:40]}-{uuid.uuid4().hex[:6]}"
+    d.mkdir(parents=True)
+    yield d.resolve()
+    shutil.rmtree(d, ignore_errors=True)
+
+
+@pytest.fixture
+def origin_repo(work):
+    origin = work / "origin.git"
+    git("init", "--bare", "-b", "main", str(origin), cwd=work)
+    seed = work / "seed"
+    git("clone", str(origin), str(seed), cwd=work)
+    git("config", "user.name", "Test", cwd=seed)
+    git("config", "user.email", "test@example.com", cwd=seed)
+    (seed / "README.md").write_text("test\n")
+    commit_all(seed, "init")
+    git("push", "origin", "HEAD:main", cwd=seed)
+    repo = work / "repo"
+    git("clone", str(origin), str(repo), cwd=work)
+    git("config", "user.name", "Test", cwd=repo)
+    git("config", "user.email", "test@example.com", cwd=repo)
+    return repo
+
+
+@pytest.fixture
+def library_path(work):
+    root = work / "libroot"
+    root.mkdir()
+    git("init", "-b", "main", cwd=root)
+    git("config", "user.name", "Test", cwd=root)
+    git("config", "user.email", "test@example.com", cwd=root)
+    (root / "other.txt").write_text("x\n")
+    commit_all(root, "init")
+    return root / "factory-library"
+
+
+class Factory:
+    def __init__(self, cwd, env):
+        self.cwd = cwd
+        self.env = env
+
+    def __call__(self, *args, cwd=None, check=True, input=None, env=None):
+        r = subprocess.run(
+            [sys.executable, str(BIN), *[str(a) for a in args]],
+            cwd=cwd or self.cwd,
+            env={**self.env, **(env or {})},
+            capture_output=True,
+            text=True,
+            input=input,
+            timeout=180,
+        )
+        if check and r.returncode != 0:
+            raise AssertionError(f"factory {args} failed ({r.returncode}):\n{r.stdout}\n{r.stderr}")
+        return r
+
+    def json(self, *args, **kw):
+        return json.loads(self(*args, "--json", **kw).stdout)
+
+
+@pytest.fixture
+def factory(work, origin_repo):
+    link_dir = work / "bin"
+    env = {
+        **os.environ,
+        "FACTORY_LINK_DIR": str(link_dir),
+        "FACTORY_TERMINAL": "fake",
+        "FACTORY_NO_OPEN": "1",
+        "FACTORY_CLAUDE_HOME": str(work / "claude-home"),
+        "GIT_AUTHOR_NAME": "Test",
+        "GIT_AUTHOR_EMAIL": "test@example.com",
+        "GIT_COMMITTER_NAME": "Test",
+        "GIT_COMMITTER_EMAIL": "test@example.com",
+    }
+    env.pop("FACTORY_TASK", None)
+    link_dir.mkdir(parents=True, exist_ok=True)
+    (link_dir / "factory").symlink_to(BIN)
+    env["PATH"] = f"{link_dir}{os.pathsep}{env['PATH']}"
+    os.environ["PATH"] = env["PATH"]
+    return Factory(origin_repo, env)
+
+
+class Inited:
+    def __init__(self, repo, library, factory, work):
+        self.repo = repo
+        self.library = library
+        self.factory = factory
+        self.work = work
+        self.fdir = repo / ".factory"
+        self.worktrees = work / "worktrees"
+
+
+def bootstrap_factory_dir(repo, library, worktree_root):
+    f = repo / ".factory"
+    for d in ("steps", "pipelines", "tasks/archive"):
+        (f / d).mkdir(parents=True, exist_ok=True)
+    (f / "factory.yaml").write_text(yaml.safe_dump({"version": 1, "library": str(library), "terminal": "fake", "poll_minutes": 5}))
+    (f / "config.yaml").write_text(yaml.safe_dump({"create-worktree": {"worktree_root": str(worktree_root)}}))
+    (f / "backlog.md").write_text("# Backlog\n")
+    (f / "claude-settings.json").write_text('{"permissions": {"allow": ["Bash(factory:*)", "Bash(factory *)"]}}\n')
+    for d in ("steps", "pipelines"):
+        (library / d).mkdir(parents=True, exist_ok=True)
+    (library / "factory.yaml").write_text(yaml.safe_dump({"version": 1}))
+
+
+@pytest.fixture
+def inited(factory, origin_repo, library_path, work):
+    bootstrap_factory_dir(origin_repo, library_path, work / "worktrees")
+    return Inited(origin_repo, library_path, factory, work)
+
+
+def write_step(root, sid, manifest, body="Do the step.\n"):
+    d = Path(root) / "steps"
+    d.mkdir(parents=True, exist_ok=True)
+    data = {"id": sid, "description": f"Step {sid}", "category": "test", "type": "prompt", **manifest}
+    (d / f"{sid}.md").write_text("---\n" + yaml.safe_dump(data, sort_keys=False) + "---\n\n" + body)
+    return d / f"{sid}.md"
+
+
+def write_pipeline(root, data):
+    d = Path(root) / "pipelines"
+    d.mkdir(parents=True, exist_ok=True)
+    full = {"description": f"Pipeline {data['id']}", **data}
+    (d / f"{data['id']}.yaml").write_text(yaml.safe_dump(full, sort_keys=False))
+    return d / f"{data['id']}.yaml"
+
+
+def fake_calls(fdir):
+    p = Path(fdir) / "fake_adapter_calls.json"
+    return json.loads(p.read_text()).get("calls", []) if p.exists() else []
+
+
+def fake_config(fdir, **cfg):
+    (Path(fdir) / "fake_adapter_config.json").write_text(json.dumps(cfg))
+
+
+def task_json(fdir, tid):
+    return json.loads((Path(fdir) / "tasks" / tid / "task.json").read_text())
+
+
+def events(fdir, tid):
+    p = Path(fdir) / "tasks" / tid / "events.jsonl"
+    return [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
