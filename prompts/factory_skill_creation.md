@@ -35,6 +35,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
     2. Task life: statuses, blocked, pause and resume, goto, artifacts, focus and send prompt, clean, event log.
     3. Authoring: step assistant, pipeline editor and its local server, catalog, library commits.
     4. Lifecycle and docs: versioning, migration, README.
+    5. Dashboard: the dashboard views and their server API.
 4. Ask validation. Ask the user to validate the plan file.
 5. Build. After plan validation, use the `/superpowers:subagent-driven-development` skill to implement the plan inside `YOUR_WORKING_DIR`, one milestone at a time. Run the tests of a milestone, fix the failures, and commit before starting the next milestone. Do not skip straight from this prompt to implementation.
 6. Verify. Check every item in Definition Of Done, fix failures, and rerun the affected checks. Keep final verification artifacts inside `VERIFICATION_DIR` and report actual results and any remaining blockers.
@@ -78,8 +79,9 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
     - Add a backlog entry: runs the built-in step `backlog-add`
     - Remove a backlog entry: runs the built-in step `backlog-remove`
   - Factory
+    - Open dashboard: starts the local server if needed and opens the dashboard in the browser
     - Init the factory. When the factory is not initialized in the repository, this is the only action shown. After init, it is never shown.
-    - Exit: stops the menu. It first asks whether to pause all tasks (see Pause and resume).
+    - Exit: stops the menu and the local server. It first asks whether to pause all tasks (see Pause and resume).
 
 ### Factory elements
 
@@ -250,13 +252,53 @@ Save the path with `factory state set plan <path>`.
 
 #### Local server
 
-- A small local HTTP server, written with the Python standard `http.server` module, serves the editor page and its API. The future dashboard will reuse it.
-- API: list steps, get one step (manifest and body), list pipelines, load a pipeline, check a pipeline, save a pipeline. The page uses only this API. It never reads or writes files directly.
+- One small local HTTP server, written with the Python standard `http.server` module, serves the pipeline editor, the dashboard and their API.
+- `factory pipeline edit` and `factory dashboard` start it if it is not running, then open their page with `open <url>`. The running server writes its port, token and process id to `.factory/server.json`, so the factory reuses it.
+- API: list steps, get one step (manifest and body), list pipelines, load, check and save a pipeline, list tasks, list the backlog, and one route per dashboard action. The pages use only this API. They never read or write files directly.
+- Every action route calls the same function as the matching CLI command. The server holds no task logic.
+- While it runs, the server runs `factory poll` every `poll_minutes` (see External waiting).
 - Security:
   - It listens on `127.0.0.1` only, on a free port.
   - It generates a random token at start. The page URL carries it, and every API request must send it.
   - It rejects requests whose `Origin` header is not the server itself.
-- It stops when the user closes the editor from the page, or after 30 minutes without requests.
+- It stops on Exit from the orchestrator, or after 30 minutes without requests. An open dashboard page sends requests every 5 seconds, so the server stays alive while a page is open.
+
+#### Dashboard
+
+- `factory dashboard` opens the dashboard. It has two views: Tasks and Backlog.
+- The pages use plain HTML, CSS and JavaScript, with no external library, so they work offline. They refresh every 5 seconds.
+- Every button calls an API route, which calls the same function as the matching CLI command. Errors are shown in the page.
+
+##### Tasks view
+
+- One column per board column from `.factory/factory.yaml`, plus Done at the end.
+- The user can hide and show columns. The choice is saved in the browser.
+- Cards cannot be dragged between columns. The steps set the column.
+- One card per task, not archived. A card shows:
+  - The Jira ticket key, when set, as a link that opens `ticket_url` in a new tab. `ticket_url` is in `.factory/factory.yaml`, with `{key}` in its place, for example `https://<company>.atlassian.net/browse/{key}`.
+  - The description, the pipeline and the current step
+  - The status as text and an icon, and the time in the current status, for example "blocked for 2 h"
+  - A background color from the status: `active` green, `blocked` red, `awaiting_approval` amber, `waiting_external` blue, `paused` grey. Done cards are neutral.
+  - A clear marker when the session state is `gone`
+  - The list of artifacts. Clicking one shows it in the page, as plain text.
+- Card buttons, shown only when they apply:
+  - Focus: `factory terminal focus`
+  - Show MR: opens `mr_url` from the task state in a new tab, whenever it is set
+  - Approve and Request changes, when the task is `awaiting_approval`. The card shows what to validate: a link to the artifact, or an "Open in IDE" button for `target: worktree`.
+  - Mark done, when the task is `waiting_external` on a step without a `done_check`
+  - Send prompt: free text, sent with `factory terminal send-prompt`
+  - Pause: asks to wait until the session is idle, or to stop now. Waiting runs in the background on the server with the adapter `wait-idle`, so the page never freezes.
+  - Resume, when the task is `paused` or its session is `gone`
+- A "Launch" button opens a form: pipeline, description and inputs. The form shows the `factory launch --dry-run` result, and launches after the user confirms.
+- The Done column has a "Clean" button. It shows the `factory clean` result, and deletes the selected tasks with `delete-task`.
+
+##### Backlog view
+
+- One card per entry, in priority order: title, summary and pipeline.
+- Drag a card to change its priority. This calls `factory backlog move`.
+- "Add" opens a form: title, summary and optional pipeline.
+- "Delete" removes an entry after confirmation.
+- "Start" opens the Launch form, filled from the entry, and launches with `--from-backlog <id>`.
 
 #### Catalog
 
@@ -567,6 +609,7 @@ Users ask for a dark theme. Start with the settings screen only.
   2. Generic: `<library>/`, with `library` read from `.factory/factory.yaml`
   3. Built-in: read from the installed plugin, next to the CLI, so they always match the CLI version
 - Commands:
+  - `factory dashboard`: starts the local server if needed and opens the dashboard.
   - `factory launch <pipeline> ...` and `factory launch --dry-run ...`: create a task, or show what the launch would do.
   - `factory next`: prints the current step instructions, with the task state keys it reads.
   - `factory done`: runs the step `done_check` if present. If it passes, it saves the step end and prints the next step. If it fails, it prints why and stays on the step.
@@ -597,7 +640,7 @@ Users ask for a dark theme. Start with the settings screen only.
   - `check`: checks that the terminal is available, and gives the fix if not
   - `start-session <name> <cwd> <prompt> -- <claude args>`: opens a new terminal in `cwd`, starts Claude with the args and the first prompt, and returns a handle
   - `close <handle>`: stops the Claude session and closes its terminal
-  - Optional: `send-prompt <handle> <text>`, `focus <handle>`, `state <handle>` (the live session state, `gone` when the session no longer exists) and `notify <text>`. An adapter that does not support them says so, and the factory hides the actions that need them.
+  - Optional: `send-prompt <handle> <text>`, `focus <handle>`, `state <handle>` (the live session state, `gone` when the session no longer exists), `wait-idle <handle>` (waits until the session finishes its current turn) and `notify <text>`. An adapter that does not support them says so, and the factory hides the actions that need them.
 - This build ships one adapter: `herdr`.
 
 #### Herdr adapter
@@ -609,7 +652,7 @@ Users ask for a dark theme. Start with the settings screen only.
   - The pane id is read from the JSON response, never guessed.
   - The handle is the Herdr agent name and the workspace or tab id.
 - `close`: closes the workspace or the tab. Check that this also stops the Claude process. If it does not, stop it first.
-- `send-prompt`: `herdr agent prompt`. `focus`: `herdr agent focus`. `state`: `herdr agent get`. `notify`: `herdr notification`. Check the exact syntax with the installed `herdr` binary.
+- `send-prompt`: `herdr agent prompt`. `focus`: `herdr agent focus`. `state`: `herdr agent get`. `wait-idle`: `herdr agent wait`. `notify`: `herdr notification`. Check the exact syntax with the installed `herdr` binary.
 
 ### Versioning and migration
 
@@ -642,6 +685,7 @@ In the main repository, never committed:
   config.yaml        # Step config values for this repository
   claude-settings.json  # Permission rules for task sessions
   backlog.md         # Tasks not started yet
+  server.json        # Port, token and process id of the running local server
   pipelines/         # Local pipelines, one <id>.yaml file each
   steps/             # Local steps, one <id>.md file each
   tasks/
@@ -685,6 +729,7 @@ The library, a folder in any git repository:
     3. Pause all tasks on Exit, start the factory again, and resume.
     4. Create a step with "Create a new step".
     5. Copy `quick-task` in the pipeline editor, add the new step, save, and run it.
+    6. Open the dashboard, follow a task across the columns, and approve a `user-validation` from a card.
   - A reference: the menu actions, the `factory` commands, and the step and pipeline fields.
   - Troubleshooting: terminal check failed, data version mismatch, session gone.
 - The README uses simple English and short sentences.
@@ -709,6 +754,8 @@ The library, a folder in any git repository:
   - A command refuses data with another version. A test migration from version 1 to a fake version 2 runs and creates the backup.
   - `factory pipeline check` reports each error and warning type on test pipelines.
   - The editor server API, tested without a browser: list, get a step, load, copy, check and save. Requests without the token or with a wrong `Origin` are rejected.
+  - The dashboard API, tested without a browser: the task list returns column, status and session state. Each action route calls the same function as its CLI command, checked with the fake adapter. Backlog move changes the order. The launch form route returns the dry-run result.
+  - A second `factory dashboard` reuses the running server from `.factory/server.json`.
   - With a fake test adapter that records its calls, launch and delete call only the adapter, never `herdr` directly.
   - `factory block` and `factory unblock` change the status, and `factory tasks` lists blocked tasks first.
   - With the fake test adapter, pause saves the status and closes the terminal, and resume restores the status with the same session id.
