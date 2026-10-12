@@ -1,0 +1,52 @@
+[
+  {
+    "name": "launch fetches origin and creates the worktree from origin/main",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Claude runs in Herdr with the task id as its name",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Claude receives the first prompt and runs factory next",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "first script step runs with factory next and factory done",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "pause closes the task terminal",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "resume reopens the same Claude session",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "the resumed session continues the pipeline to the end",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "the session never waits on a permission prompt",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "delete asks for approval when there are uncommitted changes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "delete closes the terminal, removes the worktree and archives the task",
+    "ok": true,
+    "detail": ""
+  }
+]
