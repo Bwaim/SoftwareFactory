@@ -74,15 +74,23 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
   - `description`: one line, shown in the launch menu
   - `inputs`: values asked to the user at launch, each with a description. They are saved in the task state, so steps read them with `reads`.
   - `steps`: ordered list of step ids. Each entry can set config values for this pipeline with `with`.
+  - `claude`: optional `model` and `effort` for the task session, passed at launch as `--model` and `--effort`.
+  - A `steps` entry can also set `model` and `effort`. They override the step manifest values for this pipeline.
 - Example:
 
 ```yaml
 id: fix-crash
 description: Fix a production crash from its Crashlytics link
+claude:
+  model: sonnet
+  effort: medium
 inputs:
   crash_url:
     description: Crashlytics link of the crash
 steps:
+  - id: analyze-crash
+    effort: high
+  - id: user-validation
   - id: fix-crash
   - id: commit
   - id: create-merge-request
@@ -108,6 +116,8 @@ steps:
   - `done_check`: optional shell command. Exit code 0 means the step is done. When present, the factory checks it before moving to the next step.
   - `config`: config keys, each with a description and an optional default value
   - `required`: `true` if the step must never be skipped
+  - `run_in`: `session` (default) or `subagent`. Used by `prompt` and `skill` steps.
+  - `model` and `effort`: optional, used only when `run_in` is `subagent`. Example: `model: opus`, `effort: high`.
 - The body depends on the type:
   - `prompt`: the instructions the agent follows
   - `skill`: the skill to call and how to use its result
@@ -141,6 +151,10 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - Each child step keeps its own done check, config and `required` flag.
   - A composite step cannot include itself, directly or through another composite step. The factory checks this when it loads the steps.
   - The current step is shown with its full path, for example `rebase-and-commit > commit`.
+- A step that asks the user anything must use `run_in: session`. A subagent cannot talk to the user. `user-validation` always runs in the session.
+- For a `subagent` step, `factory next` prints the Agent tool call to make: the model, the effort and a full prompt. The prompt holds the step body, the values of the keys it reads, its config values and the artifact paths. The subagent sees nothing of the session conversation.
+- The subagent writes its outputs with `factory state set` and ends with a short report. If it needs the user, it says so in its report, and the session asks the user and runs the step again.
+- The session runs `factory done` after the subagent ends.
 
 - A step can be used by many pipelines.
 - Built-in steps: `create-task`, `create-worktree`, `delete-task`, `backlog-add`, `backlog-remove`, `migrate` and `user-validation`.
@@ -159,6 +173,8 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - Its category. It shows the existing categories first, so the user reuses one when it fits.
   - What it reads from and writes to the task state file
   - Its done condition
+  - Where it runs: in the session or in a subagent. If the step asks the user anything, it must run in the session.
+  - For a subagent: its model and effort
   - Its config keys, with a description and an optional default value
   - If it must never be skipped
 - Before writing, it checks the existing generic and local steps. If a similar step exists, it proposes to reuse or update it.
@@ -193,12 +209,14 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - Edit the id, the description and the inputs
   - Filter the available steps by category or by text
   - Reload the available steps, to see a step created in another task
-- Each available step shows its id, category, description and level: local, generic or built-in.
+  - Edit the session `model` and `effort`, and the `model` and `effort` of each subagent step
+- Each available step shows its id, category, description, level (local, generic or built-in) and where it runs (session or subagent).
 - It runs the pipeline checks live and shows the problems:
   - Error: `create-worktree` is listed, but not as the first step
   - Error: a step id does not exist
   - Warning: a `reads` key is not a pipeline input and is not written by an earlier step
   - Warning: a generic pipeline uses a local step
+  - Warning: `model` or `effort` set on a step that runs in the session. It has no effect.
 - It can save with warnings, never with errors.
 - On save, it asks where to save: generic in `<source>/library/pipelines/`, or local in `.factory/pipelines/`. When the user edits a generic pipeline, they can save a local override instead.
 - If a needed step does not exist, the user creates it with "Create a new step" from the orchestrator, then reloads the list in the editor.
@@ -232,7 +250,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - The same id is used for the task folder, the terminal name and the Claude session name.
 - It runs the `create-worktree` step. The built-in pipeline `new-step-assistant` runs in the main repository instead.
 - It creates the task folder and the task state file, with the inputs, before the session starts.
-- It starts the task session with `factory terminal start-session`, in the worktree or in the main repository. Claude starts with `--name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json --add-dir <main repository>/.factory/tasks/<id>/artifacts` and receives the first prompt (see Task execution).
+- It starts the task session with `factory terminal start-session`, in the worktree or in the main repository. Claude starts with `--name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json --add-dir <main repository>/.factory/tasks/<id>/artifacts`, plus `--model` and `--effort` when the pipeline sets them, and receives the first prompt (see Task execution).
 - It saves the terminal handle in the task state.
 - The orchestrator goes back to its menu without waiting for the task.
 
@@ -279,7 +297,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - Each line has a timestamp, an event type, the step path and details.
 - Event types:
   - `task_created`
-  - `step_started`
+  - `step_started`, with where the step runs, the model and the effort
   - `step_done`
   - `step_skipped`
   - `done_check_failed`, with the command output
@@ -330,7 +348,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - At start, after the version check, if paused tasks exist, the orchestrator lists them and offers to resume all of them, some of them or none.
 - Resuming a task:
   - It starts a new terminal with `factory terminal start-session` in the task worktree, or in the main repository for `new-step-assistant`.
-  - Claude starts with `--resume <session-id> --name <id> --settings <main repository>/.factory/claude-settings.json --add-dir <main repository>/.factory/tasks/<id>/artifacts`, so the conversation continues.
+  - Claude starts with the same args as at launch (see Task launch), plus `--resume <session-id>`, so the conversation continues.
   - The prompt is: "The factory resumed this task. Run `factory status`, then continue with `factory next`."
   - It restores the saved status and saves the new terminal handle.
 - "Resume a task" in the menu lists the paused tasks, and the `active` or `blocked` tasks whose session state is `gone`.
@@ -500,6 +518,8 @@ migrations/          # One script per format version change
   - Worktree creation on the test repository, with git only: new branch, existing local branch behind `origin` (fast-forwarded), branch only on `origin`, diverged branch (stops), and branch used by another worktree (stops).
   - `factory goto` moves back to an earlier step, refuses a later step, and blocks the task on the 3rd jump back to the same step.
   - `factory artifact path` creates the artifacts folder and prints an absolute path in the main repository, also when called from a worktree.
+  - For a subagent step, `factory next` prints the Agent call with the right model and effort: the pipeline entry value wins over the manifest value.
+  - `factory pipeline check` warns about `model` or `effort` on a step that runs in the session.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
