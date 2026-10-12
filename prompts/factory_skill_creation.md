@@ -244,6 +244,18 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - Steps that wrap superpowers skills: `brainstorm` (`/superpowers:brainstorming`) and `write-plan` (`/superpowers:writing-plans`). They save their files in the artifacts folder.
 - The builder reads each wrapped skill to set `run_in`: `session` if the skill asks the user anything, otherwise `subagent`.
 
+#### Library commits
+
+- After each write to `<source>/library/`, the factory offers to commit it in the source repository:
+  - The step assistant saves a generic step
+  - The pipeline editor saves a generic pipeline
+  - A catalog item is installed to the generic library
+  - `migrate` changes the library
+- It shows the changed files and the commit message, and commits only after approval.
+- The message is `Factory library: <action> <kind> <id>`, for example `Factory library: add step create-merge-request`. A migration uses `Factory library: migrate to version <n>`.
+- It commits only the changed files in `library/`, with a pathspec. Other changes in the source repository are never included, even if they are staged.
+- It never pushes.
+
 #### Tasks
 
 ##### Task properties
@@ -464,6 +476,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory catalog list` and `factory catalog install <id> --generic|--local`: browse and install catalog items.
   - `factory terminal focus <id>` and `factory terminal send-prompt <id> <text>`: focus a task session and send it a prompt.
   - `factory clean`: lists finished tasks and whether their work is merged.
+  - `factory library commit <message> <paths...>`: commits the given library files in the source repository, and nothing else.
 
 ### Terminal adapter
 
@@ -598,6 +611,7 @@ migrations/          # One script per format version change
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
   - With the fake test adapter, focus and send prompt call the adapter, and are hidden when the adapter does not support them.
   - `factory clean` detects a branch merged into `origin/<base_ref>`, a pushed branch whose remote branch was deleted, and a branch not merged.
+  - `factory library commit` commits only the given library files. Another staged file in the test source stays staged and is not committed.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
