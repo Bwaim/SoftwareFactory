@@ -1,2 +1,371 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Software factory</title></head><body></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline editor</title>
+<style>
+:root { --bg: #fafafa; --fg: #1d1d1f; --muted: #6e6e73; --line: #d2d2d7; --err: #c62828; --warn: #b26a00; --accent: #0a62c9; --panel: #ffffff; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161618; --fg: #f2f2f7; --muted: #a1a1a6; --line: #3a3a3c; --err: #ff6b6b; --warn: #ffb74d; --accent: #64a8ff; --panel: #1f1f22; } }
+body { margin: 0; font: 14px/1.4 -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+header { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+main { display: grid; grid-template-columns: 320px 1fr 360px; gap: 16px; padding: 16px; align-items: start; }
+[hidden] { display: none !important; }
+section { min-width: 0; }
+h3 { margin: 0 0 8px; }
+input, select, button, textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+button { cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 6px 0; background: var(--panel); cursor: grab; }
+.card.clickable { cursor: pointer; }
+.muted { color: var(--muted); font-size: 12px; }
+#error { display: none; background: var(--err); color: white; padding: 8px 16px; }
+.problem.error { color: var(--err); }
+.problem.warning { color: var(--warn); }
+#pipeline { min-height: 200px; border: 2px dashed var(--line); border-radius: 8px; padding: 8px; margin: 8px 0; }
+#pipeline.over { border-color: var(--accent); }
+pre { white-space: pre-wrap; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--panel); }
+.field { display: grid; grid-template-columns: 110px 1fr; gap: 8px; margin: 6px 0; align-items: center; }
+.row { display: flex; gap: 6px; margin: 4px 0; align-items: center; }
+.row input { flex: 1; min-width: 0; }
+.head { display: flex; gap: 8px; align-items: center; cursor: grab; }
+.head .grow { flex: 1; }
+.link { color: var(--accent); cursor: pointer; text-decoration: underline; }
+.start { padding: 16px; border-bottom: 1px solid var(--line); }
+.start .row { margin: 8px 0; }
+dl { display: grid; grid-template-columns: 110px 1fr; gap: 4px 8px; margin: 8px 0; }
+dt { color: var(--muted); }
+dd { margin: 0; word-break: break-word; }
+.tag { border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; font-size: 11px; color: var(--muted); margin-right: 4px; }
+</style>
+</head>
+<body>
+<div id="error"></div>
+<header><strong>Pipeline editor</strong><span id="title" class="muted"></span></header>
+<section id="start" class="start" hidden></section>
+<main id="editor" hidden>
+  <section>
+    <h3>Available steps</h3>
+    <div id="filters" class="row"></div>
+    <div id="available"></div>
+  </section>
+  <section>
+    <h3>Pipeline</h3>
+    <div id="form"></div>
+    <div id="pipeline"></div>
+    <div id="problems"></div>
+    <div id="save"></div>
+  </section>
+  <section>
+    <h3>Step detail</h3>
+    <div id="detail" class="muted">Click a step.</div>
+  </section>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const TOKEN = params.get("token");
+const CHECK_DELAY_MS = 300;
+const state = { steps: [], columns: [], pipelines: [], loadedLevel: null, saveLevel: "local", model: null, checkTimer: null, checkCount: 0, hasError: true, commit: null, savedPath: null };
+const byId = (id) => document.getElementById(id);
+
+async function api(path, body) {
+  const opts = { headers: { "X-Factory-Token": TOKEN } };
+  if (body !== undefined) { opts.method = "POST"; opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+  const r = await fetch(path, opts);
+  const data = await r.json();
+  if (!r.ok) { showError(data.error || r.statusText); throw new Error(data.error || r.statusText); }
+  hideError();
+  return data;
+}
+function showError(text) { const e = byId("error"); e.textContent = text; e.style.display = "block"; }
+function hideError() { byId("error").style.display = "none"; }
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k.startsWith("on")) node.addEventListener(k.slice(2), v); else node.setAttribute(k, v); }
+  for (const c of children) node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return node;
+}
+function clear(node) { node.replaceChildren(); return node; }
+function guard(fn) { return (...a) => fn(...a).catch(() => {}); }
+
+function emptyModel() {
+  return { id: "", description: "", model: "", effort: "", start_column: "", inputs: [], steps: [], extra: {} };
+}
+function entryOf(raw) {
+  const e = typeof raw === "string" ? { id: raw } : raw || {};
+  return { id: e.id || "", model: e.model || "", effort: e.effort || "", column: e.column || "",
+    with: Object.entries(e.with || {}).map(([key, value]) => ({ key, value: typeof value === "string" ? value : JSON.stringify(value) })), open: false };
+}
+function modelOf(data) {
+  const claude = data.claude || {};
+  const known = new Set(["id", "description", "claude", "start_column", "inputs", "steps"]);
+  const extra = Object.fromEntries(Object.entries(data).filter(([k]) => !known.has(k) && !k.startsWith("_")));
+  return { id: data.id || "", description: data.description || "", model: claude.model || "", effort: claude.effort || "",
+    start_column: data.start_column || "",
+    inputs: Object.entries(data.inputs || {}).map(([key, v]) => ({ key, description: (v && v.description) || "" })),
+    steps: (data.steps || []).map(entryOf), extra };
+}
+function parseValue(text) {
+  try { const v = JSON.parse(text); if (typeof v !== "string") return v; } catch (e) {}
+  return text;
+}
+function dataOf(m) {
+  const data = { ...m.extra, id: m.id, description: m.description, claude: { model: m.model, effort: m.effort },
+    start_column: m.start_column, inputs: {}, steps: [] };
+  for (const r of m.inputs) if (r.key) data.inputs[r.key] = { description: r.description };
+  for (const s of m.steps) {
+    const w = {};
+    for (const r of s.with) if (r.key) w[r.key] = parseValue(r.value);
+    data.steps.push({ id: s.id, with: w, model: s.model, effort: s.effort, column: s.column });
+  }
+  return data;
+}
+
+function field(label, node) { return el("div", { class: "field" }, el("label", {}, label), node); }
+function textInput(value, onChange, placeholder = "") {
+  const i = el("input", { type: "text", placeholder });
+  i.value = value;
+  i.addEventListener("input", () => onChange(i.value));
+  return i;
+}
+function selectInput(options, value, onChange) {
+  const s = el("select");
+  for (const o of options) s.append(el("option", { value: o }, o || "(none)"));
+  s.value = value;
+  s.addEventListener("change", () => onChange(s.value));
+  return s;
+}
+function pairRows(rows, keyName, valueName, keyHint, valueHint) {
+  const box = el("div");
+  const draw = () => {
+    clear(box);
+    rows.forEach((r, i) => {
+      box.append(el("div", { class: "row" },
+        textInput(r[keyName], (v) => { r[keyName] = v; changed(); }, keyHint),
+        textInput(r[valueName], (v) => { r[valueName] = v; changed(); }, valueHint),
+        el("button", { type: "button", onclick: () => { rows.splice(i, 1); draw(); changed(); } }, "Remove")));
+    });
+    box.append(el("button", { type: "button", onclick: () => { rows.push({ [keyName]: "", [valueName]: "" }); draw(); } }, "Add"));
+  };
+  draw();
+  return box;
+}
+
+function renderForm() {
+  const m = state.model, f = clear(byId("form"));
+  f.append(
+    field("id", textInput(m.id, (v) => { m.id = v; changed(); })),
+    field("description", textInput(m.description, (v) => { m.description = v; changed(); })),
+    field("model", textInput(m.model, (v) => { m.model = v; changed(); }, "session model")),
+    field("effort", textInput(m.effort, (v) => { m.effort = v; changed(); }, "session effort")),
+    field("start_column", selectInput(["", ...state.columns], m.start_column, (v) => { m.start_column = v; changed(); })),
+    field("inputs", pairRows(m.inputs, "key", "description", "key", "description")));
+}
+
+function renderPipeline() {
+  const box = clear(byId("pipeline"));
+  if (!state.model.steps.length) box.append(el("div", { class: "muted" }, "Drag steps here."));
+  state.model.steps.forEach((s, i) => box.append(pipelineRow(s, i)));
+}
+function pipelineRow(s, i) {
+  const head = el("div", { class: "head", draggable: "true" },
+    el("span", { class: "muted" }, String(i + 1)),
+    el("span", { class: "link grow", onclick: () => showDetail(s.id) }, s.id),
+    el("button", { type: "button", onclick: () => { s.open = !s.open; renderPipeline(); } }, s.open ? "Close" : "Edit"),
+    el("button", { type: "button", onclick: () => { state.model.steps.splice(i, 1); renderPipeline(); changed(); } }, "Remove"));
+  head.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "move:" + i); e.dataTransfer.effectAllowed = "move"; });
+  const card = el("div", { class: "card", "data-row": "1" }, head);
+  if (s.open) {
+    card.append(
+      el("div", { class: "muted" }, "with"),
+      pairRows(s.with, "key", "value", "key", "value"),
+      field("model", textInput(s.model, (v) => { s.model = v; changed(); })),
+      field("effort", textInput(s.effort, (v) => { s.effort = v; changed(); })),
+      field("column", selectInput(["", ...state.columns], s.column, (v) => { s.column = v; changed(); })));
+  }
+  return card;
+}
+function dropIndex(y) {
+  const rows = [...byId("pipeline").querySelectorAll("[data-row]")];
+  const at = rows.findIndex((r) => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
+  return at < 0 ? rows.length : at;
+}
+function setupDrop() {
+  const zone = byId("pipeline");
+  zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("over"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    zone.classList.remove("over");
+    const [kind, value] = e.dataTransfer.getData("text/plain").split(":");
+    const steps = state.model.steps;
+    let at = dropIndex(e.clientY);
+    if (kind === "new") steps.splice(at, 0, entryOf(value));
+    else if (kind === "move") {
+      const from = Number(value);
+      const [item] = steps.splice(from, 1);
+      if (from < at) at -= 1;
+      steps.splice(at, 0, item);
+    } else return;
+    renderPipeline();
+    changed();
+  });
+}
+
+function renderFilters() {
+  const f = clear(byId("filters"));
+  const categories = ["", ...new Set(state.steps.map((s) => s.category).filter(Boolean))].sort();
+  const current = state.categoryFilter || "";
+  f.append(selectInput(categories, categories.includes(current) ? current : "", (v) => { state.categoryFilter = v; renderAvailable(); }),
+    textInput(state.textFilter || "", (v) => { state.textFilter = v; renderAvailable(); }, "Filter"),
+    el("button", { type: "button", onclick: guard(loadSteps) }, "Reload steps"));
+}
+function renderAvailable() {
+  const box = clear(byId("available"));
+  const text = (state.textFilter || "").toLowerCase();
+  const category = state.categoryFilter || "";
+  for (const s of state.steps) {
+    if (category && s.category !== category) continue;
+    if (text && !(s.id + " " + s.category + " " + s.description).toLowerCase().includes(text)) continue;
+    const card = el("div", { class: "card clickable", draggable: "true", onclick: () => showDetail(s.id) },
+      el("strong", {}, s.id), " ",
+      el("span", { class: "tag" }, s.category || "no category"),
+      el("span", { class: "tag" }, s.level),
+      el("span", { class: "tag" }, s.run_in),
+      el("div", { class: "muted" }, s.description));
+    card.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "new:" + s.id); e.dataTransfer.effectAllowed = "copy"; });
+    box.append(card);
+  }
+}
+async function loadSteps() {
+  state.steps = await api("/api/steps");
+  renderFilters();
+  renderAvailable();
+}
+
+function valueText(v) { return typeof v === "string" ? v : JSON.stringify(v); }
+async function showDetail(id) {
+  const d = await api("/api/steps/" + encodeURIComponent(id));
+  const box = clear(byId("detail"));
+  box.classList.remove("muted");
+  box.append(el("h4", {}, d.id), el("div", {}, d.description));
+  const list = el("dl");
+  const rows = Object.entries(d.manifest).filter(([k]) => k !== "id" && k !== "description");
+  for (const [k, v] of rows) list.append(el("dt", {}, k), el("dd", {}, valueText(v)));
+  list.append(el("dt", {}, "level"), el("dd", {}, d.level), el("dt", {}, "file"), el("dd", {}, d.path));
+  if (d.reads.length || d.writes.length) list.append(el("dt", {}, "reads (all)"), el("dd", {}, d.reads.join(", ")), el("dt", {}, "writes (all)"), el("dd", {}, d.writes.join(", ")));
+  box.append(list);
+  if (d.children.length) {
+    const kids = el("div", {}, el("div", { class: "muted" }, "Child steps"));
+    for (const c of d.children) kids.append(el("div", {}, el("span", { class: "link", onclick: guard(() => showDetail(c)) }, c)));
+    box.append(kids);
+  }
+  box.append(el("div", { class: "muted" }, "Body"), el("pre", {}, d.body));
+}
+
+function changed() {
+  state.commit = null;
+  state.savedPath = null;
+  state.hasError = true;
+  renderSave();
+  clearTimeout(state.checkTimer);
+  state.checkTimer = setTimeout(guard(runCheck), CHECK_DELAY_MS);
+}
+async function runCheck() {
+  const ticket = ++state.checkCount;
+  const problems = await api("/api/pipelines/check", { data: dataOf(state.model), level: state.saveLevel });
+  if (ticket !== state.checkCount) return;
+  const box = clear(byId("problems"));
+  for (const p of problems) box.append(el("div", { class: "problem " + p.level }, p.level === "error" ? "Error: " : "Warning: ", p.message));
+  if (!problems.length) box.append(el("div", { class: "muted" }, "No problems."));
+  state.hasError = problems.some((p) => p.level === "error");
+  renderSave();
+}
+
+function radio(value, label) {
+  const input = el("input", { type: "radio", name: "level", value });
+  input.checked = state.saveLevel === value;
+  input.addEventListener("change", () => { state.saveLevel = value; changed(); });
+  return el("label", {}, input, " " + label + " ");
+}
+function renderSave() {
+  const box = clear(byId("save"));
+  const localLabel = state.loadedLevel === "generic" ? "Save a local override" : "Save local";
+  box.append(el("div", { class: "row" }, radio("generic", "Save generic"), radio("local", localLabel)));
+  const save = el("button", { type: "button", class: "primary", onclick: guard(savePipeline) }, "Save");
+  save.disabled = state.hasError;
+  box.append(save);
+  if (state.savedPath) box.append(el("div", { class: "muted" }, "Saved to " + state.savedPath));
+  if (state.commit) {
+    box.append(el("div", {}, "The library is a git repository. Files:"));
+    for (const p of state.commit.paths) box.append(el("div", { class: "muted" }, p));
+    box.append(el("div", {}, state.commit.message),
+      el("button", { type: "button", onclick: guard(commitLibrary) }, "Commit to library"));
+  }
+}
+async function savePipeline() {
+  const result = await api("/api/pipelines/save", { data: dataOf(state.model), level: state.saveLevel });
+  state.savedPath = result.path;
+  state.commit = result.library_commit;
+  state.loadedLevel = result.level;
+  renderSave();
+}
+async function commitLibrary() {
+  await api("/api/library/commit", { message: state.commit.message, paths: state.commit.paths });
+  state.commit = null;
+  state.savedPath = state.savedPath + " (committed to the library)";
+  renderSave();
+}
+
+function openModel(model, level) {
+  state.model = model;
+  state.loadedLevel = level;
+  state.saveLevel = level === "generic" ? "generic" : "local";
+  byId("start").hidden = true;
+  byId("editor").hidden = false;
+  byId("title").textContent = model.id || "new pipeline";
+  renderForm();
+  renderPipeline();
+  changed();
+}
+async function loadPipeline(id) {
+  const loaded = await api("/api/pipelines/" + encodeURIComponent(id));
+  openModel(modelOf(loaded.data), loaded.level);
+}
+function pipelineSelect() {
+  const s = el("select");
+  for (const p of state.pipelines) s.append(el("option", { value: p.id }, p.id + " (" + p.level + ")"));
+  return s;
+}
+function renderStart() {
+  const box = clear(byId("start"));
+  box.hidden = false;
+  box.append(el("h3", {}, "Start"));
+  box.append(el("div", { class: "row" }, el("button", { type: "button", onclick: () => openModel(emptyModel(), null) }, "Create an empty pipeline")));
+  const copySelect = pipelineSelect();
+  const newId = el("input", { type: "text", placeholder: "new pipeline id" });
+  box.append(el("div", { class: "row" },
+    el("button", { type: "button", onclick: guard(async () => {
+      const copied = await api("/api/pipelines/copy", { source: copySelect.value, new_id: newId.value });
+      openModel(modelOf(copied.data), null);
+    }) }, "Copy an existing pipeline"), copySelect, newId));
+  const editSelect = pipelineSelect();
+  box.append(el("div", { class: "row" },
+    el("button", { type: "button", onclick: guard(() => loadPipeline(editSelect.value)) }, "Edit an existing pipeline"), editSelect));
+}
+
+async function init() {
+  const info = await api("/api/info");
+  state.columns = info.columns;
+  setupDrop();
+  await loadSteps();
+  const id = params.get("id");
+  if (id) { await loadPipeline(id); return; }
+  state.pipelines = await api("/api/pipelines");
+  renderStart();
+}
+init().catch(() => {});
+</script>
+</body>
+</html>

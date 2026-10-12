@@ -10,6 +10,12 @@ def register(sub, common):
     ps = p.add_subparsers(dest="action", required=True)
     pc = ps.add_parser("check", parents=[common])
     pc.add_argument("id")
+    ps.add_parser("list", parents=[common])
+    pe = ps.add_parser("edit", parents=[common]); pe.add_argument("id", nargs="?")
+    p = sub.add_parser("step")
+    sts = p.add_subparsers(dest="action", required=True)
+    sts.add_parser("list", parents=[common])
+    sh = sts.add_parser("show", parents=[common]); sh.add_argument("id")
     p = sub.add_parser("config")
     cs = p.add_subparsers(dest="action", required=True)
     g = cs.add_parser("get", parents=[common]); g.add_argument("step"); g.add_argument("key")
@@ -478,3 +484,49 @@ def dashboard_cmd(args):
 def server_stop_cmd(args):
     from . import server
     print("Server stopped." if server.stop_server(ctx_of(args)) else "The server was not running.")
+
+
+@cli.command("pipeline list")
+def pipeline_list_cmd(args):
+    from . import pipeline_store
+    from .registry import Registry
+    rows = pipeline_store.list_pipelines(Registry.load(ctx_of(args)))
+    if args.json:
+        cli.emit(rows, True)
+        return
+    for r in rows:
+        print(f"{r['id']} ({r['level']}): {r['description']}")
+
+
+@cli.command("pipeline edit")
+def pipeline_edit_cmd(args):
+    from . import server
+    info = server.ensure_server(ctx_of(args))
+    url = server.page_url(info, "editor", **({"id": args.id} if args.id else {}))
+    server.open_page(url)
+    print(f"Pipeline editor: {url}")
+
+
+@cli.command("step list")
+def step_list_cmd(args):
+    from . import pipeline_store
+    from .registry import Registry
+    reg = Registry.load(ctx_of(args))
+    rows = [pipeline_store.step_summary(s) for s in sorted(reg.steps.values(), key=lambda s: s.id)]
+    if args.json:
+        cli.emit(rows, True)
+        return
+    for r in rows:
+        print(f"{r['id']} [{r['category']}] ({r['level']}, {r['run_in']}): {r['description']}")
+
+
+@cli.command("step show")
+def step_show_cmd(args):
+    from . import pipeline_store
+    from .registry import Registry
+    reg = Registry.load(ctx_of(args))
+    detail = pipeline_store.step_detail(reg, reg.step(args.id))
+    if args.json:
+        cli.emit(detail, True)
+    else:
+        print(f"{detail['path']}\n\n{detail['body']}")
