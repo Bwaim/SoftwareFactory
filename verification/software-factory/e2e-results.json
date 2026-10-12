@@ -2,7 +2,7 @@
   {
     "name": "launch fetches origin and creates the worktree from origin/main",
     "ok": true,
-    "detail": "worktree 3558076f new origin 3558076f clone head 595cd0e0"
+    "detail": "worktree 220e299d new origin 220e299d clone head f51513b8"
   },
   {
     "name": "Claude runs in Herdr named with the task id, with the factory settings",
@@ -37,12 +37,12 @@
   {
     "name": "the same Claude transcript file exists and grew after resume",
     "ok": true,
-    "detail": "/Users/fabienboismoreau/.claude/projects/-Users-fabienboismoreau-Documents-Projects-SoftwareFactory-SoftwareFactory-verification-software-factory-work-e2e-worktrees-e2e-task/b5f392e2-7f23-4eb5-9e15-083e1d5edd4f.jsonl 346069 -> 371846"
+    "detail": "/Users/fabienboismoreau/.claude/projects/-Users-fabienboismoreau-Documents-Projects-SoftwareFactory-SoftwareFactory-verification-software-factory-work-e2e-worktrees-e2e-task/9cf105dd-7b32-458a-9b23-531247b4ddcf.jsonl 343932 -> 364666"
   },
   {
     "name": "the session never waits on a permission prompt",
     "ok": true,
-    "detail": "14 samples, blocked 0, error 0"
+    "detail": "13 samples, blocked 0, error 0"
   },
   {
     "name": "delete asks for approval when there are uncommitted changes",

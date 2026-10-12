@@ -1,6 +1,6 @@
 # Software factory verification report
 
-Date: 2026-10-12 21:41
+Date: 2026-10-12 21:47
 
 Total: 215 of 215 checks pass.
 
@@ -241,15 +241,15 @@ Total: 215 of 215 checks pass.
 
 | Check | Result |
 |---|---|
-| launch fetches origin and creates the worktree from origin/main | PASS (worktree 3558076f new origin 3558076f clone head 595cd0e0) |
+| launch fetches origin and creates the worktree from origin/main | PASS (worktree 220e299d new origin 220e299d clone head f51513b8) |
 | Claude runs in Herdr named with the task id, with the factory settings | PASS (status idle kind claude processes 1) |
 | Claude receives the first prompt and runs factory next | PASS |
 | first script step runs with factory next and factory done | PASS |
 | pause closes the task terminal | PASS |
 | resume reopens the Claude process with --resume and the same session id | PASS (resume processes 1) |
 | the resumed session continues the pipeline to the end | PASS |
-| the same Claude transcript file exists and grew after resume | PASS (/Users/fabienboismoreau/.claude/projects/-Users-fabienboismoreau-Documents-Projects-SoftwareFactory-SoftwareFactory-verification-software-factory-work-e2e-worktrees-e2e-task/b5f392e2-7f23-4eb5-9e15-083e1d5edd4f.jsonl 346069 -> 371846) |
-| the session never waits on a permission prompt | PASS (14 samples, blocked 0, error 0) |
+| the same Claude transcript file exists and grew after resume | PASS (/Users/fabienboismoreau/.claude/projects/-Users-fabienboismoreau-Documents-Projects-SoftwareFactory-SoftwareFactory-verification-software-factory-work-e2e-worktrees-e2e-task/9cf105dd-7b32-458a-9b23-531247b4ddcf.jsonl 343932 -> 364666) |
+| the session never waits on a permission prompt | PASS (13 samples, blocked 0, error 0) |
 | delete asks for approval when there are uncommitted changes | PASS |
 | delete closes the terminal, removes the worktree and archives the task | PASS |
 | no Herdr workspace or tab is left open after the run | PASS |
