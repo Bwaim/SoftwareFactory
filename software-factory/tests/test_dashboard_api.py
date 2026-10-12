@@ -93,3 +93,11 @@ def test_clean_and_delete_routes(dash):
     assert request(i, "POST", "/api/delete/dry-run", {"id": "del"})[1]["needs_confirm"] is False
     assert request(i, "POST", "/api/delete", {"id": "del", "confirm_unpushed": False})[0] == 200
     assert (inited.fdir / "tasks" / "archive" / "del").exists()
+
+
+def test_missing_body_field_is_400(dash):
+    inited, i = dash
+    ctx = repo.load_ctx(cwd=inited.repo)
+    make_task(ctx, tid="t1", terminal_handle={"agent": "t1"})
+    status, err = request(i, "POST", "/api/tasks/t1/send-prompt", {})
+    assert status == 400 and "text" in err["error"]

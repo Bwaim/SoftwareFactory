@@ -174,6 +174,8 @@ def make_handler(server):
                 self.reply(200, api.dispatch(server, method, url.path, parse_qs(url.query), body))
             except api.NotFound:
                 self.reply(404, {"error": "Not found."})
+            except KeyError as e:
+                self.reply(400, {"error": f"Missing field: {e.args[0]}."})
             except FactoryError as e:
                 self.reply(400, {"error": str(e)})
             except Exception as e:
