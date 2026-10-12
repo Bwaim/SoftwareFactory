@@ -238,7 +238,7 @@ Card buttons:
 - **Resume**: shown when the task is paused or its session is gone.
 - A finished task has no Focus, Send prompt, Pause or Resume button.
 
-"Send prompt", "Pause", "Resume", "Launch" and "Check" are disabled when the terminal check fails.
+"Send prompt", "Pause", "Resume", "Launch", "Check" and the backlog "Start" are disabled when the terminal check fails.
 
 #### Launch form
 
@@ -269,9 +269,10 @@ The "Clean" button of the `Done` column lists the finished tasks that can be del
 
 #### Banner
 
-When `factory terminal check` fails, an orange banner shows the message at the top of the page.
-The buttons that need the terminal are disabled.
-Fix the problem (see Troubleshooting). The banner goes away at the next refresh.
+The server runs the terminal check once, when it starts.
+If the check fails, an orange banner shows the message at the top of the page.
+The buttons that need the terminal are disabled. This includes "Start" in the backlog.
+To clear the banner, fix the terminal problem (see Troubleshooting). Then run `factory server stop` and `factory dashboard`.
 
 #### Ticket links
 
@@ -284,7 +285,7 @@ Only `http` and `https` URLs are used.
 - The server listens on `127.0.0.1` only. It uses a random port.
 - Each start makes a new token. The URL holds it: `?token=...`. Every API call must send it.
 - The server checks the `Host` header. It must be `127.0.0.1` and the server port.
-- The server checks the `Origin` header. It must be the server itself.
+- The server checks the `Origin` header. If present, it must be the server itself.
 - The server stops after 30 minutes without requests. `factory dashboard` starts it again.
 - `factory server stop` stops it now. The menu action "Exit" stops it too.
 - The file `.factory/server.json` holds the port and the token. Only you can read it.
