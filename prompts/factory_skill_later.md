@@ -1,4 +1,4 @@
-# nextory-factory: saved for later
+# software-factory: saved for later
 
 Ideas and requirements not in the current build. Move them to `factory_skill_creation.md` when needed.
 

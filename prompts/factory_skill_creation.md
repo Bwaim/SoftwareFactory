@@ -1,4 +1,4 @@
-# Skill nextory-factory
+# Skill software-factory
 
 ## Problem
 
@@ -14,16 +14,16 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 
 ## Variables
 
-- `PROJECT_ROOT: /Users/fabienboismoreau/Documents/Projects/Nextory/NextoryCustomSkills`
+- `PROJECT_ROOT: /Users/fabienboismoreau/Documents/Projects/SoftwareFactory/SoftwareFactory`
 - `SPEC_DIR: <PROJECT_ROOT>/specs/`
     - Save your own spec here.
 - `PLAN_DIR: <PROJECT_ROOT>/plans/`
     - Save your own plan here.
-- `YOUR_WORKING_DIR: <PROJECT_ROOT>/nextory-factory/`
+- `YOUR_WORKING_DIR: <PROJECT_ROOT>/software-factory/`
     - Save your work here.
-- `VERIFICATION_DIR: <PROJECT_ROOT>/verification/nextory-factory/`
+- `VERIFICATION_DIR: <PROJECT_ROOT>/verification/software-factory/`
     - Save your verification artifacts here.
-- `FACTORY_SOURCE: <PROJECT_ROOT>/nextory-factory/`
+- `FACTORY_SOURCE: <PROJECT_ROOT>/software-factory/`
     - Source of the factory. At runtime, the factory reads the generic library from `<FACTORY_SOURCE>/library/`, never from the installed plugin.
 
 ## Workflow
@@ -41,7 +41,8 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 
 - Your completed implementation plan exists under `PLAN_DIR/`
     - It was written before implementation, and the build followed its build step.
-- The `nextory-factory` skill exists under `YOUR_WORKING_DIR` and is registered in the plugin marketplace of `PROJECT_ROOT`.
+- The `software-factory` skill exists under `YOUR_WORKING_DIR`.
+- `PROJECT_ROOT/.claude-plugin/marketplace.json` exists. It defines a marketplace named `software-factory` with one plugin that points to `YOUR_WORKING_DIR`. The user can install it from any repository with `/plugin marketplace add <PROJECT_ROOT>`.
 
 ### Runtime
 
@@ -52,7 +53,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 
 ### General concept
 
-- The `nextory-factory` skill is an orchestrator launched in the main repository.
+- The `software-factory` skill is an orchestrator launched in the main repository.
 - It can do the following actions, grouped in the menu:
   - Tasks
     - Launch a new pipeline, from scratch or from a backlog entry
@@ -625,7 +626,7 @@ migrations/          # One script per format version change
 
 - You'll be graded on a continuous basis based on every completed bullet in the Definition Of Done.
 - Every step of Workflow must be fully accomplished: plan, build and verify.
-- Instant failure if you write project deliverables outside `YOUR_WORKING_DIR` with the exception of `SPEC_DIR`, `PLAN_DIR`, `VERIFICATION_DIR` and the marketplace file.
+- Instant failure if you write project deliverables outside `YOUR_WORKING_DIR` with the exception of `SPEC_DIR`, `PLAN_DIR`, `VERIFICATION_DIR` and `PROJECT_ROOT/.claude-plugin/marketplace.json`.
 - Instant failure if you read any part of any file inside `<PROJECT_ROOT>/specs/*` that isn't your own spec.
 - Instant failure if you close a Herdr workspace, tab, pane or session you did not create.
 - Running tools outside these directories is allowed. Temporary files and tool-managed runtime data (caches, logs, browser profiles, updater logs) may use their normal locations and are not grading failures.
