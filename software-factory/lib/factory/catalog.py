@@ -1,6 +1,5 @@
 import difflib
 import shutil
-from pathlib import Path
 
 from . import fsio, repo, requires
 from .errors import FactoryError

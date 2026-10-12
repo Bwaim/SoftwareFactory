@@ -1,9 +1,7 @@
-import re
-
 import yaml
 
-from conftest import SF, write_step
-from factory import repo, requires
+from conftest import SF
+from factory import requires
 from factory.registry import parse_step_text
 
 FORBIDDEN = ["nextory", "android", "kotlin", "gradlew", "crashlytics", "jira", "herdr", "fabien"]
@@ -47,6 +45,10 @@ def test_missing_requires(inited, work):
     (skill / "SKILL.md").write_text("x")
     items = by_id(inited.factory.json("catalog", "list"))
     assert items["brainstorm"]["missing_requires"] == []
+    marketplace = work / "claude-home" / "plugins" / "marketplaces" / "m" / "superpowers" / "1.0" / "skills" / "debugging"
+    marketplace.mkdir(parents=True)
+    (marketplace / "SKILL.md").write_text("x")
+    assert requires.missing(["/superpowers:debugging"], inited.repo) == ["/superpowers:debugging"]
     assert requires.missing(["definitely-not-a-tool-xyz", "git"], inited.repo) == ["definitely-not-a-tool-xyz"]
 
 
@@ -71,4 +73,4 @@ def test_catalog_steps_parse_with_registry():
         assert body.strip()
     wait_review, _ = parse_step_text((SF / "catalog" / "steps" / "wait-review.md").read_text(), "wait-review")
     assert wait_review["done_check"].startswith('if [ "$FACTORY_CONFIG_FORGE" = github ]; then gh pr view')
-    assert wait_review["done_check"].endswith('json.load(sys.stdin).get(\\"approved\\") else 1)"; fi')
+    assert wait_review["done_check"].endswith('json.load(sys.stdin).get(\\"approved\\") else 1)"; else exit 1; fi')
