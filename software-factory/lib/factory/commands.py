@@ -34,6 +34,10 @@ def register(sub, common):
     p = sub.add_parser("terminal")
     ts = p.add_subparsers(dest="action", required=True)
     ts.add_parser("check", parents=[common])
+    p = sub.add_parser("delete", parents=[common])
+    p.add_argument("id")
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--confirm-unpushed", action="store_true")
 
 
 @cli.command("next")
@@ -101,6 +105,21 @@ def launch_cmd(args):
         return 0 if report["ok"] else 1
     task = launch.launch(ctx, args.pipeline, args.description, inputs, args.id, args.from_backlog)
     cli.emit(task, True) if args.json else print(f"Task {task['id']} started." + (f" Worktree: {task['worktree']}" if task["worktree"] else ""))
+
+
+@cli.command("delete")
+def delete_cmd(args):
+    from . import delete
+    ctx = ctx_of(args)
+    if args.dry_run:
+        plan = delete.plan_delete(ctx, args.id)
+        if args.json:
+            cli.emit(plan, True)
+        else:
+            print(delete.render_plan(plan))
+        return
+    delete.delete(ctx, args.id, args.confirm_unpushed)
+    print(f"Task {args.id} deleted and archived.")
 
 
 @cli.command("version check")
