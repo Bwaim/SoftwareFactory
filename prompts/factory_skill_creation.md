@@ -50,6 +50,8 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 
 ### Runtime
 
+- The factory code is Python 3. Each program (the `factory` CLI, the editor server) is a single-file script run with `uv run --script`. It declares its dependencies inline, for example `pyyaml`, so `uv` installs them on first run. Dependencies are kept to the minimum.
+- `uv` can also install the Python version the scripts need, so the machine needs only `uv`.
 - The orchestrator is a Claude session started inside the configured terminal. At start, it runs `factory terminal check`. If the check fails, it says why and stops.
 - The `factory` command can be called by name in every Claude session the factory starts, in the main repository and in worktrees. Init makes this work, for example with a link in `~/.local/bin`.
 - Init writes `.factory/claude-settings.json` with allow rules for the `factory` commands. Every task session starts with `--settings <main repository>/.factory/claude-settings.json`, so it never asks for permission on a `factory` command.
@@ -461,6 +463,7 @@ Save the path with `factory state set plan <path>`.
 - Init checks the prerequisites and reports each one as OK or failing with the fix:
   - The terminal adapter check passes
   - The current folder is a git repository with an `origin` remote
+  - `uv` is installed. If it is not, Init shows the install command.
 - It saves the terminal as `terminal` in `.factory/factory.yaml`. This build has only the `herdr` adapter, so Init selects it without asking.
 - It asks for the path of the library folder and saves it as `library` in `.factory/factory.yaml`.
   - If the folder does not exist, it offers to create it with `factory.yaml`, `steps/` and `pipelines/`.
@@ -637,6 +640,7 @@ The library, a folder in any git repository:
   - Every `factory` command written in the README exists in the CLI.
   - No catalog file refers to a project-specific skill or tool.
   - `factory catalog list` shows the missing `requires` of an item.
+  - The CLI runs on a machine with only `uv` installed: `uv` installs the dependencies on the first run.
   - Two processes writing `config.yaml` and `backlog.md` at the same time lose no write.
   - For a task without a worktree, `factory next` prints commands with `--task <id>`, and a command without it fails with a message that says to add it.
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
