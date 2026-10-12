@@ -1,7 +1,7 @@
 import difflib
 import shutil
 
-from . import fsio, repo, requires
+from . import fsio, library, repo, requires
 from .errors import FactoryError
 from .registry import Registry, parse_step_text
 
@@ -117,6 +117,6 @@ def install(ctx, item_id, target, with_steps=False, replace=False, dry_run=False
         if src.suffix == ".sh":
             dest.chmod(0o755)
         plan["written"].append(str(dest))
-    if target == "generic" and repo.git(["rev-parse", "--show-toplevel"], root, check=False).returncode == 0:
-        plan["library_commit"] = {"message": f"Factory library: add {item['kind']} {item_id}", "paths": plan["written"]}
+    if target == "generic" and library.in_git(root):
+        plan["library_commit"] = {"message": library.message("add", item["kind"], item_id), "paths": plan["written"]}
     return plan

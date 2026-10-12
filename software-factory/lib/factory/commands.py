@@ -93,6 +93,9 @@ def register(sub, common):
     ci.add_argument("--with-steps", action="store_true")
     ci.add_argument("--replace", action="store_true")
     ci.add_argument("--dry-run", action="store_true")
+    p = sub.add_parser("library")
+    ls = p.add_subparsers(dest="action", required=True)
+    lc = ls.add_parser("commit", parents=[common]); lc.add_argument("message"); lc.add_argument("paths", nargs="+")
 
 
 @cli.command("next")
@@ -541,6 +544,13 @@ def step_show_cmd(args):
         cli.emit(detail, True)
     else:
         print(f"{detail['path']}\n\n{detail['body']}")
+
+
+@cli.command("library commit")
+def library_commit_cmd(args):
+    from . import library
+    sha = library.commit(ctx_of(args), args.message, args.paths)
+    print(f"Committed {sha[:10]}. Not pushed.")
 
 
 @cli.command("catalog list")

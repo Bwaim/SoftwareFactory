@@ -97,6 +97,12 @@ def pipeline_check_route(server, query, body):
     return pipeline_store.check(server.ctx, body["data"], body.get("level"))
 
 
+@route("POST", "/api/library/commit")
+def library_commit(server, query, body):
+    from . import library
+    return {"sha": library.commit(server.ctx, body["message"], body["paths"])}
+
+
 @route("POST", "/api/pipelines/save")
 def pipeline_save(server, query, body):
     from . import pipeline_store

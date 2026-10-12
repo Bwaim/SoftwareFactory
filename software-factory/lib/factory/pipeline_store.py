@@ -1,4 +1,4 @@
-from . import fsio, pipeline_check, repo
+from . import fsio, library, pipeline_check
 from .errors import FactoryError
 from .registry import STEP_ID_RE, Registry, normalize_entry
 
@@ -69,10 +69,6 @@ def target_root(ctx, level):
     raise FactoryError("Save as `generic` or `local`.")
 
 
-def library_in_git(lib):
-    return repo.git(["rev-parse", "--show-toplevel"], lib, check=False).returncode == 0
-
-
 def save(ctx, data, level):
     problems = check(ctx, data, level)
     errors = [p["message"] for p in problems if p["level"] == "error"]
@@ -85,6 +81,6 @@ def save(ctx, data, level):
     existed = path.exists()
     fsio.write_yaml(path, compact(data))
     offer = None
-    if level == "generic" and library_in_git(ctx.library()):
-        offer = {"message": f"Factory library: {'update' if existed else 'add'} pipeline {pid}", "paths": [str(path)]}
+    if level == "generic" and library.in_git(ctx.library()):
+        offer = {"message": library.message("update" if existed else "add", "pipeline", pid), "paths": [str(path)]}
     return {"path": str(path), "level": level, "library_commit": offer, "problems": problems}
