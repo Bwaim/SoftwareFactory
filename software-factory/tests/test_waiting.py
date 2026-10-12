@@ -1,6 +1,8 @@
 import pytest
 
 from conftest import events, fake_calls, task_from_pipeline, task_json, write_pipeline, write_step
+from factory import engine, repo
+from factory.errors import FactoryError
 
 
 @pytest.fixture
@@ -68,3 +70,22 @@ def test_wait_refused_on_normal_step(inited):
     task_from_pipeline(inited, "p")
     run(inited, "next")
     assert run(inited, "wait", check=False).returncode == 1
+
+
+def test_end_wait_refused_when_not_waiting(inited):
+    write_step(inited.fdir, "plain", {})
+    write_pipeline(inited.fdir, {"id": "p", "steps": ["plain"]})
+    task_from_pipeline(inited, "p")
+    ctx = repo.load_ctx(cwd=inited.repo)
+    with pytest.raises(FactoryError, match="not waiting"):
+        engine.end_wait(ctx, "t1", "manual")
+
+
+def test_end_wait_adds_period_to_done_when(inited):
+    write_step(inited.fdir, "qa", {"wait_external": True, "done_when": "QA is done"})
+    write_pipeline(inited.fdir, {"id": "q", "steps": ["qa"]})
+    task_from_pipeline(inited, "q", terminal_handle={"agent": "t1"})
+    run = lambda *a: inited.factory(*a, "--task", "t1")
+    run("next"); run("wait"); run("external-done", "t1")
+    texts = [c.get("text", "") for c in fake_calls(inited.fdir)]
+    assert texts[-1] == "The external event happened: QA is done. Run `factory next --task t1`."

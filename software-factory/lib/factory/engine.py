@@ -251,8 +251,16 @@ def open_ide(ctx, tid):
             "`factory config set user-validation ide_command '<command with {path}>'`, for example `code {path}`."
         )
     path = str(task_cwd(ctx, state.load(ctx, tid)))
-    argv = [part.replace("{path}", path) for part in shlex.split(command)]
-    subprocess.Popen(argv)
+    try:
+        argv = [part.replace("{path}", path) for part in shlex.split(command)]
+    except ValueError as e:
+        raise FactoryError(f"The IDE command is not valid: {e}. Fix it with `factory config set user-validation ide_command '<command>'`.")
+    if not argv:
+        raise FactoryError("The IDE command is empty. Set it with `factory config set user-validation ide_command '<command>'`.")
+    try:
+        subprocess.Popen(argv, start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as e:
+        raise FactoryError(f"Cannot start the IDE command `{argv[0]}`: {e.strerror or e}.")
     return argv
 
 
@@ -361,12 +369,15 @@ def wait(ctx, tid):
 
 def end_wait(ctx, tid, how):
     task = state.load(ctx, tid)
+    if task["status"] != "waiting_external":
+        raise FactoryError(f"Task {tid} is not waiting for an external event.")
     entry, step = load_step(ctx, task)
     events.log(ctx, tid, "external_event", state.step_path_str(task), how=how)
     advance(ctx, tid, "step_done")
     task = state.load(ctx, tid)
+    happened = (step.done_when or "An external event.").removesuffix(".")
     session.notify(ctx, f"Task {tid}: {step.done_when or 'the external event happened'}")
-    session.deliver(ctx, tid, f"The external event happened: {step.done_when} Run `{cmd(task, 'next')}`.")
+    session.deliver(ctx, tid, f"The external event happened: {happened}. Run `{cmd(task, 'next')}`.")
 
 
 def poll(ctx):

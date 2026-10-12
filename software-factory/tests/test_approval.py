@@ -57,6 +57,14 @@ def test_open_ide_needs_command(uv, monkeypatch):
     inited.factory("config", "set", "user-validation", "ide_command", "code {path}")
     ctx = repo.load_ctx(cwd=inited.repo)
     started = []
-    monkeypatch.setattr(engine.subprocess, "Popen", lambda argv: started.append(argv))
+    monkeypatch.setattr(engine.subprocess, "Popen", lambda argv, **kwargs: started.append(argv))
     argv = engine.open_ide(ctx, "t1")
     assert argv == ["code", str(inited.repo)]
+
+
+def test_open_ide_bad_command_is_factory_error(uv):
+    inited, run = uv
+    for command in ("code 'unclosed {path}", "no-such-ide-command-xyz {path}", "   "):
+        inited.factory("config", "set", "user-validation", "ide_command", command)
+        r = run("open-ide", check=False)
+        assert r.returncode == 1 and "Traceback" not in r.stderr and r.stderr.startswith("Error:")
