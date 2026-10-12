@@ -34,7 +34,7 @@ def test_start_in_worktree(herdr_env, origin_repo):
     adapter, calls = herdr_env
     prompt = 'Run `factory next`. Say "hi" $HOME'
     handle = adapter.start_session("t1", origin_repo / "wt", prompt, ["--name", "t1", "--settings", "/a b/c.json"], True)
-    assert handle == {"agent": "t1", "workspace": "w9"}
+    assert handle == {"agent": "t1", "workspace": "w9", "tab": "w9:t1"}
     c = [call for call in calls() if call[:2] != ["workspace", "list"]]
     assert c[0][:2] == ["worktree", "open"] and "--no-focus" in c[0] and "--trust-repository" not in c[0]
     assert c[1][:3] == ["agent", "start", "t1"] and c[1][c[1].index("--pane") + 1] == "w9:p1"
@@ -46,9 +46,54 @@ def test_extra_workspace_recorded_and_closed(herdr_env, origin_repo, monkeypatch
     adapter, calls = herdr_env
     monkeypatch.setenv("FAKE_HERDR_EXTRA_WS", "1")
     handle = adapter.start_session("t1", origin_repo / "wt", "p", [], True)
-    assert handle == {"agent": "t1", "workspace": "w9", "extra_workspace": "w8"}
+    assert handle == {"agent": "t1", "workspace": "w9", "tab": "w9:t1", "extra_workspaces": ["w8"]}
     adapter.close(handle)
     assert closed(calls()) == ["w9", "w8"]
+
+
+def test_extra_workspace_with_live_agent_left_open(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_EXTRA_WS", "1")
+    monkeypatch.setenv("FAKE_HERDR_W8_STATUS", "idle")
+    handle = adapter.start_session("t1", origin_repo / "wt", "p", [], True)
+    adapter.close(handle)
+    assert closed(calls()) == ["w9"]
+
+
+def test_workspace_with_other_tab_only_our_tab_closed(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    handle = adapter.start_session("t1", origin_repo / "wt", "p", [], True)
+    monkeypatch.setenv("FAKE_HERDR_OTHER_TAB", "1")
+    adapter.close(handle)
+    assert closed(calls()) == []
+    assert calls()[-1] == ["tab", "close", "w9:t1"]
+
+
+def test_already_open_worktree_workspace_not_owned(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_ALREADY_OPEN", "1")
+    handle = adapter.start_session("t1", origin_repo / "wt", "p", [], True)
+    assert handle == {"agent": "t1", "tab": "w9:t2"}
+    tab_create = next(c for c in calls() if c[:2] == ["tab", "create"])
+    assert tab_create[tab_create.index("--workspace") + 1] == "w9"
+    assert tab_create[tab_create.index("--cwd") + 1] == str(origin_repo / "wt")
+    agent_start = next(c for c in calls() if c[:2] == ["agent", "start"])
+    assert agent_start[agent_start.index("--pane") + 1] == "w9:p2"
+    adapter.close(handle)
+    assert closed(calls()) == []
+    assert calls()[-1] == ["tab", "close", "w9:t2"]
+
+
+def test_exception_after_open_closes_what_was_opened(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+
+    def boom(before, handle):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(adapter, "find_extra_workspaces", boom)
+    with pytest.raises(AdapterError, match="boom"):
+        adapter.start_session("t1", origin_repo / "wt", "p", [], True)
+    assert closed(calls()) == ["w9"]
 
 
 def test_preexisting_workspace_never_closed(herdr_env, origin_repo, monkeypatch):
@@ -75,7 +120,7 @@ def test_main_repo_uses_existing_workspace(herdr_env, origin_repo, monkeypatch):
 def test_main_repo_creates_workspace_when_missing(herdr_env, origin_repo):
     adapter, calls = herdr_env
     handle = adapter.start_session("t2", origin_repo, "p", [], False)
-    assert handle == {"agent": "t2", "workspace": "w7", "created_workspace": True}
+    assert handle == {"agent": "t2", "workspace": "w7", "tab": "w7:t1", "created_workspace": True}
     create = next(c for c in calls() if c[:2] == ["workspace", "create"])
     assert "--no-focus" in create and create[create.index("--cwd") + 1] == str(origin_repo)
     assert not any(c[:2] == ["tab", "create"] for c in calls())

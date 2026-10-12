@@ -42,7 +42,21 @@ def workspace_list():
 
 
 if args[:2] == ["worktree", "open"]:
-    print(json.dumps({"result": {"workspace": {"workspace_id": "w9"}, "tab": {"tab_id": "w9:t1"}, "root_pane": pane}}))
+    already_open = os.environ.get("FAKE_HERDR_ALREADY_OPEN") == "1"
+    print(json.dumps({"result": {"already_open": already_open, "type": "worktree_opened", "workspace": {"workspace_id": "w9"}, "tab": {"tab_id": "w9:t1"}, "root_pane": pane}}))
+elif args[:2] == ["tab", "list"]:
+    ws = option("--workspace")
+    tabs = []
+    if ws == "w8":
+        tabs.append({"tab_id": "w8:t1", "workspace_id": ws, "agent_status": os.environ.get("FAKE_HERDR_W8_STATUS", "unknown")})
+    else:
+        if ws in ("w9", "w7"):
+            tabs.append({"tab_id": f"{ws}:t1", "workspace_id": ws, "agent_status": "idle"})
+        if any(c[:2] == ["tab", "create"] for c in logged()) and ws not in ("w9", "w7"):
+            tabs.append({"tab_id": f"{ws}:t2", "workspace_id": ws, "agent_status": "idle"})
+        if os.environ.get("FAKE_HERDR_OTHER_TAB") == "1":
+            tabs.append({"tab_id": f"{ws}:t9", "workspace_id": ws, "agent_status": "unknown"})
+    print(json.dumps({"result": {"type": "tab_list", "tabs": tabs}}))
 elif args[:2] == ["workspace", "list"]:
     print(json.dumps({"result": {"type": "workspace_list", "workspaces": workspace_list()}}))
 elif args[:2] == ["workspace", "create"]:

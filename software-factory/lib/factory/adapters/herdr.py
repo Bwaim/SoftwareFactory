@@ -43,8 +43,14 @@ class HerdrAdapter(Adapter):
             return False, "The `herdr` command is not installed. Install Herdr from https://herdr.dev."
         return True, "Herdr is available."
 
-    def workspaces(self):
-        return parse(run(["workspace", "list"])).get("result", {}).get("workspaces", [])
+    def workspaces(self, check=True):
+        return parse(run(["workspace", "list"], check=check)).get("result", {}).get("workspaces", [])
+
+    def tabs(self, workspace_id):
+        r = run(["tab", "list", "--workspace", workspace_id], check=False)
+        if r.returncode != 0:
+            return None
+        return parse(r).get("result", {}).get("tabs", [])
 
     def main_repo_workspace_ids(self, workspaces):
         ids = []
@@ -54,45 +60,47 @@ class HerdrAdapter(Adapter):
                 ids.append(workspace["workspace_id"])
         return ids
 
+    def create_tab(self, name, workspace_id, cwd):
+        result = parse(run(["tab", "create", "--workspace", workspace_id, "--cwd", str(cwd), "--label", name, "--no-focus"]))["result"]
+        return {"agent": name, "tab": result["tab"]["tab_id"]}, result["root_pane"]["pane_id"]
+
     def open_worktree(self, name, cwd):
-        before = {w["workspace_id"] for w in self.workspaces()}
         result = parse(run(["worktree", "open", "--cwd", str(self.ctx.main), "--path", str(cwd), "--label", name, "--no-focus"]))["result"]
         pane = result["root_pane"]
-        handle = {"agent": name, "workspace": pane["workspace_id"]}
-        created = [
-            workspace_id
-            for workspace_id in self.main_repo_workspace_ids(self.workspaces())
-            if workspace_id not in before and workspace_id != pane["workspace_id"]
-        ]
-        if created:
-            handle["extra_workspace"] = created[0]
+        if result.get("already_open"):
+            return self.create_tab(name, pane["workspace_id"], cwd)
+        handle = {"agent": name, "workspace": pane["workspace_id"], "tab": pane["tab_id"]}
         return handle, pane["pane_id"]
+
+    def find_extra_workspaces(self, before, handle):
+        after = self.main_repo_workspace_ids(self.workspaces(check=False))
+        return [w for w in after if w not in before and w != handle.get("workspace")]
 
     def open_main_repo(self, name, cwd):
         existing = self.main_repo_workspace_ids(self.workspaces())
         if existing:
-            result = parse(run(["tab", "create", "--workspace", existing[0], "--cwd", str(cwd), "--label", name, "--no-focus"]))["result"]
-            return {"agent": name, "tab": result["tab"]["tab_id"]}, result["root_pane"]["pane_id"]
+            return self.create_tab(name, existing[0], cwd)
         result = parse(run(["workspace", "create", "--cwd", str(cwd), "--label", name, "--no-focus"]))["result"]
         pane = result["root_pane"]
-        return {"agent": name, "workspace": pane["workspace_id"], "created_workspace": True}, pane["pane_id"]
-
-    def open_location(self, name, cwd, in_worktree):
-        if in_worktree:
-            return self.open_worktree(name, cwd)
-        return self.open_main_repo(name, cwd)
+        handle = {"agent": name, "workspace": pane["workspace_id"], "tab": pane["tab_id"], "created_workspace": True}
+        return handle, pane["pane_id"]
 
     def screen(self, name):
         r = run(["agent", "read", name, "--source", "recent-unwrapped", "--lines", "60"], check=False)
         return r.stdout
 
     def start_session(self, name, cwd, prompt, claude_args, in_worktree):
-        handle, pane = self.open_location(name, cwd, in_worktree)
+        before = set(self.main_repo_workspace_ids(self.workspaces())) if in_worktree else set()
+        handle, pane = self.open_worktree(name, cwd) if in_worktree else self.open_main_repo(name, cwd)
         try:
+            if in_worktree and "workspace" in handle:
+                extra = self.find_extra_workspaces(before, handle)
+                if extra:
+                    handle["extra_workspaces"] = extra
             run(["agent", "start", name, "--kind", "claude", "--pane", pane, "--timeout", str(START_TIMEOUT_MS), "--", *claude_args],
                 timeout=START_TIMEOUT_MS // 1000 + 30)
             run(["agent", "prompt", name, prompt], timeout=60)
-        except AdapterError as e:
+        except Exception as e:
             screen = self.screen(name).lower()
             self.close(handle)
             if any(marker in screen for marker in TRUST_MARKERS):
@@ -100,22 +108,37 @@ class HerdrAdapter(Adapter):
                     f"Claude asks to trust the folder {cwd}. "
                     "Open Claude once in the main repository and trust it, then launch again."
                 )
-            raise e
+            if isinstance(e, AdapterError):
+                raise
+            raise AdapterError(f"Herdr start failed: {e}")
         return handle
 
     def stop_agent(self, handle):
         run(["agent", "send-keys", handle["agent"], "ctrl+c", "ctrl+c"], check=False)
 
+    def close_own(self, handle):
+        workspace_id, tab_id = handle.get("workspace"), handle.get("tab")
+        if workspace_id:
+            tabs = self.tabs(workspace_id)
+            others = [t for t in tabs if t["tab_id"] != tab_id] if tabs is not None else [None]
+            if not others:
+                run(["workspace", "close", workspace_id], check=False)
+                return
+        if tab_id:
+            run(["tab", "close", tab_id], check=False)
+
+    def close_extra(self, workspace_id):
+        tabs = self.tabs(workspace_id)
+        if tabs is not None and len(tabs) == 1 and tabs[0].get("agent_status", "unknown") == "unknown":
+            run(["workspace", "close", workspace_id], check=False)
+
     def close(self, handle):
         if not handle:
             return
         self.stop_agent(handle)
-        if handle.get("workspace"):
-            run(["workspace", "close", handle["workspace"]], check=False)
-        elif handle.get("tab"):
-            run(["tab", "close", handle["tab"]], check=False)
-        if handle.get("extra_workspace"):
-            run(["workspace", "close", handle["extra_workspace"]], check=False)
+        self.close_own(handle)
+        for workspace_id in handle.get("extra_workspaces", []):
+            self.close_extra(workspace_id)
 
     def send_prompt(self, handle, text):
         run(["agent", "prompt", handle["agent"], text])
