@@ -173,3 +173,20 @@ def task_json(fdir, tid):
 def events(fdir, tid):
     p = Path(fdir) / "tasks" / tid / "events.jsonl"
     return [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+
+
+def make_task(ctx, tid="t1", worktree=None, steps=None, **fields):
+    from factory import state
+
+    task = {
+        "id": tid, "description": "d", "pipeline": "p",
+        "steps": steps if steps is not None else [{"id": "s", "path": ["s"], "with": {}, "column": None, "model": None, "effort": None}],
+        "position": 0, "started": None, "status": "active", "status_reason": None,
+        "status_since": state.now(), "saved_status": None, "column": "Discovery",
+        "worktree": worktree, "base_ref": "main", "session_id": "sid", "terminal_handle": None,
+        "goto_counts": {}, "approval": None, "claude": {}, "state": {},
+        "created_at": state.now(), "updated_at": state.now(),
+        **fields,
+    }
+    state.create(ctx, task)
+    return task
