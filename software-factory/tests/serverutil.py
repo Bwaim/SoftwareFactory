@@ -17,7 +17,7 @@ def request(info, method, path, body=None, token=True, origin=None, host=None):
         headers["Origin"] = origin
     data = None
     if body is not None:
-        data = json.dumps(body).encode()
+        data = body if isinstance(body, bytes) else json.dumps(body).encode()
         headers["Content-Type"] = "application/json"
     conn.request(method, path, body=data, headers=headers)
     r = conn.getresponse()

@@ -219,7 +219,7 @@ function renderFilters() {
   const current = state.categoryFilter || "";
   f.append(selectInput(categories, categories.includes(current) ? current : "", (v) => { state.categoryFilter = v; renderAvailable(); }),
     textInput(state.textFilter || "", (v) => { state.textFilter = v; renderAvailable(); }, "Filter"),
-    el("button", { type: "button", onclick: guard(loadSteps) }, "Reload steps"));
+    el("button", { type: "button", onclick: guard(async () => { await loadSteps(); if (state.model) await runCheck(); }) }, "Reload steps"));
 }
 function renderAvailable() {
   const box = clear(byId("available"));
@@ -264,9 +264,8 @@ async function showDetail(id) {
   box.append(el("div", { class: "muted" }, "Body"), el("pre", {}, d.body));
 }
 
-function changed() {
-  state.commit = null;
-  state.savedPath = null;
+function changed(keepSaveResult = false) {
+  if (!keepSaveResult) { state.commit = null; state.savedPath = null; }
   state.hasError = true;
   renderSave();
   clearTimeout(state.checkTimer);
@@ -286,7 +285,7 @@ async function runCheck() {
 function radio(value, label) {
   const input = el("input", { type: "radio", name: "level", value });
   input.checked = state.saveLevel === value;
-  input.addEventListener("change", () => { state.saveLevel = value; changed(); });
+  input.addEventListener("change", () => { state.saveLevel = value; changed(true); });
   return el("label", {}, input, " " + label + " ");
 }
 function renderSave() {
@@ -361,9 +360,13 @@ async function init() {
   setupDrop();
   await loadSteps();
   const id = params.get("id");
-  if (id) { await loadPipeline(id); return; }
+  let failure = null;
+  if (id) {
+    try { await loadPipeline(id); return; } catch (e) { failure = e.message; }
+  }
   state.pipelines = await api("/api/pipelines");
   renderStart();
+  if (failure) showError(failure);
 }
 init().catch(() => {});
 </script>

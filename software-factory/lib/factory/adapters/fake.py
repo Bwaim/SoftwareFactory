@@ -19,6 +19,8 @@ class FakeAdapter(Adapter):
 
     def check(self):
         cfg = self.cfg()
+        if cfg.get("check_raises"):
+            raise RuntimeError(cfg["check_raises"])
         return bool(cfg.get("check_ok", True)), cfg.get("check_message", "Fake terminal is available.")
 
     def start_session(self, name, cwd, prompt, claude_args, in_worktree):

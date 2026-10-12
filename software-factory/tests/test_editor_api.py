@@ -52,3 +52,14 @@ def test_cli_lists(ed):
     ids = [p["id"] for p in inited.factory.json("pipeline", "list")]
     assert "base" in ids
     assert "gen" in [s["id"] for s in inited.factory.json("step", "list")]
+
+
+def test_save_drops_empty_nested_fields(ed):
+    inited, i = ed
+    data = {"id": "tidy", "description": "", "claude": {"model": "", "effort": ""},
+            "inputs": {"a": {"description": ""}}, "steps": [{"id": "gen", "with": {}, "model": "", "column": ""}]}
+    status, saved = request(i, "POST", "/api/pipelines/save", {"data": data, "level": "local"})
+    assert status == 200
+    stored = yaml.safe_load((inited.fdir / "pipelines" / "tidy.yaml").read_text())
+    assert "claude" not in stored and "description" not in stored
+    assert stored["steps"] == ["gen"] and stored["inputs"] == {"a": {}}

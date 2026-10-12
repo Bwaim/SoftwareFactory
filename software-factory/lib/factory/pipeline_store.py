@@ -35,12 +35,25 @@ def check(ctx, data, level):
     return [p.to_dict() for p in pipeline_check.check(reg, data, ctx.columns(), level)]
 
 
+def is_empty(value):
+    return value in (None, "", {}, [])
+
+
+def prune(value):
+    if not isinstance(value, dict):
+        return value
+    pruned = {k: prune(v) for k, v in value.items()}
+    return {k: v for k, v in pruned.items() if not is_empty(v)}
+
+
 def compact(data):
     steps = []
     for entry in data.get("steps") or []:
-        e = {k: v for k, v in normalize_entry(entry).items() if v not in (None, "", {}, [])}
+        e = prune(normalize_entry(entry))
         steps.append(e["id"] if list(e) == ["id"] else e)
-    clean = {k: v for k, v in data.items() if not k.startswith("_") and v not in (None, "", {}, [])}
+    clean = prune({k: v for k, v in data.items() if not k.startswith("_")})
+    if data.get("inputs"):
+        clean["inputs"] = {k: prune(v or {}) for k, v in data["inputs"].items()}
     clean["steps"] = steps
     return clean
 
