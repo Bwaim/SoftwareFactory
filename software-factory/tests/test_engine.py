@@ -97,3 +97,9 @@ def test_run_script_gets_config_and_task(inited):
     assert "`factory run-script --task t1`" in inited.factory("next", "--task", "t1").stdout
     inited.factory("run-script", "--task", "t1")
     assert (inited.fdir / "tasks" / "t1" / "artifacts" / "out.txt").read_text().strip() == "hello"
+
+
+def test_next_tells_session_about_block_skip_and_goto(flow):
+    out = run(flow, "next").stdout
+    assert "Only after the user approves" in out
+    assert "`factory skip --task t1`" in out

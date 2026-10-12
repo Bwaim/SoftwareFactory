@@ -147,6 +147,13 @@ def end_line(step):
     return "When the step is done, run `factory done`."
 
 
+IF_NEEDED = [
+    "If needed:",
+    '- If you cannot continue without the user, run `factory block "<question>"`, ask the user, then run `factory unblock` when the user answers.',
+    "- Only after the user approves: skip this step with `factory skip`, or go back to an earlier step with `factory goto <step path> --reason \"<why>\"`.",
+]
+
+
 def render(ctx, task, entry, step, values):
     lines = header(task, step)
     if step.run_in == "subagent" and step.type in ("prompt", "skill"):
@@ -157,7 +164,7 @@ def render(ctx, task, entry, step, values):
             lines += ["", "Run the step script with `factory run-script`. It prints the script output and its exit code."]
         else:
             lines += ["", "Instructions:", step.body.strip()]
-    lines += ["", end_line(step)]
+    lines += ["", end_line(step), "", *IF_NEEDED]
     text = "\n".join(lines)
     return with_task_flag(text, task["id"]) if not task.get("worktree") else text
 
