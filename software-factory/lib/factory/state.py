@@ -6,6 +6,7 @@ from .errors import FactoryError
 
 STATUSES = ("active", "blocked", "awaiting_approval", "waiting_external", "paused", "finished")
 ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+TASK_ID_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 
 
 def now():
@@ -16,8 +17,14 @@ def tasks_dir(ctx):
     return ctx.fdir / "tasks"
 
 
+def check_task_id(tid):
+    if not isinstance(tid, str) or not TASK_ID_RE.fullmatch(tid):
+        raise FactoryError(f"Invalid task id `{tid}`.")
+    return tid
+
+
 def task_dir(ctx, tid):
-    return tasks_dir(ctx) / tid
+    return tasks_dir(ctx) / check_task_id(tid)
 
 
 def task_file(ctx, tid):
@@ -82,9 +89,17 @@ def set_key(ctx, tid, key, value):
     update(ctx, tid, lambda t: t["state"].__setitem__(key, value))
 
 
-def artifact_path(ctx, tid, name):
+def artifact_file(ctx, tid, name):
     if not ARTIFACT_NAME_RE.match(name):
         raise FactoryError("The artifact name must be a simple file name, for example `plan.md`.")
-    d = task_dir(ctx, tid) / "artifacts"
-    d.mkdir(parents=True, exist_ok=True)
-    return (d / name).resolve()
+    folder = (task_dir(ctx, tid) / "artifacts").resolve()
+    path = (folder / name).resolve()
+    if path.parent != folder:
+        raise FactoryError("The artifact must stay inside the task artifacts folder.")
+    return path
+
+
+def artifact_path(ctx, tid, name):
+    path = artifact_file(ctx, tid, name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path

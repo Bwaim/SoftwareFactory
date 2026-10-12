@@ -121,7 +121,8 @@ def tasks(server, query, body):
 @route("GET", f"/api/tasks/{TASK}/artifacts/([^/]+)")
 def artifact(server, tid, name, query, body):
     from . import state
-    path = state.artifact_path(server.ctx, tid, name)
+    state.load(server.ctx, tid)
+    path = state.artifact_file(server.ctx, tid, name)
     if not path.is_file():
         raise NotFound(name)
     return {"name": name, "text": path.read_text(errors="replace")}
@@ -215,7 +216,7 @@ def delete_dry_run(server, query, body):
 @route("POST", "/api/delete")
 def delete_task(server, query, body):
     from . import delete
-    return delete.delete(server.ctx, body["id"], bool(body.get("confirm_unpushed")))
+    return delete.delete(server.ctx, body["id"], body.get("confirm_unpushed") is True)
 
 
 @route("GET", "/api/backlog")

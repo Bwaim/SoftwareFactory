@@ -8,7 +8,7 @@ from . import adapters, config, events, pipeline_check, repo, session, state
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, NO_WORKTREE_PIPELINES, Registry
 
-TASK_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+TASK_ID_RE = state.TASK_ID_RE
 ID_BASE_MAX = 29
 
 
@@ -121,7 +121,7 @@ def plan_launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlo
         report["errors"].append("The description is empty.")
     report["missing_inputs"] = [k for k in pipeline.inputs if not str(inputs.get(k, "")).strip()]
     if task_id:
-        if not TASK_ID_RE.match(task_id):
+        if not TASK_ID_RE.fullmatch(task_id):
             report["errors"].append(f"The id `{task_id}` must match [a-z][a-z0-9_-]{{0,31}}.")
         elif id_taken(ctx, task_id):
             report["errors"].append(f"The id `{task_id}` is already used.")

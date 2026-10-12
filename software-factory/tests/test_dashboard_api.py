@@ -101,3 +101,42 @@ def test_missing_body_field_is_400(dash):
     make_task(ctx, tid="t1", terminal_handle={"agent": "t1"})
     status, err = request(i, "POST", "/api/tasks/t1/send-prompt", {})
     assert status == 400 and "text" in err["error"]
+
+
+@pytest.mark.parametrize("bad_id", ["../x", "archive/x"])
+def test_delete_rejects_non_task_ids(dash, bad_id):
+    inited, i = dash
+    decoy = inited.fdir / "tasks" / "archive" / "x"
+    decoy.mkdir(parents=True)
+    (decoy / "task.json").write_text("{}")
+    other = inited.fdir / "x"
+    other.mkdir()
+    assert request(i, "POST", "/api/delete/dry-run", {"id": bad_id})[0] == 400
+    assert request(i, "POST", "/api/delete", {"id": bad_id, "confirm_unpushed": True})[0] == 400
+    assert (decoy / "task.json").exists() and other.exists()
+
+
+def test_artifact_for_unknown_task_creates_nothing(dash):
+    inited, i = dash
+    assert request(i, "GET", "/api/tasks/ghost/artifacts/spec.md")[0] == 400
+    assert not (inited.fdir / "tasks" / "ghost").exists()
+
+
+def test_artifact_symlink_outside_is_refused(dash, tmp_path):
+    inited, i = dash
+    ctx = repo.load_ctx(cwd=inited.repo)
+    make_task(ctx, tid="t1")
+    secret = tmp_path / "secret.md"
+    secret.write_text("secret")
+    (inited.fdir / "tasks" / "t1" / "artifacts" / "spec.md").symlink_to(secret)
+    status, err = request(i, "GET", "/api/tasks/t1/artifacts/spec.md")
+    assert status == 400 and "artifacts folder" in err["error"]
+
+
+def test_confirm_unpushed_must_be_true(dash):
+    inited, i = dash
+    request(i, "POST", "/api/launch", {"pipeline": "p", "description": "Dirty", "inputs": {}})
+    (inited.worktrees / "dirty" / "new.txt").write_text("x")
+    assert request(i, "POST", "/api/delete/dry-run", {"id": "dirty"})[1]["needs_confirm"] is True
+    assert request(i, "POST", "/api/delete", {"id": "dirty", "confirm_unpushed": "false"})[0] == 400
+    assert (inited.fdir / "tasks" / "dirty").exists()
