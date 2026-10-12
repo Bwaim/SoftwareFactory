@@ -34,8 +34,8 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
     1. Core: the `factory` CLI, task state, step execution, config, worktree creation, the terminal adapter with the Herdr adapter, task launch and delete, Init and the orchestrator menu.
     2. Task life: statuses, blocked, pause and resume, goto, artifacts, focus and send prompt, clean, event log.
     3. Authoring: step assistant, pipeline editor and its local server, catalog, library commits.
-    4. Lifecycle and docs: versioning, migration, README.
-    5. Dashboard: the dashboard views and their server API.
+    4. Lifecycle and docs: versioning, migration, README without the dashboard parts.
+    5. Dashboard: the dashboard views, their server API, and the README dashboard parts (tutorial step 6, dashboard reference).
 4. Ask validation. Ask the user to validate the plan file.
 5. Build. After plan validation, use the `/superpowers:subagent-driven-development` skill to implement the plan inside `YOUR_WORKING_DIR`, one milestone at a time. Run the tests of a milestone, fix the failures, and commit before starting the next milestone. Do not skip straight from this prompt to implementation.
 6. Verify. Check every item in Definition Of Done, fix failures, and rerun the affected checks. Keep final verification artifacts inside `VERIFICATION_DIR` and report actual results and any remaining blockers.
