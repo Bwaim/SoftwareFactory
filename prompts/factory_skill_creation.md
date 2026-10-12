@@ -30,9 +30,13 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 
 1. Brainstorm. Use the `/superpowers:brainstorming` skill to create a specification file from these requirements. Save the specification file in `SPEC_DIR/` before writing the plan.
 2. Ask validation. Ask the user to validate the specification file.
-3. Plan. After specification validation, use the `/superpowers:writing-plans` skill to create an implementation plan from the specification file. Save the plan file in `PLAN_DIR/` before writing implementation code.
+3. Plan. After specification validation, use the `/superpowers:writing-plans` skill to create an implementation plan from the specification file. Save the plan file in `PLAN_DIR/` before writing implementation code. Split the plan into these milestones, in this order:
+    1. Core: the `factory` CLI, task state, step execution, config, worktree creation, the terminal adapter with the Herdr adapter, task launch and delete, Init and the orchestrator menu.
+    2. Task life: statuses, blocked, pause and resume, goto, artifacts, focus and send prompt, clean, event log.
+    3. Authoring: step assistant, pipeline editor and its local server, catalog, library commits.
+    4. Lifecycle and docs: versioning, migration, README.
 4. Ask validation. Ask the user to validate the plan file.
-5. Build. After plan validation, use the `/superpowers:subagent-driven-development` skill to implement the plan inside `YOUR_WORKING_DIR`. Do not skip straight from this prompt to implementation.
+5. Build. After plan validation, use the `/superpowers:subagent-driven-development` skill to implement the plan inside `YOUR_WORKING_DIR`, one milestone at a time. Run the tests of a milestone, fix the failures, and commit before starting the next milestone. Do not skip straight from this prompt to implementation.
 6. Verify. Check every item in Definition Of Done, fix failures, and rerun the affected checks. Keep final verification artifacts inside `VERIFICATION_DIR` and report actual results and any remaining blockers.
 
 ## Definition Of Done
@@ -604,6 +608,7 @@ The library, a folder in any git repository:
 ### Verification
 
 - The build is verified with an automated test run. Its report goes to `VERIFICATION_DIR`.
+- The report has one section per milestone, with the tests run and their results.
 - Test setup, all inside `VERIFICATION_DIR`:
   - A test git repository. Its `origin` remote is a local bare repository, so nothing is pushed to a real remote.
   - A test library in its own test git repository. The tests never change a real library.
