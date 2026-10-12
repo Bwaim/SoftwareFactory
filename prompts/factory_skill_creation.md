@@ -515,6 +515,22 @@ library/
 migrations/          # One script per format version change
 ```
 
+### Documentation
+
+- `YOUR_WORKING_DIR/README.md` contains:
+  - What the factory does, in a few lines.
+  - The concepts, one line each: task, pipeline, step, step types, local / generic / built-in levels, catalog, artifacts.
+  - Install and prerequisites: the plugin marketplace, Herdr, the Bash allowlist.
+  - A tutorial with the exact actions and the expected result of each:
+    1. Init the factory in a repository and install the starter pack.
+    2. Run `quick-task` on a small change: follow it in Herdr, show tasks, approve the `user-validation` step, check the commit.
+    3. Pause all tasks on Exit, start the factory again, and resume.
+    4. Create a step with "Create a new step".
+    5. Copy `quick-task` in the pipeline editor, add the new step, save, and run it.
+  - A reference: the menu actions, the `factory` commands, and the step and pipeline fields.
+  - Troubleshooting: terminal check failed, data version mismatch, session gone.
+- The README uses simple English and short sentences.
+
 ### Verification
 
 - The build is verified with an automated test run. Its report goes to `VERIFICATION_DIR`.
@@ -543,6 +559,7 @@ migrations/          # One script per format version change
   - For a subagent step, `factory next` prints the Agent call with the right model and effort: the pipeline entry value wins over the manifest value.
   - `factory pipeline check` warns about `model` or `effort` on a step that runs in the session.
   - Installing a catalog pipeline copies it and offers its missing steps. The status shows not installed, installed, and installed and changed since.
+  - Every `factory` command written in the README exists in the CLI.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
