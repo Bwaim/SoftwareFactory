@@ -328,7 +328,7 @@ Save the path with `factory state set plan <path>`.
 
 ##### Task launch
 
-- A pipeline is launched with `factory launch <pipeline> --description <text> [--input <key>=<value> ...] [--id <id>] [--from-backlog <number>]`. It does not use Claude. It is the built-in step `create-task`.
+- A pipeline is launched with `factory launch <pipeline> --description <text> [--input <key>=<value> ...] [--id <id>] [--from-backlog <id>]`. It does not use Claude. It is the built-in step `create-task`.
 - The orchestrator menu and the dashboard both use it. They only collect the values: the menu asks the user, the dashboard shows a form.
 - `factory launch --dry-run` with the same values prints what would happen: the task id, the worktree path, the branch case (new, existing or detached), the missing inputs and the errors. The caller shows it, and launches only after the user confirms.
 - The task id is a slug of the description: lowercase, matching `[a-z][a-z0-9_-]{0,31}`. If the id is taken, a suffix `-2`, `-3` is added. `--id` sets it by hand. The id never changes.
@@ -510,12 +510,27 @@ Save the path with `factory state set plan <path>`.
 #### Backlog
 
 - `.factory/backlog.md` holds the tasks not started yet. The user can also edit it by hand.
-- One entry per line: `- <description>`, with an optional pipeline id at the end: `[pipeline: <id>]`.
+- Each entry is a section:
+  - A `##` heading with the title
+  - A hidden id line: `<!-- id: <id> -->`
+  - An optional `pipeline: <id>` line
+  - A short summary, in free text
+- Example:
+
+```markdown
+## Add dark mode to settings
+<!-- id: b7 -->
+pipeline: plan-and-build
+Users ask for a dark theme. Start with the settings screen only.
+```
+
+- The order of the entries in the file is the priority. The first entry is the most important.
+- The id is stable. Entries written by hand without an id get one the next time the CLI writes the file.
 - Built-in steps, run in the orchestrator session:
-  - `backlog-add`: asks for the description and the optional pipeline, then adds the entry.
+  - `backlog-add`: asks for the title, the summary and the optional pipeline, then adds the entry at the end.
   - `backlog-remove`: lists the entries and removes the one the user selects.
-- When the user launches a pipeline, the orchestrator offers to start from a backlog entry. The entry gives the description and the pipeline. The launch uses `--from-backlog`, so the entry is removed once the task is created.
-- At the end of Init, the orchestrator asks if the user wants to import backlog entries. The user pastes a list or gives a file path. The orchestrator shows the parsed entries and adds them with `backlog-add` after approval.
+- When the user launches a pipeline, the orchestrator offers to start from a backlog entry. The title becomes the task description, and the summary is saved in the task state key `summary`, so steps can read it. The launch uses `--from-backlog <id>`, so the entry is removed once the task is created.
+- At the end of Init, the orchestrator asks if the user wants to import backlog entries. The user pastes a list or gives a file path. Each line becomes the title of an entry. The orchestrator shows the parsed entries and adds them with `backlog-add` after approval.
 
 ### Orchestrator
 
@@ -559,7 +574,7 @@ Save the path with `factory state set plan <path>`.
   - `factory state get <key>` and `factory state set <key> <value>`: read and write the task state.
   - `factory status`: prints the task id, the pipeline and the current step path.
   - `factory config get <step> <key>` and `factory config set <step> <key> <value>`: read and write the repository config.
-  - `factory backlog list`, `factory backlog add <description> [--pipeline <id>]` and `factory backlog remove <number>`: read and change the backlog.
+  - `factory backlog list`, `factory backlog add <title> [--summary <text>] [--pipeline <id>]`, `factory backlog remove <id>` and `factory backlog move <id> --to <position>`: read and change the backlog.
   - `factory pipeline edit [<id>]`: opens the pipeline editor.
   - `factory pipeline check <id>`: runs the pipeline checks and prints the errors and warnings.
   - `factory block <reason>` and `factory unblock`: change the blocked status of the task.
@@ -689,7 +704,7 @@ The library, a folder in any git repository:
   - `next`, `done` and `skip` on a test pipeline: `done_check` passes and fails, and `skip` is refused for a required step.
   - Composite steps: the full path is shown, `reads` and `writes` are computed, and a loop is refused.
   - A pipeline that lists `create-worktree` but not as its first step is refused.
-  - Backlog add, list and remove.
+  - Backlog add, list, remove and move, by id. A hand-written entry without an id gets one. Launching from an entry saves its summary in the task state and removes the entry.
   - The event log contains the expected events.
   - A command refuses data with another version. A test migration from version 1 to a fake version 2 runs and creates the backup.
   - `factory pipeline check` reports each error and warning type on test pipelines.
