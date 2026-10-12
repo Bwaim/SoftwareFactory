@@ -91,6 +91,8 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
   - `steps`: ordered list of step ids. Each entry can set config values for this pipeline with `with`.
   - `claude`: optional `model` and `effort` for the task session, passed at launch as `--model` and `--effort`.
   - A `steps` entry can also set `model` and `effort`. They override the step manifest values for this pipeline.
+  - `start_column`: the board column of a new task. Default: the first column.
+  - A `steps` entry can also set `column`. It overrides the step manifest value for this pipeline.
 - Example:
 
 ```yaml
@@ -134,6 +136,7 @@ steps:
   - `run_in`: `session` (default) or `subagent`. Used by `prompt` and `skill` steps.
   - `model` and `effort`: optional, used only when `run_in` is `subagent`. Example: `model: opus`, `effort: high`.
   - `requires`: optional list of tools and skills the step needs, for example `[gh]` or `[/superpowers:writing-plans]`
+  - `column`: optional board column. The task moves to it when the step starts.
 - The body depends on the type:
   - `prompt`: the instructions the agent follows
   - `skill`: the skill to call and how to use its result
@@ -176,7 +179,7 @@ Save the path with `factory state set plan <path>`.
 
 - A step can be used by many pipelines.
 - Built-in steps: `create-task`, `create-worktree`, `delete-task`, `backlog-add`, `backlog-remove`, `migrate` and `user-validation`.
-- `user-validation`: the session stops and waits for the user to approve.
+- `user-validation`: the task waits for the user to approve a result (see Approval).
 - Required steps are enforced by the factory CLI: `factory skip` refuses them, and `factory done` runs their `done_check`.
 
 #### Step creation
@@ -307,9 +310,12 @@ Save the path with `factory state set plan <path>`.
 - The current step path.
 - A status:
   - `active`: the pipeline runs
-  - `blocked`: the task waits for the user, with a reason
+  - `blocked`: the session waits for an answer from the user, with a reason
+  - `awaiting_approval`: the user must validate a result (see Approval)
+  - `waiting_external`: the task waits for an external event, like a merge request review (see External waiting)
   - `paused`: the factory stopped the session (see Pause and resume)
   - `finished`: the last step is done
+- The board column (see Board columns).
 - An optional branch name.
 - An optional worktree path. It is empty for `new-step-assistant`.
 - The Claude session id.
@@ -385,6 +391,10 @@ Save the path with `factory state set plan <path>`.
   - `step_goto`, with the from step, the to step and the reason
   - `task_finished`
   - `prompt_sent`, with the text
+  - `column_changed`, with the from and to columns
+  - `approval_requested`, with the target
+  - `approved`
+  - `changes_requested`, with the text
 - With the Claude session id from the task state, this log is enough to split the session transcript by step later.
 
 ##### Task execution
@@ -429,8 +439,26 @@ Save the path with `factory state set plan <path>`.
 
 - `factory block <reason>` sets the task to `blocked`. `factory unblock` sets it back to `active`.
 - The agent runs `factory block` when it cannot continue without the user, and `factory unblock` when the user has answered.
-- The `user-validation` step always blocks the task while it waits for approval.
 - When a task becomes blocked and the adapter supports `notify`, the user gets a notification.
+
+##### Board columns
+
+- The board columns are a list in `.factory/factory.yaml`. Default: Discovery, Specification, Plan, Implementation, Review, QA.
+- A finished task goes to a Done column, which is always last.
+- A new task starts in the pipeline `start_column`.
+- When a step starts, the task moves to the step `column`, from the pipeline entry first, then from the step manifest. A step without a column leaves the task where it is.
+- `factory pipeline check` reports an error for a column that is not in the list.
+
+##### Approval
+
+- `user-validation` sets the task to `awaiting_approval`. Its `with` says what to validate:
+  - `target: artifact`, with `artifact_key`: the state key that holds the artifact path, for example `spec`
+  - `target: worktree`: the code in the task worktree
+- The user approves or requests changes, from the dashboard or by answering in the session:
+  - `factory approve` saves the approval. The `done_check` of `user-validation` checks it. The session gets "The user approved. Run `factory done`."
+  - `factory request-changes <text>` sets the task back to `active`. The session gets the text as feedback and continues the step.
+- `factory open-ide` opens the task worktree with the config key `ide_command`, for example `open -a "Android Studio" {path}` or `code {path}`. The key is asked on first use, like any config key.
+- When the dashboard or the menu approves, it sends the message to the session with the adapter `send-prompt`.
 
 ##### Pause and resume
 
@@ -518,6 +546,7 @@ Save the path with `factory state set plan <path>`.
   - `factory catalog list` and `factory catalog install <id> --generic|--local`: browse and install catalog items.
   - `factory terminal focus <id>` and `factory terminal send-prompt <id> <text>`: focus a task session and send it a prompt.
   - `factory clean`: lists finished tasks and whether their work is merged.
+  - `factory approve`, `factory request-changes <text>` and `factory open-ide`: approval actions.
   - `factory library commit <message> <paths...>`: commits the given library files in the repository that contains the library, and nothing else.
 
 ### Terminal adapter
@@ -653,6 +682,8 @@ The library, a folder in any git repository:
   - No catalog file refers to a project-specific skill or tool.
   - `factory catalog list` shows the missing `requires` of an item.
   - The CLI runs on a machine with only `uv` installed: `uv` installs the dependencies on the first run.
+  - A task starts in `start_column` and moves when a step with a `column` starts. The pipeline entry wins over the manifest. An unknown column is a pipeline check error.
+  - `user-validation` sets `awaiting_approval`. `factory approve` lets `factory done` pass. `factory request-changes` sets `active` and sends the text with the fake adapter.
   - Two processes writing `config.yaml` and `backlog.md` at the same time lose no write.
   - For a task without a worktree, `factory next` prints commands with `--task <id>`, and a command without it fails with a message that says to add it.
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
