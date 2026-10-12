@@ -60,6 +60,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
   - Delete a task: runs the built-in step `delete-task`
   - Create or edit a pipeline: opens the pipeline editor next to the orchestrator
   - Create a new step: runs the built-in pipeline `new-step-assistant`
+  - Browse the catalog: lists the catalog pipelines and steps, and installs them
   - Add a backlog entry: runs the built-in step `backlog-add`
   - Remove a backlog entry: runs the built-in step `backlog-remove`
   - Resume a task: restarts the session of a paused task, or of a task whose session is gone
@@ -98,7 +99,7 @@ steps:
       target_branch: release
 ```
 
-- Built-in pipeline: `new-step-assistant`. This build ships no other pipeline. The user creates them with the pipeline editor.
+- Built-in pipeline: `new-step-assistant`. Other pipelines come from the catalog or from the pipeline editor.
 - Adding a new pipeline needs only a new pipeline file, with no change in the orchestrator.
 - Each pipeline run is a task.
 
@@ -220,6 +221,21 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - It can save with warnings, never with errors.
 - On save, it asks where to save: generic in `<source>/library/pipelines/`, or local in `.factory/pipelines/`. When the user edits a generic pipeline, they can save a local override instead.
 - If a needed step does not exist, the user creates it with "Create a new step" from the orchestrator, then reloads the list in the editor.
+
+#### Catalog
+
+- The factory ships a catalog of ready-to-use pipelines and steps in `FACTORY_SOURCE/catalog/`.
+- Catalog items are templates. Installing an item copies it to the generic library or to the local factory, as the user chooses. The user owns the copy.
+- "Browse the catalog" lists each item with its category, its description and its status: not installed, installed, or installed and changed since.
+- Installing a pipeline lists the steps it uses that are not installed, and installs them after approval.
+- An installed item that already exists is replaced only after the user sees the difference and approves.
+- Init offers the starter pack: the `quick-task` pipeline and its steps.
+- Catalog content for this build:
+  - Pipeline `quick-task`: `implement`, `user-validation`, `commit`
+  - Step `implement`: a prompt step, "do the task description"
+  - Steps that wrap existing skills: `commit` (`/nextory-commit`), `create-merge-request` (`/nextory-create-merge-request`), `review-mr` (`/nextory-review-mr`), `address-mr-comments` (`/nextory-address-mr-comments`), `create-ticket` (`/nextory-create-ticket`)
+  - Steps that wrap superpowers skills: `brainstorm` (`/superpowers:brainstorming`) and `write-plan` (`/superpowers:writing-plans`). They save their files in the artifacts folder.
+- The builder reads each wrapped skill to set `run_in`: `session` if the skill asks the user anything, otherwise `subagent`.
 
 #### Tasks
 
@@ -387,6 +403,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - It asks for the path of the factory source, with `FACTORY_SOURCE` as the default, and saves it as `source` in `.factory/factory.yaml`. It checks that `<source>/library/` exists.
 - It creates `.factory/` with its files and empty folders (see File organization). It never overwrites an existing file.
 - It adds `.factory/` and `.factory.backup-*/` to `.git/info/exclude`. It never changes `.gitignore`, because the repository can be shared.
+- It offers to install the catalog starter pack (see Catalog).
 - It ends with the backlog import (see Backlog).
 
 ### Factory CLI
@@ -413,6 +430,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory pause <id>`, `factory pause --all` and `factory resume <id>`: pause and resume tasks.
   - `factory goto <step-path> --reason <text>`: moves the task back to an earlier step.
   - `factory artifact path <name>`: prints the absolute path of a task artifact file.
+  - `factory catalog list` and `factory catalog install <id> --generic|--local`: browse and install catalog items.
 
 ### Terminal adapter
 
@@ -459,6 +477,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - Built-in steps and pipelines are in `FACTORY_SOURCE/builtin/`.
 - Steps and pipelines created by the user are in `FACTORY_SOURCE/library/`.
 - A rebuild can replace everything in `FACTORY_SOURCE` except `library/`. It changes files in `library/` only through a migration script.
+- A rebuild can replace `catalog/`. Installed copies are not affected.
 
 ### File organization
 
@@ -486,6 +505,9 @@ In `FACTORY_SOURCE`:
 builtin/
   pipelines/         # Built-in pipelines
   steps/             # Built-in steps
+catalog/
+  pipelines/         # Pipeline templates, installed by copy
+  steps/             # Step templates, installed by copy
 library/
   factory.yaml       # Data format version of the library
   pipelines/         # Generic pipelines created by the user
@@ -520,6 +542,7 @@ migrations/          # One script per format version change
   - `factory artifact path` creates the artifacts folder and prints an absolute path in the main repository, also when called from a worktree.
   - For a subagent step, `factory next` prints the Agent call with the right model and effort: the pipeline entry value wins over the manifest value.
   - `factory pipeline check` warns about `model` or `effort` on a step that runs in the session.
+  - Installing a catalog pipeline copies it and offers its missing steps. The status shows not installed, installed, and installed and changed since.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
