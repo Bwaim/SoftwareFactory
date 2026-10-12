@@ -62,7 +62,8 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
   - Create a new step: runs the built-in pipeline `new-step-assistant`
   - Add a backlog entry: runs the built-in step `backlog-add`
   - Remove a backlog entry: runs the built-in step `backlog-remove`
-  - Exit: stops the menu. Running tasks are not affected.
+  - Resume a task: restarts the session of a paused task, or of a task whose session is gone
+  - Exit: stops the menu. It first asks whether to pause all tasks (see Pause and resume).
 
 ### Factory elements
 
@@ -280,6 +281,8 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `task_deleted`
   - `task_blocked`, with the reason
   - `task_unblocked`
+  - `task_paused`
+  - `task_resumed`
 - With the Claude session id from the task state, this log is enough to split the session transcript by step later.
 
 ##### Task execution
@@ -304,6 +307,22 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - The agent runs `factory block` when it cannot continue without the user, and `factory unblock` when the user has answered.
 - The `user-validation` step always blocks the task while it waits for approval.
 - When a task becomes blocked and the adapter supports `notify`, the user gets a notification.
+
+##### Pause and resume
+
+- Pausing a task:
+  - It saves the current status (`active` or `blocked`, with the reason), so resume can restore it.
+  - If the session is working, it asks the user to wait until the session is idle, or to stop it now. A stopped step is not marked done, so it continues on resume.
+  - It closes the task terminal with `factory terminal close` and sets the status to `paused`.
+- On Exit, the orchestrator asks whether to pause all `active` and `blocked` tasks. If the user says no, the sessions keep running.
+- At start, after the version check, if paused tasks exist, the orchestrator lists them and offers to resume all of them, some of them or none.
+- Resuming a task:
+  - It starts a new terminal with `factory terminal start-session` in the task worktree, or in the main repository for `new-step-assistant`.
+  - Claude starts with `--resume <session-id> --name <id> --settings <main repository>/.factory/claude-settings.json`, so the conversation continues.
+  - The prompt is: "The factory resumed this task. Run `factory status`, then continue with `factory next`."
+  - It restores the saved status and saves the new terminal handle.
+- "Resume a task" in the menu lists the paused tasks, and the `active` or `blocked` tasks whose session state is `gone`.
+- If the adapter does not support `state`, the user can still resume an `active` or `blocked` task. The orchestrator first warns that a second session could start if the first one is still running.
 
 #### Backlog
 
@@ -353,6 +372,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory pipeline check <id>`: runs the pipeline checks and prints the errors and warnings.
   - `factory block <reason>` and `factory unblock`: change the blocked status of the task.
   - `factory tasks`: prints the task list.
+  - `factory pause <id>`, `factory pause --all` and `factory resume <id>`: pause and resume tasks.
 
 ### Terminal adapter
 
@@ -363,7 +383,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `start-session <name> <cwd> <prompt> -- <claude args>`: opens a new terminal in `cwd`, starts Claude with the args and the first prompt, and returns a handle
   - `run <cwd> <command>`: opens a terminal next to the caller for an interactive program, like the pipeline editor
   - `close <handle>`: stops the Claude session and closes its terminal
-  - Optional: `send-prompt <handle> <text>`, `focus <handle>`, `state <handle>` (the live session state) and `notify <text>`. An adapter that does not support them says so, and the factory hides the actions that need them.
+  - Optional: `send-prompt <handle> <text>`, `focus <handle>`, `state <handle>` (the live session state, `gone` when the session no longer exists) and `notify <text>`. An adapter that does not support them says so, and the factory hides the actions that need them.
 - This build ships one adapter: `herdr`.
 
 #### Herdr adapter
@@ -453,10 +473,12 @@ migrations/          # One script per format version change
   - The pipeline editor load, copy, check and save functions are tested without the screen.
   - With a fake test adapter that records its calls, launch and delete call only the adapter, never `herdr` directly.
   - `factory block` and `factory unblock` change the status, and `factory tasks` lists blocked tasks first.
+  - With the fake test adapter, pause saves the status and closes the terminal, and resume restores the status with the same session id.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
   - The test Claude session starts with `.factory/claude-settings.json` and never waits on a permission prompt.
+  - Pausing the task closes its terminal. Resuming it reopens the same Claude session, which continues the pipeline.
   - Deleting the task asks for approval when there are uncommitted changes, closes the task terminal, removes the worktree and archives the task folder.
 - The tests close only the Herdr workspaces, tabs and panes they created.
 - At the end, the tests remove the test repository and the test source. The report stays.
