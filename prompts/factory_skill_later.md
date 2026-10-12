@@ -22,9 +22,7 @@ Ideas and requirements not in the current build. Move them to `factory_skill_cre
 
 ### Dashboard security
 
-- The server listens on `127.0.0.1` only.
-- It requires a random token generated at start.
-- It rejects requests whose `Origin` header is not the dashboard.
+- The dashboard uses the local server and its security rules from the main prompt.
 - <TODO: decide if Send prompt allows free text or only fixed prompt templates>
 
 ### Limits

@@ -70,7 +70,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
     - Delete a task: runs the built-in step `delete-task`
     - Clean finished tasks: deletes finished tasks whose work is merged
   - Pipelines and steps
-    - Create or edit a pipeline: opens the pipeline editor next to the orchestrator
+    - Create or edit a pipeline: opens the pipeline editor in the browser
     - Create a new step: runs the built-in pipeline `new-step-assistant`
     - Browse the catalog: lists the catalog pipelines and steps, and installs them
   - Backlog
@@ -214,22 +214,21 @@ Save the path with `factory state set plan <path>`.
 
 #### Pipeline editor
 
-- Pipelines are created and changed with an interactive terminal editor: `factory pipeline edit [<id>]`. It does not use Claude.
-- The orchestrator opens it with `factory terminal run`, because a Claude session cannot run an interactive program.
-- It is written in Python with the standard `curses` module, so it needs no install.
+- Pipelines are created and changed in a web page served by the local server (see Local server): `factory pipeline edit [<id>]` starts the server and opens the page with `open <url>`. It does not use Claude.
+- The page uses plain HTML, CSS and JavaScript, with no external library, so it works offline. Drag and drop uses the browser's native support.
 - Start options:
   - Create an empty pipeline
   - Copy an existing pipeline as a starting point
   - Edit an existing pipeline
-- It shows the pipeline steps on one side and the available steps on the other. Keyboard actions:
-  - Add, remove and reorder steps
-  - Edit the `with` values of a step
-  - Edit the id, the description and the inputs
+- The page shows the available steps on one side and the pipeline steps on the other:
+  - Drag a step from the list into the pipeline, and drag pipeline steps to reorder them
+  - Remove a step from the pipeline
+  - Edit the `with` values, `model` and `effort` of a pipeline step in a form
+  - Edit the id, the description, the inputs, and the session `model` and `effort` in a form
   - Filter the available steps by category or by text
   - Reload the available steps, to see a step created in another task
-  - Edit the session `model` and `effort`, and the `model` and `effort` of each subagent step
 - Each available step shows its id, category, description, level (local, generic or built-in) and where it runs (session or subagent).
-- It runs the pipeline checks live and shows the problems:
+- It runs the pipeline checks live, through the server, and shows the problems:
   - Error: `create-worktree` is listed, but not as the first step
   - Error: a step id does not exist
   - Warning: a `reads` key is not a pipeline input and is not written by an earlier step
@@ -238,6 +237,16 @@ Save the path with `factory state set plan <path>`.
 - It can save with warnings, never with errors.
 - On save, it asks where to save: generic in `<library>/pipelines/`, or local in `.factory/pipelines/`. When the user edits a generic pipeline, they can save a local override instead.
 - If a needed step does not exist, the user creates it with "Create a new step" from the orchestrator, then reloads the list in the editor.
+
+#### Local server
+
+- A small local HTTP server, written with the Python standard `http.server` module, serves the editor page and its API. The future dashboard will reuse it.
+- API: list steps, list pipelines, load a pipeline, check a pipeline, save a pipeline. The page uses only this API. It never reads or writes files directly.
+- Security:
+  - It listens on `127.0.0.1` only, on a free port.
+  - It generates a random token at start. The page URL carries it, and every API request must send it.
+  - It rejects requests whose `Origin` header is not the server itself.
+- It stops when the user closes the editor from the page, or after 30 minutes without requests.
 
 #### Catalog
 
@@ -513,7 +522,6 @@ Save the path with `factory state set plan <path>`.
 - An adapter implements:
   - `check`: checks that the terminal is available, and gives the fix if not
   - `start-session <name> <cwd> <prompt> -- <claude args>`: opens a new terminal in `cwd`, starts Claude with the args and the first prompt, and returns a handle
-  - `run <cwd> <command>`: opens a terminal next to the caller for an interactive program, like the pipeline editor
   - `close <handle>`: stops the Claude session and closes its terminal
   - Optional: `send-prompt <handle> <text>`, `focus <handle>`, `state <handle>` (the live session state, `gone` when the session no longer exists) and `notify <text>`. An adapter that does not support them says so, and the factory hides the actions that need them.
 - This build ships one adapter: `herdr`.
@@ -526,7 +534,6 @@ Save the path with `factory state set plan <path>`.
   - Then `herdr agent start <name> --kind claude --pane <pane_id> -- <claude args>`, then `herdr agent prompt <name> <prompt>`.
   - The pane id is read from the JSON response, never guessed.
   - The handle is the Herdr agent name and the workspace or tab id.
-- `run`: `herdr pane split`, then `herdr pane run`.
 - `close`: closes the workspace or the tab. Check that this also stops the Claude process. If it does not, stop it first.
 - `send-prompt`: `herdr agent prompt`. `focus`: `herdr agent focus`. `state`: `herdr agent get`. `notify`: `herdr notification`. Check the exact syntax with the installed `herdr` binary.
 
@@ -627,7 +634,7 @@ The library, a folder in any git repository:
   - The event log contains the expected events.
   - A command refuses data with another version. A test migration from version 1 to a fake version 2 runs and creates the backup.
   - `factory pipeline check` reports each error and warning type on test pipelines.
-  - The pipeline editor load, copy, check and save functions are tested without the screen.
+  - The editor server API, tested without a browser: list, load, copy, check and save. Requests without the token or with a wrong `Origin` are rejected.
   - With a fake test adapter that records its calls, launch and delete call only the adapter, never `herdr` directly.
   - `factory block` and `factory unblock` change the status, and `factory tasks` lists blocked tasks first.
   - With the fake test adapter, pause saves the status and closes the terminal, and resume restores the status with the same session id.
