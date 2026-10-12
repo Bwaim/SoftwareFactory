@@ -63,6 +63,13 @@ def register(sub, common):
     p = sub.add_parser("approval")
     aps = p.add_subparsers(dest="action", required=True)
     aps.add_parser("check", parents=[common])
+    p = sub.add_parser("backlog")
+    bs = p.add_subparsers(dest="action", required=True)
+    bs.add_parser("list", parents=[common])
+    a = bs.add_parser("add", parents=[common]); a.add_argument("title"); a.add_argument("--summary", default=""); a.add_argument("--pipeline", default=None)
+    r = bs.add_parser("remove", parents=[common]); r.add_argument("id")
+    m = bs.add_parser("move", parents=[common]); m.add_argument("id"); m.add_argument("--to", type=int, required=True)
+    i = bs.add_parser("import", parents=[common]); i.add_argument("--file", default=None); i.add_argument("--dry-run", action="store_true")
     sub.add_parser("menu", parents=[common])
 
 
@@ -392,3 +399,56 @@ def external_done_cmd(args):
     from . import engine
     engine.external_done(ctx_of(args), args.id)
     print(f"Task {args.id}: the external event is marked done.")
+
+
+def print_entries(entries, as_json):
+    if as_json:
+        cli.emit([e.to_dict() for e in entries], True)
+        return
+    if not entries:
+        print("The backlog is empty.")
+    for n, e in enumerate(entries, 1):
+        pipeline = f" [{e.pipeline}]" if e.pipeline else ""
+        print(f"{n}. {e.title}{pipeline} (id {e.id})")
+
+
+@cli.command("backlog list")
+def backlog_list(args):
+    from . import backlog
+    print_entries(backlog.list_entries(ctx_of(args)), args.json)
+
+
+@cli.command("backlog add")
+def backlog_add(args):
+    from . import backlog
+    e = backlog.add(ctx_of(args), args.title, args.summary, args.pipeline)
+    if args.json:
+        cli.emit(e.to_dict(), True)
+    else:
+        print(f"Added {e.title} (id {e.id}).")
+
+
+@cli.command("backlog remove")
+def backlog_remove(args):
+    from . import backlog
+    e = backlog.remove(ctx_of(args), args.id)
+    print(f"Removed {e.title}.")
+
+
+@cli.command("backlog move")
+def backlog_move(args):
+    from . import backlog
+    print_entries(backlog.move(ctx_of(args), args.id, args.to), args.json)
+
+
+@cli.command("backlog import")
+def backlog_import(args):
+    import sys
+    from pathlib import Path
+    from . import backlog
+    text = Path(args.file).read_text() if args.file else sys.stdin.read()
+    titles = backlog.parse_import(text)
+    if args.dry_run:
+        cli.emit(titles, True) if args.json else print("\n".join(titles))
+        return
+    print_entries(backlog.import_titles(ctx_of(args), titles), args.json)
