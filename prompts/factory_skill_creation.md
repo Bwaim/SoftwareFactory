@@ -53,18 +53,25 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 ### General concept
 
 - The `nextory-factory` skill is an orchestrator launched in the main repository.
-- It can do the following actions:
-  - Init the factory. When the factory is not initialized in the repository, this is the only action shown. After init, it is never shown.
-  - Launch a new pipeline, from scratch or from a backlog entry
-  - Show tasks: lists the tasks with their status
-  - Delete a task: runs the built-in step `delete-task`
-  - Create or edit a pipeline: opens the pipeline editor next to the orchestrator
-  - Create a new step: runs the built-in pipeline `new-step-assistant`
-  - Browse the catalog: lists the catalog pipelines and steps, and installs them
-  - Add a backlog entry: runs the built-in step `backlog-add`
-  - Remove a backlog entry: runs the built-in step `backlog-remove`
-  - Resume a task: restarts the session of a paused task, or of a task whose session is gone
-  - Exit: stops the menu. It first asks whether to pause all tasks (see Pause and resume).
+- It can do the following actions, grouped in the menu:
+  - Tasks
+    - Launch a new pipeline, from scratch or from a backlog entry
+    - Show tasks: lists the tasks with their status
+    - Focus a task: switches the terminal to the task session
+    - Send a prompt to a task
+    - Resume a task: restarts the session of a paused task, or of a task whose session is gone
+    - Delete a task: runs the built-in step `delete-task`
+    - Clean finished tasks: deletes finished tasks whose work is merged
+  - Pipelines and steps
+    - Create or edit a pipeline: opens the pipeline editor next to the orchestrator
+    - Create a new step: runs the built-in pipeline `new-step-assistant`
+    - Browse the catalog: lists the catalog pipelines and steps, and installs them
+  - Backlog
+    - Add a backlog entry: runs the built-in step `backlog-add`
+    - Remove a backlog entry: runs the built-in step `backlog-remove`
+  - Factory
+    - Init the factory. When the factory is not initialized in the repository, this is the only action shown. After init, it is never shown.
+    - Exit: stops the menu. It first asks whether to pause all tasks (see Pause and resume).
 
 ### Factory elements
 
@@ -326,6 +333,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `task_resumed`
   - `step_goto`, with the from step, the to step and the reason
   - `task_finished`
+  - `prompt_sent`, with the text
 - With the Claude session id from the task state, this log is enough to split the session transcript by step later.
 
 ##### Task execution
@@ -348,6 +356,23 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - Status, with the reason when blocked
   - Live session state from the terminal adapter, or `unknown` if the adapter does not support it
 - Blocked tasks are listed first.
+
+##### Focus and send a prompt
+
+- "Focus a task" lists the tasks with a live session and calls `factory terminal focus` on the selected one.
+- "Send a prompt to a task" lists the tasks with a live session, asks for the text and calls `factory terminal send-prompt`.
+  - If the session is working, it asks the user to wait until the session is idle, or to send now.
+  - If the session is gone or the task is paused, it offers to resume the task first.
+- Both actions are hidden when the adapter does not support them.
+
+##### Clean finished tasks
+
+- It lists the `finished` tasks. For each one, it shows if its work is merged:
+  - The branch is merged into `origin/<base_ref>`, or
+  - The branch was pushed and its remote branch no longer exists, as after a merge request with "delete source branch". This also covers squash merges.
+- A finished task without a branch counts as merged.
+- Merged tasks are selected by default. The user can change the selection.
+- Each selected task goes through `delete-task`, with all its checks.
 
 ##### Blocked status
 
@@ -393,7 +418,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 ### Orchestrator
 
 - When the factory starts, the orchestrator always shows the menu with the available actions.
-- The menu is a numbered text list. The user answers with a number. Do not use the `AskUserQuestion` tool for the menu, because it allows at most 4 options.
+- The menu is a numbered text list, with one heading per group and one number sequence for the whole menu. The user answers with a number. Do not use the `AskUserQuestion` tool for the menu, because it allows at most 4 options.
 - When an action is done, the orchestrator shows the menu again.
 
 ### Init
@@ -437,6 +462,8 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory goto <step-path> --reason <text>`: moves the task back to an earlier step.
   - `factory artifact path <name>`: prints the absolute path of a task artifact file.
   - `factory catalog list` and `factory catalog install <id> --generic|--local`: browse and install catalog items.
+  - `factory terminal focus <id>` and `factory terminal send-prompt <id> <text>`: focus a task session and send it a prompt.
+  - `factory clean`: lists finished tasks and whether their work is merged.
 
 ### Terminal adapter
 
@@ -569,6 +596,8 @@ migrations/          # One script per format version change
   - Two processes writing `config.yaml` and `backlog.md` at the same time lose no write.
   - For a task without a worktree, `factory next` prints commands with `--task <id>`, and a command without it fails with a message that says to add it.
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
+  - With the fake test adapter, focus and send prompt call the adapter, and are hidden when the adapter does not support them.
+  - `factory clean` detects a branch merged into `origin/<base_ref>`, a pushed branch whose remote branch was deleted, and a branch not merged.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
