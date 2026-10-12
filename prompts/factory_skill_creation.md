@@ -24,7 +24,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 - `VERIFICATION_DIR: <PROJECT_ROOT>/verification/software-factory/`
     - Save your verification artifacts here.
 - `FACTORY_SOURCE: <PROJECT_ROOT>/software-factory/`
-    - Source of the factory. At runtime, the factory reads the generic library from `<FACTORY_SOURCE>/library/`, never from the installed plugin.
+    - Source of the factory: code, built-in steps and pipelines, catalog and migrations. It holds no user data.
 
 ## Workflow
 
@@ -172,9 +172,9 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 #### Step creation
 
-- The `new-step-assistant` pipeline runs as a task in the main repository, without a worktree. It starts Claude with `--add-dir <source>`, so it can write generic steps.
+- The `new-step-assistant` pipeline runs as a task in the main repository, without a worktree. It starts Claude with `--add-dir <library>`, so it can write generic steps.
 - It first asks where to save the step:
-  - Generic: in `<source>/library/steps/`, reusable in any repository.
+  - Generic: in `<library>/steps/`, reusable in any repository that uses this library.
   - Local: in `.factory/steps/` of the main repository, only for this repository.
 - It asks the user:
   - The goal of the step
@@ -227,7 +227,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - Warning: a generic pipeline uses a local step
   - Warning: `model` or `effort` set on a step that runs in the session. It has no effect.
 - It can save with warnings, never with errors.
-- On save, it asks where to save: generic in `<source>/library/pipelines/`, or local in `.factory/pipelines/`. When the user edits a generic pipeline, they can save a local override instead.
+- On save, it asks where to save: generic in `<library>/pipelines/`, or local in `.factory/pipelines/`. When the user edits a generic pipeline, they can save a local override instead.
 - If a needed step does not exist, the user creates it with "Create a new step" from the orchestrator, then reloads the list in the editor.
 
 #### Catalog
@@ -247,14 +247,15 @@ Save the merge request URL with `factory state set mr_url <url>`.
 
 #### Library commits
 
-- After each write to `<source>/library/`, the factory offers to commit it in the source repository:
+- After each write to `<library>/`, the factory offers to commit it in the git repository that contains the library:
   - The step assistant saves a generic step
   - The pipeline editor saves a generic pipeline
   - A catalog item is installed to the generic library
   - `migrate` changes the library
 - It shows the changed files and the commit message, and commits only after approval.
 - The message is `Factory library: <action> <kind> <id>`, for example `Factory library: add step create-merge-request`. A migration uses `Factory library: migrate to version <n>`.
-- It commits only the changed files in `library/`, with a pathspec. Other changes in the source repository are never included, even if they are staged.
+- It commits only the changed files in the library, with a pathspec. Other changes in that repository are never included, even if they are staged.
+- If the library is not in a git repository, library commits are disabled.
 - It never pushes.
 
 #### Tasks
@@ -440,7 +441,9 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - The terminal adapter check passes
   - The current folder is a git repository with an `origin` remote
 - It saves the terminal as `terminal` in `.factory/factory.yaml`. This build has only the `herdr` adapter, so Init selects it without asking.
-- It asks for the path of the factory source, with `FACTORY_SOURCE` as the default, and saves it as `source` in `.factory/factory.yaml`. It checks that `<source>/library/` exists.
+- It asks for the path of the library folder and saves it as `library` in `.factory/factory.yaml`.
+  - If the folder does not exist, it offers to create it with `factory.yaml`, `steps/` and `pipelines/`.
+  - If the folder is not in a git repository, it warns that library commits are disabled.
 - It creates `.factory/` with its files and empty folders (see File organization). It never overwrites an existing file.
 - It adds `.factory/` and `.factory.backup-*/` to `.git/info/exclude`. It never changes `.gitignore`, because the repository can be shared.
 - It offers to install the catalog starter pack (see Catalog).
@@ -457,7 +460,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - It writes every file atomically: it writes a temporary file, then renames it. It holds a lock while it changes a shared file (`config.yaml`, `backlog.md`), so parallel sessions never lose a write.
 - It merges steps and pipelines from three levels. When two have the same id, the first level wins:
   1. Local: `.factory/` of the main repository
-  2. Generic: `<source>/library/`, with `source` read from `.factory/factory.yaml`
+  2. Generic: `<library>/`, with `library` read from `.factory/factory.yaml`
   3. Built-in: read from the installed plugin, next to the CLI, so they always match the CLI version
 - Commands:
   - `factory next`: prints the current step instructions, with the task state keys it reads.
@@ -477,7 +480,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory catalog list` and `factory catalog install <id> --generic|--local`: browse and install catalog items.
   - `factory terminal focus <id>` and `factory terminal send-prompt <id> <text>`: focus a task session and send it a prompt.
   - `factory clean`: lists finished tasks and whether their work is merged.
-  - `factory library commit <message> <paths...>`: commits the given library files in the source repository, and nothing else.
+  - `factory library commit <message> <paths...>`: commits the given library files in the repository that contains the library, and nothing else.
 
 ### Terminal adapter
 
@@ -506,7 +509,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 ### Versioning and migration
 
 - The factory has a data format version: one integer, starting at 1. It covers everything the factory reads and writes: the `.factory/` layout, the task state, the step and pipeline manifests, the config and the backlog.
-- `.factory/factory.yaml` stores the version of the repository data. `<source>/library/factory.yaml` stores the version of the generic library.
+- `.factory/factory.yaml` stores the version of the repository data. `<library>/factory.yaml` stores the version of the generic library.
 - Every `factory` command checks the data version. It refuses to run when the version is different from its own.
 - A build that changes the data format increases the version by 1 and adds a migration script `migrations/<from>-to-<to>`. The builder finds the previous format in the git history of `FACTORY_SOURCE`.
 - At start, the orchestrator compares the data version with its own version:
@@ -515,16 +518,14 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - Newer: it stops and tells the user to update the factory.
 - The `migrate` step:
   - Backs up `.factory/` to `.factory.backup-<date>/`.
-  - Requires a clean git status in `<source>/library/`, so the change can be reviewed and reverted with git.
+  - If the library is in a git repository, requires a clean git status in the library, so the change can be reviewed and reverted with git. Otherwise, backs up the library to `<library>.backup-<date>/`.
   - Runs the migration scripts in order, on the repository data, the active tasks and the generic library.
   - Shows a summary and the backup path.
 
 ### Rebuild
 
-- Built-in steps and pipelines are in `FACTORY_SOURCE/builtin/`.
-- Steps and pipelines created by the user are in `FACTORY_SOURCE/library/`.
-- A rebuild can replace everything in `FACTORY_SOURCE` except `library/`. It changes files in `library/` only through a migration script.
-- A rebuild can replace `catalog/`. Installed copies are not affected.
+- `FACTORY_SOURCE` holds no user data. A rebuild can replace all of it.
+- A rebuild never changes a library or a `.factory/` folder, except through a migration script.
 
 ### File organization
 
@@ -532,7 +533,7 @@ In the main repository, never committed:
 
 ```
 .factory/
-  factory.yaml       # Data format version, factory source path and terminal
+  factory.yaml       # Data format version, library path and terminal
   config.yaml        # Step config values for this repository
   claude-settings.json  # Permission rules for task sessions
   backlog.md         # Tasks not started yet
@@ -555,11 +556,16 @@ builtin/
 catalog/
   pipelines/         # Pipeline templates, installed by copy
   steps/             # Step templates, installed by copy
-library/
+migrations/          # One script per format version change
+```
+
+The library, a folder in any git repository:
+
+```
+<library>/
   factory.yaml       # Data format version of the library
   pipelines/         # Generic pipelines created by the user
   steps/             # Generic steps created by the user
-migrations/          # One script per format version change
 ```
 
 ### Documentation
@@ -583,10 +589,10 @@ migrations/          # One script per format version change
 - The build is verified with an automated test run. Its report goes to `VERIFICATION_DIR`.
 - Test setup, all inside `VERIFICATION_DIR`:
   - A test git repository. Its `origin` remote is a local bare repository, so nothing is pushed to a real remote.
-  - A test factory source with an empty `library/`. The tests never change the real `FACTORY_SOURCE/library/`.
+  - A test library in its own test git repository. The tests never change a real library.
   - `worktree_root` points inside `VERIFICATION_DIR`.
 - CLI tests, without Herdr or Claude:
-  - Init creates `.factory/` and `factory.yaml` with the version and the source, and adds the `.git/info/exclude` entries. `.gitignore` is unchanged.
+  - Init creates `.factory/` and `factory.yaml` with the version and the library path, and adds the `.git/info/exclude` entries. `.gitignore` is unchanged.
   - A local step overrides a generic step, which overrides a built-in step.
   - Config values follow the order `with`, then `config.yaml`, then default. A missing value makes `factory next` ask for it.
   - `next`, `done` and `skip` on a test pipeline: `done_check` passes and fails, and `skip` is refused for a required step.
@@ -612,7 +618,7 @@ migrations/          # One script per format version change
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
   - With the fake test adapter, focus and send prompt call the adapter, and are hidden when the adapter does not support them.
   - `factory clean` detects a branch merged into `origin/<base_ref>`, a pushed branch whose remote branch was deleted, and a branch not merged.
-  - `factory library commit` commits only the given library files. Another staged file in the test source stays staged and is not committed.
+  - `factory library commit` commits only the given library files. Another staged file in the test library repository stays staged and is not committed.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
@@ -620,7 +626,7 @@ migrations/          # One script per format version change
   - Pausing the task closes its terminal. Resuming it reopens the same Claude session, which continues the pipeline.
   - Deleting the task asks for approval when there are uncommitted changes, closes the task terminal, removes the worktree and archives the task folder.
 - The tests close only the Herdr workspaces, tabs and panes they created.
-- At the end, the tests remove the test repository and the test source. The report stays.
+- At the end, the tests remove the test repositories. The report stays.
 
 ## How You're Graded
 
