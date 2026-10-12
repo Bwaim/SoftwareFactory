@@ -228,6 +228,11 @@ Save the path with `factory state set plan <path>`.
   - Filter the available steps by category or by text
   - Reload the available steps, to see a step created in another task
 - Each available step shows its id, category, description, level (local, generic or built-in) and where it runs (session or subagent).
+- Clicking a step, in the list or in the pipeline, opens a read-only detail panel:
+  - The full manifest: type, `reads`, `writes`, `done_when`, `done_check`, config keys with their defaults, `required`, `run_in`, `model`, `effort`, `requires`
+  - The body, as plain text
+  - The level and the file path, so the user can open the file in their own editor
+  - For a composite step, its child steps, each one clickable
 - It runs the pipeline checks live, through the server, and shows the problems:
   - Error: `create-worktree` is listed, but not as the first step
   - Error: a step id does not exist
@@ -241,7 +246,7 @@ Save the path with `factory state set plan <path>`.
 #### Local server
 
 - A small local HTTP server, written with the Python standard `http.server` module, serves the editor page and its API. The future dashboard will reuse it.
-- API: list steps, list pipelines, load a pipeline, check a pipeline, save a pipeline. The page uses only this API. It never reads or writes files directly.
+- API: list steps, get one step (manifest and body), list pipelines, load a pipeline, check a pipeline, save a pipeline. The page uses only this API. It never reads or writes files directly.
 - Security:
   - It listens on `127.0.0.1` only, on a free port.
   - It generates a random token at start. The page URL carries it, and every API request must send it.
@@ -634,7 +639,7 @@ The library, a folder in any git repository:
   - The event log contains the expected events.
   - A command refuses data with another version. A test migration from version 1 to a fake version 2 runs and creates the backup.
   - `factory pipeline check` reports each error and warning type on test pipelines.
-  - The editor server API, tested without a browser: list, load, copy, check and save. Requests without the token or with a wrong `Origin` are rejected.
+  - The editor server API, tested without a browser: list, get a step, load, copy, check and save. Requests without the token or with a wrong `Origin` are rejected.
   - With a fake test adapter that records its calls, launch and delete call only the adapter, never `herdr` directly.
   - `factory block` and `factory unblock` change the status, and `factory tasks` lists blocked tasks first.
   - With the fake test adapter, pause saves the status and closes the terminal, and resume restores the status with the same session id.
