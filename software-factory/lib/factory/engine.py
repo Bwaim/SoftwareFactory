@@ -303,6 +303,58 @@ def skip(ctx, tid):
     return advance(ctx, tid, "step_skipped")
 
 
+def wait(ctx, tid):
+    task = state.load(ctx, tid)
+    require_running(task)
+    entry, step = load_step(ctx, task)
+    if not step.wait_external:
+        raise FactoryError(f"The step `{step.id}` does not wait for an external event.")
+    reason = step.done_when or "An external event."
+    task = state.update(ctx, tid, lambda t: state.set_status(t, "waiting_external", reason))
+    events.log(ctx, tid, "waiting_started", state.step_path_str(task), reason=reason)
+    return "The task now waits for the external event. Stop here. The factory sends you a message when it happens."
+
+
+def end_wait(ctx, tid, how):
+    task = state.load(ctx, tid)
+    entry, step = load_step(ctx, task)
+    events.log(ctx, tid, "external_event", state.step_path_str(task), how=how)
+    advance(ctx, tid, "step_done")
+    task = state.load(ctx, tid)
+    session.notify(ctx, f"Task {tid}: {step.done_when or 'the external event happened'}")
+    session.deliver(ctx, tid, f"The external event happened: {step.done_when} Run `{cmd(task, 'next')}`.")
+
+
+def poll(ctx):
+    results = []
+    for task in state.list_tasks(ctx):
+        if task["status"] != "waiting_external":
+            continue
+        entry, step = load_step(ctx, task)
+        if not step.done_check:
+            continue
+        values, _ = config.resolve(ctx, step, entry.get("with"))
+        ok, output = run_check(ctx, task, step.done_check, POLL_CHECK_TIMEOUT, values)
+        row = {"id": task["id"], "ended": ok, "output": None if ok else output[-500:], "error": None}
+        if ok:
+            try:
+                end_wait(ctx, task["id"], "check")
+            except FactoryError as e:
+                row["error"] = str(e)
+        results.append(row)
+    return results
+
+
+def external_done(ctx, tid):
+    task = state.load(ctx, tid)
+    if task["status"] != "waiting_external":
+        raise FactoryError(f"Task {tid} is not waiting for an external event.")
+    entry, step = load_step(ctx, task)
+    if step.done_check:
+        raise FactoryError("This step has a done check. The wait ends when the check passes. Run `factory poll`.")
+    end_wait(ctx, tid, "manual")
+
+
 def script_env(ctx, task, values):
     env = {**os.environ, "FACTORY_TASK": task["id"]}
     for key, value in values.items():

@@ -53,6 +53,9 @@ def register(sub, common):
     p.add_argument("--create-library", action="store_true")
     sub.add_parser("link", parents=[common])
     sub.add_parser("open-ide", parents=[common])
+    sub.add_parser("wait", parents=[common])
+    sub.add_parser("poll", parents=[common])
+    p = sub.add_parser("external-done", parents=[common]); p.add_argument("id")
     p = sub.add_parser("approve", parents=[common]); p.add_argument("--send", action="store_true")
     p = sub.add_parser("request-changes", parents=[common]); p.add_argument("text"); p.add_argument("--send", action="store_true")
     p = sub.add_parser("approval")
@@ -339,3 +342,30 @@ def open_ide_cmd(args):
     from . import engine
     ctx, tid = task_of(args)
     print("Opened: " + " ".join(engine.open_ide(ctx, tid)))
+
+
+@cli.command("wait")
+def wait_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.wait(ctx, tid))
+
+
+@cli.command("poll")
+def poll_cmd(args):
+    from . import engine
+    results = engine.poll(ctx_of(args))
+    if args.json:
+        cli.emit(results, True)
+        return
+    if not results:
+        print("No task waits on a done check.")
+    for r in results:
+        print(f"{r['id']}: " + ("the wait ended." if r["ended"] else "still waiting."))
+
+
+@cli.command("external-done")
+def external_done_cmd(args):
+    from . import engine
+    engine.external_done(ctx_of(args), args.id)
+    print(f"Task {args.id}: the external event is marked done.")
