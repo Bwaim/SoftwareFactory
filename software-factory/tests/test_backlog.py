@@ -85,3 +85,14 @@ def test_two_processes_lose_no_write(inited):
     assert len({e.id for e in backlog.list_entries(ctx)}) == 100
     for tag in "ab":
         assert all(config.get_value(ctx, "s" + tag, f"k{i}") == i for i in range(50))
+
+
+def test_listing_a_file_with_ids_does_not_rewrite_it(inited):
+    inited.factory("backlog", "add", "First")
+    path = inited.fdir / "backlog.md"
+    before = path.read_bytes()
+    stamp = path.stat().st_mtime_ns
+    inited.factory.json("backlog", "list")
+    backlog.get(ctx_of(inited), "b1")
+    assert path.read_bytes() == before
+    assert path.stat().st_mtime_ns == stamp

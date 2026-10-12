@@ -88,8 +88,10 @@ def update_yaml(path, fn, default_factory=dict):
 
 def update_text(path, fn):
     with locked(path):
-        new = fn(read_text(path))
-        atomic_write_text(path, new)
+        old = read_text(path)
+        new = fn(old)
+        if new != old or not Path(path).exists():
+            atomic_write_text(path, new)
         return new
 
 
