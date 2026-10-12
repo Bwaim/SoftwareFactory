@@ -24,6 +24,13 @@ def register(sub, common):
     p = sub.add_parser("artifact")
     a = p.add_subparsers(dest="action", required=True)
     ap = a.add_parser("path", parents=[common]); ap.add_argument("name")
+    p = sub.add_parser("launch", parents=[common])
+    p.add_argument("pipeline")
+    p.add_argument("--description", default="")
+    p.add_argument("--input", action="append", default=[])
+    p.add_argument("--id", default=None)
+    p.add_argument("--from-backlog", default=None)
+    p.add_argument("--dry-run", action="store_true")
     p = sub.add_parser("terminal")
     ts = p.add_subparsers(dest="action", required=True)
     ts.add_parser("check", parents=[common])
@@ -71,6 +78,29 @@ def terminal_check(args):
     ok, message = adapters.get_adapter(ctx).check()
     print(("OK: " if ok else "FAILED: ") + message)
     return 0 if ok else 1
+
+
+def parse_inputs(items):
+    inputs = {}
+    for item in items:
+        if "=" not in item:
+            raise FactoryError(f"Invalid input `{item}`. Use --input <key>=<value>.")
+        key, value = item.split("=", 1)
+        inputs[key] = value
+    return inputs
+
+
+@cli.command("launch")
+def launch_cmd(args):
+    from . import launch
+    ctx = ctx_of(args)
+    inputs = parse_inputs(args.input)
+    if args.dry_run:
+        report = launch.plan_launch(ctx, args.pipeline, args.description, inputs, args.id, args.from_backlog)
+        cli.emit(report, True) if args.json else print(launch.render_report(report))
+        return 0 if report["ok"] else 1
+    task = launch.launch(ctx, args.pipeline, args.description, inputs, args.id, args.from_backlog)
+    cli.emit(task, True) if args.json else print(f"Task {task['id']} started." + (f" Worktree: {task['worktree']}" if task["worktree"] else ""))
 
 
 @cli.command("version check")
