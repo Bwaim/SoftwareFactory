@@ -31,7 +31,7 @@ Before writing:
 Then:
 - Show the full step file: YAML frontmatter with `id, description, category, type, reads, writes, done_when, done_check, config, required, run_in, model, effort, requires, column, wait_external` (only the fields that apply), then the body. A composite step has a `steps` list and no body. A script step body is the script file name, and the script file goes next to the step file.
 - Write the file only after the user approves.
-- For a generic step, show the file and the message `Factory library: add step <id>`, and run `factory library commit "<message>" <path>` only after approval.
+- For a generic step, show the file and the message `Factory library: add step <id>`, and run `factory library commit "<message>" <path>...` only after approval. Pass every file written for the step: the `.md` file and, for a script step, its `.sh` file.
 
 At the end:
 - Run `factory pipeline list`. Ask if the new step should be added to some pipelines, and where.

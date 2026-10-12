@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 
 from . import adapters, fsio, repo
+from . import library as library_module
 from .adapters.base import AdapterError
 from .errors import FactoryError
 from .version import DATA_VERSION
@@ -112,7 +113,7 @@ def init(cwd, library, create_library=False):
     if create_library or not (lib / "factory.yaml").exists():
         create_library_folder(lib)
     report = {"created": [], "kept": [], "library": str(lib), "checks": checks}
-    report["library_git"] = repo.git(["rev-parse", "--show-toplevel"], lib, check=False).returncode == 0
+    report["library_git"] = library_module.in_git(lib)
     f = ctx.fdir
     for d in ("steps", "pipelines", "tasks/archive"):
         (f / d).mkdir(parents=True, exist_ok=True)
