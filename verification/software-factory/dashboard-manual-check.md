@@ -39,3 +39,4 @@ Scripted check, no browser. A temporary pytest file started `factory dashboard` 
 - Launch form: Check, missing-config field, Launch enabled only after a good check.
 - Clean dialog with a task that has unpushed work, and the "I accept losing these changes" box.
 - Pause dialog: "Pausing..." shows while the job runs.
+- Approve or Request changes when the message cannot reach the session (for example `terminal: fake` with `.factory/fake_adapter_config.json` set to `{"capabilities": ["state"]}`): the card shows a red box "The approval is saved, but the session did not get the message: ...", the box stays across refreshes, and Dismiss removes it.

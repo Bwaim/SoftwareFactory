@@ -43,6 +43,7 @@ a, .link { color: var(--accent); cursor: pointer; }
 .card.dropbefore { border-top: 3px solid var(--accent); }
 .card.dropafter { border-bottom: 3px solid var(--accent); }
 .status { margin: 4px 0; }
+.delivery { display: flex; gap: 6px; align-items: center; justify-content: space-between; border: 1px solid var(--err); color: var(--err); border-radius: 6px; padding: 4px 6px; margin: 4px 0; font-size: 12px; }
 .gone { display: inline-block; border: 1px solid var(--err); color: var(--err); border-radius: 10px; padding: 0 8px; font-size: 12px; font-weight: 600; margin: 2px 0; }
 .buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .artifacts { margin: 4px 0; display: flex; gap: 8px; flex-wrap: wrap; }
@@ -79,7 +80,7 @@ const JOB_POLL_MS = 1000;
 const HIDDEN_KEY = "factory.hiddenColumns";
 const ICONS = { active: "▶", blocked: "⛔", awaiting_approval: "✋", waiting_external: "⏳", paused: "⏸", finished: "✓" };
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
-const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), dragging: false, dragId: null, lastKey: null, pollFailed: false };
+const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, pollFailed: false };
 const byId = (id) => document.getElementById(id);
 
 async function api(path, body, quiet) {
@@ -143,6 +144,15 @@ function ago(iso) {
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
   return h < 48 ? `${h} h` : `${Math.floor(h / 24)} d`;
+}
+function noteDelivery(t, data, what) {
+  if (!data || !data.delivery_error) return;
+  state.deliveryErrors.set(t.id, `${what} is saved, but the session did not get the message: ${data.delivery_error}`);
+  state.lastKey = null;
+}
+function deliveryBlock(t) {
+  return el("div", { class: "delivery" }, el("span", {}, state.deliveryErrors.get(t.id)),
+    button("Dismiss", () => { state.deliveryErrors.delete(t.id); render(); }));
 }
 function adapterDown() { return !state.info.adapter.ok; }
 function can(cap) { return state.info.adapter.ok && state.info.capabilities.includes(cap); }
@@ -234,6 +244,7 @@ function taskCard(t) {
     for (const name of t.artifacts) list.append(el("span", { class: "link", onclick: () => openArtifact(t.id, name).catch(() => {}) }, name));
     card.append(list);
   }
+  if (state.deliveryErrors.has(t.id)) card.append(deliveryBlock(t));
   if (t.approval) card.append(approvalBlock(t));
   card.append(taskButtons(t));
   return card;
@@ -257,7 +268,7 @@ function taskButtons(t) {
   if (live && can("focus") && !finished) row.append(button("Focus", () => api(`/api/tasks/${t.id}/focus`, {})));
   if (t.mr_url && /^https?:/.test(t.mr_url)) row.append(el("a", { href: t.mr_url, target: "_blank", rel: "noopener" }, "Show MR"));
   if (t.status === "awaiting_approval") {
-    row.append(button("Approve", action(() => api(`/api/tasks/${t.id}/approve`, {}))), button("Request changes", () => openRequestChanges(t)));
+    row.append(button("Approve", action(async () => noteDelivery(t, await api(`/api/tasks/${t.id}/approve`, {}), "The approval"))), button("Request changes", () => openRequestChanges(t)));
   }
   if (t.status === "waiting_external" && t.wait_has_check === false) row.append(button("Mark done", action(() => api(`/api/tasks/${t.id}/external-done`, {}))));
   if (!finished) {
@@ -275,7 +286,7 @@ async function openArtifact(tid, name) {
 function openRequestChanges(t) {
   const text = el("textarea", { placeholder: "What should change?" });
   openModal(`Request changes: ${t.id}`, text, el("div", { class: "footer" }, closeButton("Cancel"),
-    button("Send", async () => { await api(`/api/tasks/${t.id}/request-changes`, { text: text.value }); closeModal(); await refresh(true); }, { cls: "primary" })));
+    button("Send", async () => { noteDelivery(t, await api(`/api/tasks/${t.id}/request-changes`, { text: text.value }), "The change request"); closeModal(); await refresh(true); }, { cls: "primary" })));
 }
 async function waitJob(id) {
   for (;;) {
