@@ -1,0 +1,215 @@
+# Software Factory
+
+## What it does
+
+The Software Factory starts each task in its own git worktree, its own Herdr tab and its own named Claude session.
+Each type of task is a pipeline. A pipeline is an ordered list of reusable steps.
+One task is one run of a pipeline.
+You start and manage tasks from one orchestrator session in the main repository.
+
+## Concepts
+
+- **Task**: one run of a pipeline. It has a worktree, a Herdr tab and a Claude session.
+- **Pipeline**: a YAML file with an ordered list of steps.
+- **Step**: a markdown file. The frontmatter is the manifest. The body holds the instructions.
+- **Step types**: `prompt` (instructions for the session), `skill` (runs a Claude skill), `script` (runs a script with `factory run-script`), `composite` (a list of other steps).
+- **Levels**: a local step or pipeline lives in `.factory/` of the repository. A generic one lives in the library folder. A built-in one ships with the plugin. Local wins over generic. Generic wins over built-in.
+- **Catalog**: ready-made pipelines and steps. You install them by copy, into the local level or into the library.
+- **Artifacts**: files a task writes for later steps or for you. `factory artifact path <name>` prints the path.
+
+## Install and prerequisites
+
+You need:
+
+- `uv`. Install it with `brew install uv`.
+- Herdr: https://herdr.dev
+- git, with an `origin` remote in each repository.
+- Claude Code.
+- Optional: `gh` or `glab`, for the forge steps of the catalog.
+
+Install the plugin. In Claude Code, run:
+
+```
+/plugin marketplace add <path to the SoftwareFactory folder>
+/plugin install software-factory@software-factory
+```
+
+Start the orchestrator:
+
+1. Open a Herdr pane in the main repository.
+2. Start `claude`.
+3. Run `/software-factory:software-factory`.
+
+The first run creates the link `~/.local/bin/factory`. Make sure `~/.local/bin` is in your `PATH`.
+
+### Bash allowlist
+
+Task sessions use `.factory/claude-settings.json`, which allows every `factory` command.
+For the orchestrator, add these commands to your Bash allowlist.
+
+git:
+
+- `git status`, `git diff`, `git log`, `git fetch`, `git switch`
+- `git add`, `git commit`, `git push`, `git rebase`
+- `git worktree`, `git branch`, `git rev-parse`
+
+The factory CLI: `factory *`. This covers every command in the reference below.
+
+Herdr adapter:
+
+- `herdr worktree open`
+- `herdr tab create`, `herdr tab close`
+- `herdr workspace close`
+- `herdr agent start`, `herdr agent prompt`, `herdr agent get`, `herdr agent read`
+- `herdr agent focus`, `herdr agent wait`, `herdr agent send-keys`
+- `herdr notification show`
+
+## Tutorial
+
+1. **Init the factory.**
+   - Open the orchestrator in a repository. Choose "Init the factory".
+   - Give the library folder path. Say yes to create it if it does not exist.
+   - Say yes to the starter pack.
+   - Expected: the folder `.factory/` exists in the repository. `factory pipeline list` shows `quick-task`.
+2. **Run `quick-task` on a small change.**
+   - Choose "Launch a new pipeline". Pick `quick-task`. Write a short description.
+   - Read the dry run and confirm. If asked for `worktree_root`, give the folder where worktrees go.
+   - Follow the task in the new Herdr workspace.
+   - Choose "Show tasks". Expected: the task is `awaiting_approval` at `user-validation`.
+   - Approve in the task session.
+   - Expected: `git log -1` in the worktree shows the commit. The task is `finished`.
+3. **Pause and resume.**
+   - Choose "Exit" and answer yes to "pause all".
+   - Start the orchestrator again. Answer "resume all".
+   - Expected: the task session opens again with the same conversation and continues.
+4. **Create a step.**
+   - Choose "Create a new step". Answer the questions of the assistant.
+   - Expected: the new step file is in `<library>/steps/` or in `.factory/steps/`.
+5. **Create a pipeline.**
+   - Choose "Create or edit a pipeline". Copy `quick-task`.
+   - Add the new step. Save.
+   - Launch the new pipeline.
+   - Expected: the task runs the new step.
+
+## Reference
+
+### Menu actions
+
+- **Launch a new pipeline**: start a task, from scratch or from a backlog entry.
+- **Show tasks**: list the tasks with their status.
+- **Check waiting tasks**: poll the waiting tasks. Mark a manual external event as done.
+- **Focus a task**: switch the terminal to the task session.
+- **Send a prompt to a task**: send text to a task session.
+- **Resume a task**: restart a paused task, or a task whose session is gone.
+- **Delete a task**: close its terminal, remove its worktree and archive its folder.
+- **Clean finished tasks**: delete finished tasks whose work is merged.
+- **Create or edit a pipeline**: open the pipeline editor in the browser.
+- **Create a new step**: run the step assistant.
+- **Browse the catalog**: list and install catalog pipelines and steps.
+- **Add a backlog entry**: add an entry to the backlog.
+- **Remove a backlog entry**: remove an entry from the backlog.
+- **Open dashboard**: start the local server and print the dashboard URL.
+- **Init the factory**: set up the repository. Shown only before init.
+- **Exit**: ask to pause all tasks. Then stop the local server.
+
+### Commands
+
+Global option: `factory --version`.
+Most commands take `--task <id>` and `--json`.
+Inside a task worktree, the task is found from the folder.
+
+Setup:
+
+- `factory init --library <path> [--create-library]`: set up the factory in this repository.
+- `factory link`: create or fix the `~/.local/bin/factory` link.
+- `factory menu`: show the orchestrator menu.
+- `factory terminal check`: check the terminal adapter.
+- `factory version check`: compare the data version with the plugin.
+- `factory migrate [--dry-run]`: migrate the repository data and the library to the current version.
+
+Step execution, inside a task session:
+
+- `factory next`: show the current step.
+- `factory done`: finish the current step.
+- `factory skip`: skip the current step, when it is not required.
+- `factory run-script`: run the current `script` step.
+- `factory goto <step_path> --reason <text>`: go back to an earlier step.
+- `factory config get <step> <key>`: read a step config value.
+- `factory config set <step> <key> <value>`: save a step config value.
+- `factory state get <key>`: read a task state value.
+- `factory state set <key> <value>`: save a task state value.
+- `factory artifact path <name>`: print the path of an artifact.
+
+Task life:
+
+- `factory launch <pipeline> [--description <text>] [--input <name=value>] [--id <id>] [--from-backlog <id>] [--dry-run]`: start a task.
+- `factory tasks`: list the tasks.
+- `factory status`: show the status of the current task.
+- `factory block <reason>`: block the task.
+- `factory unblock`: unblock the task.
+- `factory approve [--send]`: approve the result of a `user-validation` step.
+- `factory request-changes <text> [--send]`: ask for changes.
+- `factory approval check`: check that the result is approved.
+- `factory wait`: set the task to waiting for an external event.
+- `factory poll`: check the waiting tasks.
+- `factory external-done <id>`: end a wait that has no done check.
+- `factory pause [<id>] [--all] [--wait]`: pause a task or all tasks.
+- `factory resume <id>`: resume a task.
+- `factory delete <id> [--dry-run] [--confirm-unpushed]`: delete a task.
+- `factory clean`: list finished tasks that can be deleted.
+- `factory open-ide`: open the task worktree in the IDE.
+- `factory terminal focus <id>`: focus the task session.
+- `factory terminal send-prompt <id> <text> [--wait]`: send a prompt to a task session.
+
+Backlog:
+
+- `factory backlog list`: list the entries.
+- `factory backlog add <title> [--summary <text>] [--pipeline <id>]`: add an entry.
+- `factory backlog remove <id>`: remove an entry.
+- `factory backlog move <id> --to <position>`: change the order.
+- `factory backlog import [--file <path>] [--dry-run]`: import entries from text or a file.
+
+Pipelines, steps and the library:
+
+- `factory pipeline list`: list the pipelines.
+- `factory pipeline check <id>`: check a pipeline.
+- `factory pipeline edit [<id>]`: open the pipeline editor.
+- `factory step list`: list the steps.
+- `factory step show <id>`: show a step.
+- `factory catalog list`: list the catalog items and their status.
+- `factory catalog install <id> --generic|--local [--with-steps] [--replace] [--dry-run]`: install a catalog item.
+- `factory library commit <message> <paths...>`: commit files of the library.
+
+Local server:
+
+- `factory serve`: run the local server in the foreground.
+- `factory dashboard`: start the local server if needed and print the dashboard URL.
+- `factory server stop`: stop the local server.
+
+### Step manifest fields
+
+`id`, `description`, `category`, `type`, `reads`, `writes`, `done_when`, `done_check`, `config`, `required`, `run_in`, `model`, `effort`, `requires`, `column`, `wait_external`, `steps`.
+
+### Pipeline fields
+
+- `id`, `description`
+- `inputs`: values asked at launch.
+- `steps`: a list of entries with `id`, `with`, `model`, `effort` and `column`.
+- `claude`: `model` and `effort` of the task session.
+- `start_column`: the board column of a new task.
+
+### `.factory/factory.yaml` fields
+
+`version`, `library`, `terminal`, `columns`, `poll_minutes`, `ticket_url`.
+
+## Troubleshooting
+
+- **Terminal check failed.** Start Claude inside a Herdr pane. The pane sets `HERDR_ENV=1`. If `herdr` is missing, install it.
+- **Data version mismatch.**
+  - Older data: start the orchestrator. It runs the migration.
+  - Newer data: update the plugin.
+- **Session gone.** Choose "Resume a task" in the menu, or run `factory resume <id>`.
+- **Folder trust dialog.**
+  - Worktrees of a repository you already trust in Claude show no trust dialog.
+  - If the dialog appears, the repository is not trusted. The launch fails with a clear message.
+  - Open Claude once in the main repository and trust it. Then launch again.
