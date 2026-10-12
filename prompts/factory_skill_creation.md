@@ -10,7 +10,7 @@ When many tasks run in parallel, I have no single view to follow them and act on
 
 Create a software factory skill. It starts each task in its own worktree, Herdr tab and named Claude session.
 Each type of task is a pipeline. A pipeline is an ordered list of reusable steps.
-Later, a local dashboard will show all tasks as a Kanban board. It is not part of this build.
+A local dashboard shows all tasks as a Kanban board and the backlog, and lets me act on each task.
 
 ## Variables
 
@@ -31,8 +31,8 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 1. Brainstorm. Use the `/superpowers:brainstorming` skill to create a specification file from these requirements. Save the specification file in `SPEC_DIR/` before writing the plan.
 2. Ask validation. Ask the user to validate the specification file.
 3. Plan. After specification validation, use the `/superpowers:writing-plans` skill to create an implementation plan from the specification file. Save the plan file in `PLAN_DIR/` before writing implementation code. Split the plan into these milestones, in this order:
-    1. Core: the `factory` CLI, task state, step execution, config, worktree creation, the terminal adapter with the Herdr adapter, task launch and delete, Init and the orchestrator menu.
-    2. Task life: statuses, blocked, pause and resume, goto, artifacts, focus and send prompt, clean, event log.
+    1. Core: the `factory` CLI, task state, step execution, config, worktree creation, the terminal adapter with the Herdr adapter, task launch and delete with their dry runs, Init and the orchestrator menu.
+    2. Task life: statuses, blocked, approval, board columns, external waiting, pause and resume, goto, artifacts, focus and send prompt, clean, backlog, event log.
     3. Authoring: step assistant, pipeline editor and its local server, catalog, library commits.
     4. Lifecycle and docs: versioning, migration, README without the dashboard parts.
     5. Dashboard: the dashboard views, their server API, and the README dashboard parts (tutorial step 6, dashboard reference).
@@ -51,7 +51,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 
 ### Runtime
 
-- The factory code is Python 3. Each program (the `factory` CLI, the editor server) is a single-file script run with `uv run --script`. It declares its dependencies inline, for example `pyyaml`, so `uv` installs them on first run. Dependencies are kept to the minimum.
+- The factory code is Python 3. Each program (the `factory` CLI, the local server) is a single-file script run with `uv run --script`. It declares its dependencies inline, for example `pyyaml`, so `uv` installs them on first run. Dependencies are kept to the minimum.
 - `uv` can also install the Python version the scripts need, so the machine needs only `uv`.
 - The orchestrator is a Claude session started inside the configured terminal. At start, it runs `factory terminal check`. If the check fails, it says why and stops.
 - The `factory` command can be called by name in every Claude session the factory starts, in the main repository and in worktrees. Init makes this work, for example with a link in `~/.local/bin`.
@@ -409,13 +409,14 @@ Save the path with `factory state set plan <path>`.
 
 ##### Task delete
 
-- The built-in step `delete-task` runs in the orchestrator session.
-- It lists the tasks and the user selects one.
+- A task is deleted with `factory delete <id> [--dry-run] [--confirm-unpushed]`. It does not use Claude. It is the built-in step `delete-task`.
+- The orchestrator menu and the dashboard both use it. The menu lists the tasks and the user selects one. The dashboard uses the Clean dialog.
+- `factory delete --dry-run` prints what would be removed and the checks below. The caller shows it and deletes only after the user confirms.
 - It shows what it will remove: the Claude session, its terminal, the worktree and the local branch.
 - It checks the worktree:
   - Uncommitted changes
   - Commits not pushed to `origin`
-- If there are any, it shows them and continues only after explicit user approval.
+- If there are any, the dry run shows them, and the delete runs only with `--confirm-unpushed`, after explicit user approval.
 - It deletes the local branch only if it is pushed or merged. It never deletes a remote branch.
 - It closes the task terminal with `factory terminal close`, then removes the worktree with `git worktree remove`.
 - It moves the task folder to `.factory/tasks/archive/<id>/`. It does not delete it.
@@ -467,7 +468,7 @@ Save the path with `factory state set plan <path>`.
   - Pipeline and current step path
   - Status, with the reason when blocked
   - Live session state from the terminal adapter, or `unknown` if the adapter does not support it
-- Blocked tasks are listed first.
+- Tasks that need the user are listed first: `blocked`, then `awaiting_approval`.
 
 ##### Focus and send a prompt
 
@@ -528,18 +529,18 @@ Save the path with `factory state set plan <path>`.
 ##### Pause and resume
 
 - Pausing a task:
-  - It saves the current status (`active` or `blocked`, with the reason), so resume can restore it.
+  - It saves the current status, with its reason, so resume can restore it.
   - If the session is working, it asks the user to wait until the session is idle, or to stop it now. A stopped step is not marked done, so it continues on resume.
   - It closes the task terminal with `factory terminal close` and sets the status to `paused`.
-- On Exit, the orchestrator asks whether to pause all `active` and `blocked` tasks. If the user says no, the sessions keep running.
+- On Exit, the orchestrator asks whether to pause all tasks that are not `paused` or `finished`. If the user says no, the sessions keep running.
 - At start, after the version check, if paused tasks exist, the orchestrator lists them and offers to resume all of them, some of them or none.
 - Resuming a task:
   - It starts a new terminal with `factory terminal start-session` in the task worktree, or in the main repository for `new-step-assistant`.
   - Claude starts with the same args as at launch (see Task launch), plus `--resume <session-id>`, so the conversation continues.
   - The prompt is: "The factory resumed this task. Run `factory status`, then continue with `factory next`."
   - It restores the saved status and saves the new terminal handle.
-- "Resume a task" in the menu lists the paused tasks, and the `active` or `blocked` tasks whose session state is `gone`.
-- If the adapter does not support `state`, the user can still resume an `active` or `blocked` task. The orchestrator first warns that a second session could start if the first one is still running.
+- "Resume a task" in the menu lists the paused tasks, and the tasks that are not `finished` whose session state is `gone`.
+- If the adapter does not support `state`, the user can still resume a task that is not `finished`. The orchestrator first warns that a second session could start if the first one is still running.
 
 ##### Artifacts
 
@@ -611,6 +612,7 @@ Users ask for a dark theme. Start with the settings screen only.
 - Commands:
   - `factory dashboard`: starts the local server if needed and opens the dashboard.
   - `factory launch <pipeline> ...` and `factory launch --dry-run ...`: create a task, or show what the launch would do.
+  - `factory delete <id>` and `factory delete --dry-run <id>`: delete a task, or show what the delete would do.
   - `factory next`: prints the current step instructions, with the task state keys it reads.
   - `factory done`: runs the step `done_check` if present. If it passes, it saves the step end and prints the next step. If it fails, it prints why and stays on the step.
   - `factory skip`: skips the current step, refused for required steps.
@@ -774,6 +776,7 @@ The library, a folder in any git repository:
   - `factory wait` sets `waiting_external`. `factory poll` ends the wait when the `done_check` passes, sends the message with the fake adapter, and skips paused tasks. `factory external-done` ends a wait without a `done_check`.
   - `factory launch --dry-run` reports the id, the worktree path and the branch case, and changes nothing. A taken id gets a suffix.
   - When the fake adapter fails to start the session, `factory launch` removes the worktree, the branch and the task folder it created.
+  - `factory delete --dry-run` shows uncommitted changes and unpushed commits, and changes nothing. `factory delete` refuses them without `--confirm-unpushed`.
   - Two processes writing `config.yaml` and `backlog.md` at the same time lose no write.
   - For a task without a worktree, `factory next` prints commands with `--task <id>`, and a command without it fails with a message that says to add it.
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
