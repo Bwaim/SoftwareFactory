@@ -107,3 +107,143 @@ def library_commit(server, query, body):
 def pipeline_save(server, query, body):
     from . import pipeline_store
     return pipeline_store.save(server.ctx, body["data"], body["level"])
+
+
+TASK = "([a-z][a-z0-9_-]{0,31})"
+
+
+@route("GET", "/api/tasks")
+def tasks(server, query, body):
+    from . import board
+    return board.task_rows(server.ctx)
+
+
+@route("GET", f"/api/tasks/{TASK}/artifacts/([^/]+)")
+def artifact(server, tid, name, query, body):
+    from . import state
+    path = state.artifact_path(server.ctx, tid, name)
+    if not path.is_file():
+        raise NotFound(name)
+    return {"name": name, "text": path.read_text(errors="replace")}
+
+
+@route("POST", f"/api/tasks/{TASK}/focus")
+def focus(server, tid, query, body):
+    from . import session
+    session.focus(server.ctx, tid)
+    return {"ok": True}
+
+
+@route("POST", f"/api/tasks/{TASK}/send-prompt")
+def send_prompt(server, tid, query, body):
+    from . import session
+    if body.get("wait"):
+        return {"job": server.start_job(lambda: session.send_prompt(server.ctx, tid, body["text"], True))}
+    session.send_prompt(server.ctx, tid, body["text"])
+    return {"ok": True}
+
+
+@route("POST", f"/api/tasks/{TASK}/approve")
+def approve(server, tid, query, body):
+    from . import engine
+    return {"message": engine.approve(server.ctx, tid, send=True)}
+
+
+@route("POST", f"/api/tasks/{TASK}/request-changes")
+def request_changes(server, tid, query, body):
+    from . import engine
+    return {"message": engine.request_changes(server.ctx, tid, body["text"], send=True)}
+
+
+@route("POST", f"/api/tasks/{TASK}/external-done")
+def external_done(server, tid, query, body):
+    from . import engine
+    engine.external_done(server.ctx, tid)
+    return {"ok": True}
+
+
+@route("POST", f"/api/tasks/{TASK}/pause")
+def pause(server, tid, query, body):
+    from . import session
+    if body.get("wait"):
+        return {"job": server.start_job(lambda: session.pause(server.ctx, tid, True))}
+    session.pause(server.ctx, tid)
+    return {"ok": True}
+
+
+@route("POST", f"/api/tasks/{TASK}/resume")
+def resume(server, tid, query, body):
+    from . import session
+    session.resume(server.ctx, tid)
+    return {"ok": True}
+
+
+@route("POST", f"/api/tasks/{TASK}/open-ide")
+def open_ide(server, tid, query, body):
+    from . import engine
+    return {"argv": engine.open_ide(server.ctx, tid)}
+
+
+def launch_args(body):
+    return (body["pipeline"], body.get("description", ""), body.get("inputs") or {}, body.get("id") or None, body.get("from_backlog") or None)
+
+
+@route("POST", "/api/launch/dry-run")
+def launch_dry_run(server, query, body):
+    from . import launch
+    return launch.plan_launch(server.ctx, *launch_args(body))
+
+
+@route("POST", "/api/launch")
+def launch_task(server, query, body):
+    from . import launch
+    return launch.launch(server.ctx, *launch_args(body))
+
+
+@route("GET", "/api/clean")
+def clean(server, query, body):
+    from . import delete
+    return delete.clean_report(server.ctx)
+
+
+@route("POST", "/api/delete/dry-run")
+def delete_dry_run(server, query, body):
+    from . import delete
+    return delete.plan_delete(server.ctx, body["id"])
+
+
+@route("POST", "/api/delete")
+def delete_task(server, query, body):
+    from . import delete
+    return delete.delete(server.ctx, body["id"], bool(body.get("confirm_unpushed")))
+
+
+@route("GET", "/api/backlog")
+def backlog_list(server, query, body):
+    from . import backlog
+    return [e.to_dict() for e in backlog.list_entries(server.ctx)]
+
+
+@route("POST", "/api/backlog/add")
+def backlog_add(server, query, body):
+    from . import backlog
+    return backlog.add(server.ctx, body["title"], body.get("summary", ""), body.get("pipeline")).to_dict()
+
+
+@route("POST", "/api/backlog/remove")
+def backlog_remove(server, query, body):
+    from . import backlog
+    return backlog.remove(server.ctx, body["id"]).to_dict()
+
+
+@route("POST", "/api/backlog/move")
+def backlog_move(server, query, body):
+    from . import backlog
+    return [e.to_dict() for e in backlog.move(server.ctx, body["id"], body["to"])]
+
+
+@route("POST", "/api/config/set")
+def config_set(server, query, body):
+    from . import config
+    config.set_value(server.ctx, body["step"], body["key"], body["value"])
+    return {"ok": True}
