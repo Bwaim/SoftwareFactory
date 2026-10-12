@@ -1,8 +1,8 @@
 # Software factory verification report
 
-Date: 2026-10-12 21:05
+Date: 2026-10-12 21:13
 
-Total: 171 of 171 checks pass.
+Total: 175 of 175 checks pass.
 
 ## Milestone 1. Core
 
@@ -56,6 +56,9 @@ Total: 171 of 171 checks pass.
 | `test_init_menu::test_init_reports_failed_prerequisite` | PASS |
 | `test_init_menu::test_link_fixes_wrong_target` | PASS |
 | `test_init_menu::test_menu_before_and_after_init` | PASS |
+| `test_init_menu::test_terminal_defaults_to_herdr_and_init_saves_it` | PASS |
+| `test_init_menu::test_init_lists_failed_terminal_check` | PASS |
+| `test_init_menu::test_init_lists_missing_uv_with_fix` | PASS |
 | `test_launch::test_slug_rules` | PASS |
 | `test_launch::test_dry_run_changes_nothing_and_reports` | PASS |
 | `test_launch::test_launch_detached` | PASS |
@@ -156,6 +159,7 @@ Total: 171 of 171 checks pass.
 | `test_server::test_shutdown_needs_token_and_safe_origin` | PASS |
 | `test_server::test_refused_requests_do_not_keep_server_alive` | PASS |
 | `test_server::test_adapter_check_exception_reported` | PASS |
+| `test_server::test_server_polls_waiting_tasks_on_its_own` | PASS |
 | `test_step_assistant::test_builtin_assistant_runs_in_main_repo` | PASS |
 
 ## Milestone 4. Lifecycle and docs

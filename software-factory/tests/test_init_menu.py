@@ -1,6 +1,7 @@
 import json
 import os
 
+import pytest
 import yaml
 
 from conftest import fake_config, git
@@ -61,3 +62,34 @@ def test_menu_before_and_after_init(factory, origin_repo, library_path):
     assert "focus" not in keys and "send-prompt" not in keys
     numbers = [a["n"] for g in factory.json("menu")["groups"] for a in g["actions"]]
     assert numbers == list(range(1, len(numbers) + 1))
+
+
+def test_terminal_defaults_to_herdr_and_init_saves_it(origin_repo, library_path, monkeypatch):
+    from factory import adapters
+    monkeypatch.delenv("FACTORY_TERMINAL", raising=False)
+    ctx = repo.load_ctx(origin_repo)
+    assert adapters.terminal_name(ctx) == "herdr"
+    monkeypatch.setattr(init, "terminal_check", lambda c: {"name": "terminal", "ok": True, "message": "ok"})
+    init.init(origin_repo, library_path, create_library=True)
+    assert yaml.safe_load((origin_repo / ".factory" / "factory.yaml").read_text())["terminal"] == "herdr"
+
+
+def test_init_lists_failed_terminal_check(origin_repo, library_path, monkeypatch):
+    from factory.errors import FactoryError
+    monkeypatch.setattr(init, "terminal_check", lambda c: {"name": "terminal", "ok": False, "message": "Run this inside Herdr."})
+    with pytest.raises(FactoryError) as e:
+        init.init(origin_repo, library_path, create_library=True)
+    assert "terminal: Run this inside Herdr." in str(e.value)
+    assert not (origin_repo / ".factory").exists()
+
+
+def test_init_lists_missing_uv_with_fix(origin_repo, library_path, monkeypatch):
+    from factory.errors import FactoryError
+    monkeypatch.setattr(init.shutil, "which", lambda name: None)
+    monkeypatch.setattr(init, "terminal_check", lambda c: {"name": "terminal", "ok": True, "message": "ok"})
+    checks = {c["name"]: c for c in init.prerequisites(origin_repo)}
+    assert checks["uv"]["ok"] is False and "brew install uv" in checks["uv"]["message"]
+    assert checks["git"]["ok"] is True
+    with pytest.raises(FactoryError) as e:
+        init.init(origin_repo, library_path, create_library=True)
+    assert "uv: uv is missing." in str(e.value)

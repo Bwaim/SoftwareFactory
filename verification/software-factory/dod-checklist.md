@@ -1,6 +1,6 @@
 # Definition Of Done checklist
 
-Source: "Definition Of Done" in `prompts/factory_skill_creation.md`. Test names are in `report.md` (159 pytest tests and 12 e2e checks, all pass).
+Source: "Definition Of Done" in `prompts/factory_skill_creation.md`. Test names are in `report.md` (163 pytest tests and 12 e2e checks, all pass).
 Legend: PASS = proven by a test, an e2e check or a file. PARTIAL = built and scripted-checked, but a part is not proven. FAIL = not met.
 
 Two PARTIAL reasons recur:
@@ -69,19 +69,19 @@ Two PARTIAL reasons recur:
 
 - PASS: Config in `.factory/config.yaml`; order `with`, `config.yaml`, default; missing value makes `factory next` ask; `factory config set` saves it. Evidence: `test_config_state::test_config_order`, `test_config_state::test_cli_config_set_get`, `test_engine::test_missing_config_asks`.
 - PASS: `factory next` prints resolved config values with the instructions. Evidence: `test_engine::test_run_script_gets_config_and_task`, `test_engine::test_missing_config_asks`.
-- PASS: No secrets in config files. Evidence: no secret keys in `builtin/` or `catalog/` config; `test_catalog::test_catalog_is_generic`.
+- PASS: No secrets in the shipped config. Evidence: `test_catalog::test_catalog_is_generic` and no secret-like key in `builtin/` or `catalog/` config defaults (checked by reading the files). The rule for user config is by design only, no test.
 
 ## Factory elements: Pipeline editor
 
 - PARTIAL: Editor is a plain HTML/CSS/JS page on the local server, no external library, started by `factory pipeline edit`, with start options, drag and drop, forms, filters, reload, level and run-in display, read-only detail panel. Evidence: `test_editor_api::test_steps_list_and_detail`, `test_editor_api::test_load_copy_check_save`, `test_editor_api::test_cli_lists`, `editor-manual-check.md` (`node --check` pass). Scripted check passed; human browser check pending (items 1 to 8).
-- PASS: Live pipeline checks via the server, every error and warning type; save with warnings, never with errors. Evidence: `test_pipeline_check::test_each_problem_type`, `test_editor_api::test_load_copy_check_save`. Live timing and disabled button: browser check pending (see above).
-- PASS: On save, asks level (generic or local); a generic pipeline can be saved as a local override. Evidence: `test_editor_api::test_load_copy_check_save`, `test_editor_api::test_save_drops_empty_nested_fields`. Dialog look: browser check pending.
+- PARTIAL: Live pipeline checks via the server, every error and warning type; save with warnings, never with errors. Evidence: `test_pipeline_check::test_each_problem_type`, `test_editor_api::test_load_copy_check_save`. Live timing and disabled button: browser check pending (see above). Scripted check passed; human browser check pending.
+- PARTIAL: On save, asks level (generic or local); a generic pipeline can be saved as a local override. Evidence: `test_editor_api::test_load_copy_check_save`, `test_editor_api::test_save_drops_empty_nested_fields`. Dialog look: browser check pending. Scripted check passed; human browser check pending.
 
 ## Factory elements: Local server
 
 - PASS: One stdlib `http.server`, serves editor, dashboard and API; writes port, token and pid to `.factory/server.json`; reused. Evidence: `test_server::test_server_survives_the_command_and_is_reused`, `test_server::test_server_info_file_is_private`.
 - PASS: API covers steps, pipelines, tasks, backlog and one route per dashboard action; routes call the CLI functions. Evidence: `test_editor_api::*`, `test_dashboard_api::test_actions_call_cli_functions`.
-- PASS: Server runs `factory poll` every `poll_minutes`. Evidence: `software-factory/lib/factory/server.py` (poll loop uses `poll_minutes`, default 5), `test_waiting::test_wait_then_poll_ends_on_check`. The timer itself has no dedicated test.
+- PASS: Server runs `factory poll` every `poll_minutes`. Evidence: `software-factory/lib/factory/server.py` (poll loop uses `poll_minutes`, default 5), `test_server::test_server_polls_waiting_tasks_on_its_own` (server with `FACTORY_POLL_SECONDS=1` ends a wait with no CLI poll), `test_waiting::test_wait_then_poll_ends_on_check`.
 - PASS: Security: `127.0.0.1` only, random token, Origin check. Evidence: `test_server::test_security_checks`, `test_server::test_non_ascii_token_is_refused`, `test_server::test_shutdown_needs_token_and_safe_origin`.
 - PASS: Stops on Exit or after 30 min idle. Evidence: `test_server::test_stop`, `test_server::test_idle_stop`, `server.py` `IDLE_SECONDS = 1800`.
 
@@ -115,7 +115,7 @@ Two PARTIAL reasons recur:
 - PASS: Worktree creation: fetch `origin`, new branch, existing local branch fast-forwarded, remote-only branch, diverged branch stops, branch in another worktree stops, detached without branch input, git only. Evidence: `test_launch::test_new_branch`, `test_launch::test_existing_local_branch_behind_is_fast_forwarded`, `test_launch::test_remote_only_branch`, `test_launch::test_diverged_branch_stops`, `test_launch::test_branch_in_other_worktree_stops`, `test_launch::test_launch_detached`, e2e "launch fetches origin and creates the worktree from origin/main".
 - PASS: `create-worktree` added automatically, refused when not first; `new-step-assistant` runs without a worktree. Evidence: `test_launch::test_create_worktree_listed_late_refused`, `test_registry::test_expand_adds_create_worktree_and_overrides`, `test_step_assistant::test_builtin_assistant_runs_in_main_repo`.
 - PASS: Task delete with `--dry-run` and `--confirm-unpushed`, local branch deleted only if pushed or merged, never a remote branch, terminal closed, worktree removed, folder archived. Evidence: `test_delete::*`, e2e "delete asks for approval when there are uncommitted changes", "delete closes the terminal, removes the worktree and archives the task".
-- PASS: Event log: JSON lines written by the CLI, all event types. Evidence: `test_event_log::test_all_event_types`, `test_config_state::test_events_append`.
+- PASS: Event log: JSON lines written by the CLI, all event types. Evidence: `test_event_log::test_all_event_types`, `test_config_state::test_events_append`, `test_migrate::test_older_refused_then_migrated` (`migrated`).
 - PASS: Task execution: first prompt, `factory next`/`done` loop, finish sets `finished` with `task_finished` and notification, skip needs approval, goto rules. Evidence: `test_engine::test_last_done_finishes`, `test_engine::test_next_tells_session_about_block_skip_and_goto`, `test_goto::*`, e2e "first script step runs with factory next and factory done", "the resumed session continues the pipeline to the end".
 - PASS: `factory goto` back only, into composites, blocks on 3rd jump. Evidence: `test_goto::test_goto_back_into_composite`, `test_goto::test_goto_forward_refused`, `test_goto::test_third_jump_blocks`.
 - PASS: Task list shows id, pipeline, step path, status with reason, live session state; blocked then awaiting approval first. Evidence: `test_board::test_block_unblock_and_order`, `test_board::test_session_state_column`.
@@ -138,13 +138,13 @@ Two PARTIAL reasons recur:
 
 ## Orchestrator
 
-- PASS: Menu is shown with the available actions, always, after each action. Evidence: `SKILL.md` lines 25-29, `test_init_menu::test_menu_before_and_after_init`. Whether Claude follows it in a live run is not tested.
-- PASS: Menu is a numbered text list, one heading per group, one number sequence; `AskUserQuestion` is not used. Evidence: `SKILL.md` lines 27-28, `test_skill::test_skill_frontmatter_and_menu_rule`. The rule is in the skill and checked by a test; a live Claude run is not tested.
+- PARTIAL: Menu is shown with the available actions, always, after each action. Evidence: `SKILL.md` lines 25-29, `test_init_menu::test_menu_before_and_after_init` Menu JSON tested; conversation behaviour not run.
+- PARTIAL: Menu is a numbered text list, one heading per group, one number sequence; `AskUserQuestion` is not used. Evidence: `SKILL.md` lines 27-28, `test_skill::test_skill_frontmatter_and_menu_rule` Menu JSON tested; conversation behaviour not run.
 
 ## Init
 
-- PASS: Init checks prerequisites and reports each as OK or failing with the fix (terminal check, git repo with `origin`, `uv`). Evidence: `test_init_menu::test_init_reports_failed_prerequisite`, `test_init_menu::test_init_creates_files_and_exclude`.
-- PASS: Saves `terminal: herdr` without asking, saves `library`, creates the library with `factory.yaml`, `steps/`, `pipelines/` when asked, warns when not in git. Evidence: `test_init_menu::test_init_creates_files_and_exclude`, `test_init_menu::test_init_needs_existing_library_or_flag`, `test_library::test_disabled_without_git`.
+- PASS: Init checks prerequisites and reports each as OK or failing with the fix (terminal check, git repo with `origin`, `uv`). Evidence: `test_init_menu::test_init_reports_failed_prerequisite` (no origin), `test_init_menu::test_init_lists_failed_terminal_check` (terminal message listed), `test_init_menu::test_init_lists_missing_uv_with_fix` (uv install command listed), `test_init_menu::test_init_creates_files_and_exclude`.
+- PASS: Saves `terminal: herdr` without asking, saves `library`, creates the library with `factory.yaml`, `steps/`, `pipelines/` when asked, warns when not in git. Evidence: `test_init_menu::test_terminal_defaults_to_herdr_and_init_saves_it` (herdr is the default and init writes it), `test_init_menu::test_init_creates_files_and_exclude`, `test_init_menu::test_init_needs_existing_library_or_flag`, `test_library::test_disabled_without_git`.
 - PASS: Creates `.factory/` with files and empty folders; never overwrites. Evidence: `test_init_menu::test_init_creates_files_and_exclude`, `test_init_menu::test_init_never_overwrites`.
 - PASS: Adds `.factory/` and `.factory.backup-*/` to `.git/info/exclude`; `.gitignore` unchanged. Evidence: `test_init_menu::test_init_creates_files_and_exclude`.
 - PARTIAL: Init offers the starter pack and ends with backlog import. Evidence: `SKILL.md` lines 35-39, `test_catalog::test_list_and_install_pipeline_with_missing_steps`, `test_backlog::test_import`. The Init conversation is not run end to end.

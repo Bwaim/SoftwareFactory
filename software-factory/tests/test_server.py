@@ -117,3 +117,25 @@ def test_adapter_check_exception_reported(inited):
         assert data["capabilities"] == []
     finally:
         inited.factory("server", "stop")
+
+
+def test_server_polls_waiting_tasks_on_its_own(inited):
+    from conftest import task_from_pipeline, task_json, write_pipeline, write_step
+    flag = inited.work / "approved.flag"
+    write_step(inited.fdir, "wait-review", {"wait_external": True, "done_when": "Approved.", "done_check": f"test -f {flag}"})
+    write_pipeline(inited.fdir, {"id": "w", "steps": ["wait-review"]})
+    task_from_pipeline(inited, "w", terminal_handle={"agent": "t1"})
+    inited.factory("next", "--task", "t1")
+    inited.factory("wait", "--task", "t1")
+    assert task_json(inited.fdir, "t1")["status"] == "waiting_external"
+    flag.write_text("ok")
+    try:
+        inited.factory("dashboard", env={"FACTORY_POLL_SECONDS": "1"})
+        end = time.time() + 10
+        status = "waiting_external"
+        while time.time() < end and status == "waiting_external":
+            time.sleep(0.5)
+            status = task_json(inited.fdir, "t1")["status"]
+        assert status != "waiting_external"
+    finally:
+        inited.factory("server", "stop", check=False)
