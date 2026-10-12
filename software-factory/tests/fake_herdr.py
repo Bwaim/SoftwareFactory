@@ -75,9 +75,16 @@ elif args[:2] == ["agent", "start"] and mode == "trust":
 elif args[:2] == ["agent", "read"]:
     print("Quick safety check: Is this a project you created or one you trust?\n Yes, I trust this folder" if mode == "trust" else "ready")
 elif args[:2] == ["agent", "get"]:
-    if mode == "gone":
+    name = args[2]
+    started = [c for c in logged() if c[:3] == ["agent", "start", name]]
+    present = bool(started) or name in os.environ.get("FAKE_HERDR_TAKEN", "").split(",") or os.environ.get("FAKE_HERDR_PRESENT") == "1"
+    if mode == "gone" or not present:
         print(json.dumps({"error": {"code": "agent_not_found"}}))
         sys.exit(1)
-    print(json.dumps({"result": {"agent": {"name": args[2], "agent_status": "idle"}}}))
+    tab_id = os.environ.get("FAKE_HERDR_AGENT_TAB")
+    if not tab_id:
+        pane_id = started[-1][started[-1].index("--pane") + 1] if started else "w9:p1"
+        tab_id = pane_id.replace(":p", ":t")
+    print(json.dumps({"result": {"agent": {"name": name, "agent_status": "idle", "tab_id": tab_id, "workspace_id": tab_id.split(":")[0]}}}))
 else:
     print(json.dumps({"result": {"type": "ok"}}))

@@ -14,6 +14,8 @@ def run(args, timeout=60, check=True):
         r = subprocess.run(["herdr", *args], capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         raise AdapterError(f"herdr {' '.join(args[:2])} timed out.")
+    except OSError as e:
+        raise AdapterError(f"herdr {' '.join(args[:2])} could not run: {e}")
     if check and r.returncode != 0:
         raise AdapterError(f"herdr {' '.join(args[:2])} failed: {(r.stderr or r.stdout).strip()}")
     return r
@@ -99,8 +101,11 @@ class HerdrAdapter(Adapter):
         return r.stdout
 
     def start_session(self, name, cwd, prompt, claude_args, in_worktree):
+        if self.find_agent(name) is not None:
+            raise AdapterError(f"A Herdr agent named {name} already exists. Close it or launch with another --id.")
         before = set(self.main_repo_workspace_ids(self.workspaces())) if in_worktree else set()
         handle = {"agent": name}
+        agent_started = False
         try:
             pane = self.open_worktree(handle, cwd) if in_worktree else self.open_main_repo(handle, cwd)
             if in_worktree and "workspace" in handle:
@@ -109,10 +114,11 @@ class HerdrAdapter(Adapter):
                     handle["extra_workspaces"] = extra
             run(["agent", "start", name, "--kind", "claude", "--pane", pane, "--timeout", str(START_TIMEOUT_MS), "--", *claude_args],
                 timeout=START_TIMEOUT_MS // 1000 + 30)
+            agent_started = True
             run(["agent", "prompt", name, prompt], timeout=60)
         except Exception as e:
             screen = self.screen(name).lower()
-            self.close_quietly(handle)
+            self.close_quietly(handle, agent_started)
             if any(marker in screen for marker in TRUST_MARKERS):
                 raise AdapterError(
                     f"Claude asks to trust the folder {cwd}. "
@@ -123,14 +129,35 @@ class HerdrAdapter(Adapter):
             raise AdapterError(f"Herdr start failed: {e}")
         return handle
 
-    def close_quietly(self, handle):
+    def close_quietly(self, handle, agent_started):
         try:
-            self.close(handle)
+            self.close(handle, stop=agent_started)
         except Exception:
             pass
 
+    def find_agent(self, name):
+        r = run(["agent", "get", name], check=False)
+        if r.returncode != 0:
+            return None
+        return parse(r).get("result", {}).get("agent") or {}
+
+    def owned_agent(self, handle):
+        agent = self.find_agent(handle["agent"])
+        if agent is None:
+            return None
+        same_tab = handle.get("tab") and agent.get("tab_id") == handle["tab"]
+        same_workspace = handle.get("workspace") and agent.get("workspace_id") == handle["workspace"]
+        return agent if same_tab or same_workspace else None
+
+    def require_owned(self, handle):
+        agent = self.owned_agent(handle)
+        if agent is None:
+            raise AdapterError(f"The Herdr agent {handle['agent']} is gone or does not belong to this task.")
+        return agent
+
     def stop_agent(self, handle):
-        run(["agent", "send-keys", handle["agent"], "ctrl+c", "ctrl+c"], check=False)
+        if self.owned_agent(handle) is not None:
+            run(["agent", "send-keys", handle["agent"], "ctrl+c", "ctrl+c"], check=False)
 
     def close_own(self, handle):
         workspace_id, tab_id = handle.get("workspace"), handle.get("tab")
@@ -147,29 +174,33 @@ class HerdrAdapter(Adapter):
         if tabs is not None and len(tabs) == 1 and tabs[0].get("agent_status", "unknown") == "unknown":
             run(["workspace", "close", workspace_id], check=False)
 
-    def close(self, handle):
+    def close(self, handle, stop=True):
         if not handle:
             return
-        self.stop_agent(handle)
+        if stop:
+            self.stop_agent(handle)
         self.close_own(handle)
         for workspace_id in handle.get("extra_workspaces", []):
             self.close_extra(workspace_id)
 
     def send_prompt(self, handle, text):
+        self.require_owned(handle)
         run(["agent", "prompt", handle["agent"], text])
 
     def focus(self, handle):
+        self.require_owned(handle)
         run(["agent", "focus", handle["agent"]])
 
     def state(self, handle):
         if not handle:
             return "gone"
-        r = run(["agent", "get", handle["agent"]], check=False)
-        if r.returncode != 0:
+        agent = self.owned_agent(handle)
+        if agent is None:
             return "gone"
-        return parse(r).get("result", {}).get("agent", {}).get("agent_status") or "unknown"
+        return agent.get("agent_status") or "unknown"
 
     def wait_idle(self, handle, timeout_s):
+        self.require_owned(handle)
         run(["agent", "wait", handle["agent"], "--timeout", str(int(timeout_s * 1000))], timeout=timeout_s + 30)
 
     def notify(self, text):

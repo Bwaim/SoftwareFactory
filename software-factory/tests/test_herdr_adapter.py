@@ -35,7 +35,7 @@ def test_start_in_worktree(herdr_env, origin_repo):
     prompt = 'Run `factory next`. Say "hi" $HOME'
     handle = adapter.start_session("t1", origin_repo / "wt", prompt, ["--name", "t1", "--settings", "/a b/c.json"], True)
     assert handle == {"agent": "t1", "workspace": "w9", "tab": "w9:t1"}
-    c = [call for call in calls() if call[:2] != ["workspace", "list"]]
+    c = [call for call in calls() if call[:2] not in (["workspace", "list"], ["agent", "get"])]
     assert c[0][:2] == ["worktree", "open"] and "--no-focus" in c[0] and "--trust-repository" not in c[0]
     assert c[1][:3] == ["agent", "start", "t1"] and c[1][c[1].index("--pane") + 1] == "w9:p1"
     assert c[1][c[1].index("--") + 1:] == ["--name", "t1", "--settings", "/a b/c.json"]
@@ -138,6 +138,7 @@ def test_trust_dialog_reported_and_cleaned(herdr_env, origin_repo, monkeypatch):
 
 def test_state_gone(herdr_env, monkeypatch):
     adapter, _ = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
     assert adapter.state({"agent": "t1", "tab": "w9:t1"}) == "idle"
     monkeypatch.setenv("FAKE_HERDR_MODE", "gone")
     assert adapter.state({"agent": "t1", "tab": "w9:t1"}) == "gone"
@@ -166,3 +167,53 @@ def test_missing_key_after_open_still_cleans_up(herdr_env, origin_repo, monkeypa
     with pytest.raises(AdapterError):
         adapter.start_session("t1", origin_repo / "wt", "p", [], True)
     assert closed(calls()) == ["w9"]
+
+
+def test_taken_agent_name_refused_and_untouched(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_TAKEN", "t1")
+    with pytest.raises(AdapterError, match="A Herdr agent named t1 already exists. Close it or launch with another --id."):
+        adapter.start_session("t1", origin_repo / "wt", "p", [], True)
+    verbs = [c[:2] for c in calls()]
+    assert ["agent", "start"] not in verbs
+    assert not any(c[:2] in (["agent", "send-keys"], ["workspace", "close"], ["tab", "close"]) for c in calls())
+
+
+def test_failed_start_does_not_send_keys_to_agent(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_MODE", "trust")
+    with pytest.raises(AdapterError):
+        adapter.start_session("t3", origin_repo / "wt", "p", [], True)
+    assert not any(c[:2] == ["agent", "send-keys"] for c in calls())
+
+
+def test_actions_refused_when_agent_in_other_tab(herdr_env, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w3:t4")
+    handle = {"agent": "t1", "tab": "w9:t1"}
+    for action in (
+        lambda: adapter.send_prompt(handle, "hi"),
+        lambda: adapter.focus(handle),
+        lambda: adapter.wait_idle(handle, 5),
+    ):
+        with pytest.raises(AdapterError, match="does not belong"):
+            action()
+    adapter.stop_agent(handle)
+    assert not any(c[:2] in (["agent", "prompt"], ["agent", "focus"], ["agent", "wait"], ["agent", "send-keys"]) for c in calls())
+
+
+def test_state_gone_when_agent_in_other_tab(herdr_env, monkeypatch):
+    adapter, _ = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w3:t4")
+    assert adapter.state({"agent": "t1", "tab": "w9:t1"}) == "gone"
+
+
+def test_actions_allowed_in_own_tab_or_workspace(herdr_env, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    adapter.send_prompt({"agent": "t1", "tab": "w9:t1"}, "hi")
+    monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w9:t4")
+    adapter.focus({"agent": "t1", "tab": "w9:t1", "workspace": "w9"})
+    assert ["agent", "prompt", "t1", "hi"] in calls() and ["agent", "focus", "t1"] in calls()
