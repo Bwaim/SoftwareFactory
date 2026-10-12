@@ -166,6 +166,11 @@ Task life:
 - `factory open-ide`: open the task worktree in the IDE.
 - `factory terminal focus <id>`: focus the task session.
 - `factory terminal send-prompt <id> <text> [--wait]`: send a prompt to a task session.
+- `factory terminal start-session <name> <cwd> <prompt> [--worktree] -- <claude args>`: start a Claude session in the terminal. Prints the session handle as JSON.
+- `factory terminal close <handle-json>`: close a session.
+- `factory terminal state <handle-json>`: print the session state.
+- `factory terminal wait-idle <handle-json> [--timeout <seconds>]`: wait until the session is idle.
+- `factory terminal notify <text>`: show a notification.
 
 Backlog:
 

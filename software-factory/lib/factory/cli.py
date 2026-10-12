@@ -40,11 +40,20 @@ def command_name(args):
     return f"{args.cmd} {action}" if action else args.cmd
 
 
+def split_passthrough(argv):
+    if "--" not in argv or "start-session" not in argv:
+        return list(argv), []
+    index = list(argv).index("--")
+    return list(argv[:index]), list(argv[index + 1:])
+
+
 def main(argv):
+    argv, passthrough = split_passthrough(argv)
     parser, sub, common = build_parser()
     from . import commands
     commands.register(sub, common)
     args = parser.parse_args(argv)
+    args.passthrough = passthrough
     name = command_name(args)
     try:
         if args.cmd not in NO_VERSION_CHECK and name not in NO_VERSION_CHECK:

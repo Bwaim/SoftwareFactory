@@ -51,6 +51,12 @@ def register(sub, common):
     ts.add_parser("check", parents=[common])
     tf = ts.add_parser("focus", parents=[common]); tf.add_argument("id")
     tp = ts.add_parser("send-prompt", parents=[common]); tp.add_argument("id"); tp.add_argument("text"); tp.add_argument("--wait", action="store_true")
+    tt = ts.add_parser("start-session", parents=[common])
+    tt.add_argument("name"); tt.add_argument("cwd"); tt.add_argument("prompt"); tt.add_argument("--worktree", action="store_true")
+    tc = ts.add_parser("close", parents=[common]); tc.add_argument("handle")
+    tg = ts.add_parser("state", parents=[common]); tg.add_argument("handle")
+    tw = ts.add_parser("wait-idle", parents=[common]); tw.add_argument("handle"); tw.add_argument("--timeout", type=float, default=3600)
+    tn = ts.add_parser("notify", parents=[common]); tn.add_argument("text")
     p = sub.add_parser("delete", parents=[common])
     p.add_argument("id")
     p.add_argument("--dry-run", action="store_true")
@@ -206,6 +212,51 @@ def terminal_check(args):
     ok, message = adapters.get_adapter(ctx).check()
     print(("OK: " if ok else "FAILED: ") + message)
     return 0 if ok else 1
+
+
+def adapter_of(args):
+    from . import adapters
+    return adapters.get_adapter(ctx_of(args))
+
+
+def parse_handle(text):
+    import json
+    try:
+        handle = json.loads(text)
+    except json.JSONDecodeError:
+        raise FactoryError("The handle must be JSON, as printed by `factory terminal start-session`.")
+    if not isinstance(handle, dict):
+        raise FactoryError("The handle must be a JSON object.")
+    return handle
+
+
+@cli.command("terminal start-session")
+def terminal_start_session(args):
+    handle = adapter_of(args).start_session(args.name, args.cwd, args.prompt, args.passthrough, args.worktree)
+    cli.emit(handle, True)
+
+
+@cli.command("terminal close")
+def terminal_close(args):
+    adapter_of(args).close(parse_handle(args.handle))
+    print("Closed.")
+
+
+@cli.command("terminal state")
+def terminal_state(args):
+    print(adapter_of(args).state(parse_handle(args.handle)))
+
+
+@cli.command("terminal wait-idle")
+def terminal_wait_idle(args):
+    adapter_of(args).wait_idle(parse_handle(args.handle), args.timeout)
+    print("Idle.")
+
+
+@cli.command("terminal notify")
+def terminal_notify(args):
+    adapter_of(args).notify(args.text)
+    print("Notification sent.")
 
 
 def parse_inputs(items):
