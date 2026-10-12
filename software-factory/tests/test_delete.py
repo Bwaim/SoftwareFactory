@@ -3,7 +3,7 @@ import json
 import pytest
 
 from conftest import fake_calls, git, write_pipeline, write_step
-from factory import delete, launch, repo
+from factory import delete, launch, repo, state
 from factory.errors import FactoryError
 
 
@@ -81,3 +81,12 @@ def test_branch_merged_then_deleted_on_origin_is_deleted(started):
     git("fetch", "--prune", "origin", cwd=inited.repo)
     delete.delete(ctx, task["id"])
     assert not git("branch", "--list", "feat/del", cwd=inited.repo)
+
+
+def test_failed_check_refuses_without_confirm(started):
+    inited, ctx, task = started
+    state.update(ctx, task["id"], lambda t: t.__setitem__("base_ref", "no-such-base"))
+    with pytest.raises(FactoryError, match="--confirm-unpushed"):
+        delete.delete(ctx, task["id"])
+    assert (inited.worktrees / task["id"]).exists()
+    assert delete.plan_delete(ctx, task["id"])["check_errors"]

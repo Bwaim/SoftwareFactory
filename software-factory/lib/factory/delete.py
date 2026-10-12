@@ -7,9 +7,12 @@ from .adapters.base import AdapterError
 from .errors import FactoryError
 
 
-def git_lines(args, cwd):
+def git_lines(args, cwd, label, errors):
     r = repo.git(args, cwd, check=False)
-    return [line for line in r.stdout.splitlines() if line.strip()] if r.returncode == 0 else []
+    if r.returncode != 0:
+        errors.append(f"{label}: {(r.stderr or r.stdout).strip()}")
+        return []
+    return [line for line in r.stdout.splitlines() if line.strip()]
 
 
 def ref_exists(cwd, ref):
@@ -41,17 +44,18 @@ def plan_delete(ctx, tid):
     plan = {
         "task_id": tid, "session_id": task.get("session_id"), "terminal_handle": task.get("terminal_handle"),
         "worktree": worktree, "branch": None, "uncommitted": [], "unpushed": [],
-        "delete_branch": False, "needs_confirm": False,
+        "delete_branch": False, "needs_confirm": False, "check_errors": [],
     }
+    errors = plan["check_errors"]
     if worktree and Path(worktree).exists():
-        plan["uncommitted"] = git_lines(["status", "--porcelain"], worktree)
+        plan["uncommitted"] = git_lines(["status", "--porcelain"], worktree, "Cannot check uncommitted changes", errors)
         branch = current_branch(worktree)
         plan["branch"] = branch
         upstream = f"origin/{branch}" if branch and ref_exists(worktree, f"refs/remotes/origin/{branch}") else f"origin/{base_ref}"
-        plan["unpushed"] = git_lines(["log", "--oneline", f"{upstream}..HEAD"], worktree)
+        plan["unpushed"] = git_lines(["log", "--oneline", f"{upstream}..HEAD"], worktree, "Cannot check unpushed commits", errors)
         if branch:
-            plan["delete_branch"] = not plan["unpushed"] and branch_merged_or_pushed(ctx, branch, base_ref)
-    plan["needs_confirm"] = bool(plan["uncommitted"] or plan["unpushed"])
+            plan["delete_branch"] = not errors and not plan["unpushed"] and branch_merged_or_pushed(ctx, branch, base_ref)
+    plan["needs_confirm"] = bool(plan["uncommitted"] or plan["unpushed"] or errors)
     return plan
 
 
@@ -69,6 +73,8 @@ def render_plan(plan):
         lines += ["Uncommitted changes:"] + [f"  {line}" for line in plan["uncommitted"]]
     if plan["unpushed"]:
         lines += ["Commits not pushed to origin:"] + [f"  {line}" for line in plan["unpushed"]]
+    if plan["check_errors"]:
+        lines += ["Checks that failed, so the work may not be safe to delete:"] + [f"  {error}" for error in plan["check_errors"]]
     return "\n".join(lines)
 
 
