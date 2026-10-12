@@ -49,6 +49,7 @@ def register(sub, common):
     p.add_argument("id")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--confirm-unpushed", action="store_true")
+    sub.add_parser("clean", parents=[common])
     p = sub.add_parser("init", parents=[common])
     p.add_argument("--library", required=True)
     p.add_argument("--create-library", action="store_true")
@@ -210,6 +211,20 @@ def delete_cmd(args):
         return
     delete.delete(ctx, args.id, args.confirm_unpushed)
     print(f"Task {args.id} deleted and archived.")
+
+
+@cli.command("clean")
+def clean_cmd(args):
+    from . import delete
+    rows = delete.clean_report(ctx_of(args))
+    if args.json:
+        cli.emit(rows, True)
+        return
+    if not rows:
+        print("No finished task.")
+    for r in rows:
+        mark = "[x]" if r["selected"] else "[ ]"
+        print(f"{mark} {r['id']}: {r['description']} ({r['reason']})")
 
 
 @cli.command("init")

@@ -37,6 +37,44 @@ def current_branch(worktree):
     return repo.git(["symbolic-ref", "--short", "-q", "HEAD"], worktree, check=False).stdout.strip() or None
 
 
+def task_branch(task):
+    branch = task["state"].get("branch")
+    worktree = task.get("worktree")
+    if not branch and worktree and Path(worktree).exists():
+        branch = current_branch(worktree)
+    return branch
+
+
+def tracks_own_branch(ctx, branch):
+    r = repo.git(["config", "--get", f"branch.{branch}.merge"], ctx.main, check=False)
+    return r.returncode == 0 and r.stdout.strip() == f"refs/heads/{branch}"
+
+
+def merge_state(ctx, branch, base_ref):
+    if not branch:
+        return True, "no branch"
+    local = f"refs/heads/{branch}"
+    base = f"refs/remotes/origin/{base_ref}"
+    if ref_exists(ctx.main, local) and ref_exists(ctx.main, base) and is_ancestor(ctx.main, local, base):
+        return True, f"merged into origin/{base_ref}"
+    if tracks_own_branch(ctx, branch) and not ref_exists(ctx.main, f"refs/remotes/origin/{branch}"):
+        return True, "pushed, and its remote branch was deleted"
+    return False, "not merged"
+
+
+def clean_report(ctx):
+    repo.git(["fetch", "origin", "--prune"], ctx.main, check=False)
+    rows = []
+    for task in state.list_tasks(ctx):
+        if task["status"] != "finished":
+            continue
+        branch = task_branch(task)
+        merged, reason = merge_state(ctx, branch, task.get("base_ref") or "main")
+        rows.append({"id": task["id"], "description": task["description"], "branch": branch,
+                     "merged": merged, "reason": reason, "selected": merged})
+    return rows
+
+
 def plan_delete(ctx, tid):
     task = state.load(ctx, tid)
     worktree = task.get("worktree")
