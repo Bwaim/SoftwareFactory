@@ -15,6 +15,8 @@ ROOT = VERIF / "work" / "e2e"
 TRUST_FAIL = "trust dialog: run --prepare and trust the repo"
 results = []
 handles = []
+state = {}
+LIVE_STATUSES = {"idle", "working", "done", "blocked"}
 
 STEP_ONE = "---\nid: e2e-one\ndescription: Write one.txt\ncategory: test\ntype: script\ndone_when: one.txt exists\ndone_check: test -f \"$(factory artifact path one.txt)\"\n---\n\ne2e-one.sh\n"
 STEP_HOLD = "---\nid: e2e-hold\ndescription: Wait for the test\ncategory: test\ntype: prompt\ndone_when: The test marks it done.\nwait_external: true\n---\n\nRun `factory wait`. Then stop and wait for a message.\n"
@@ -53,40 +55,84 @@ def task_events(fdir, tid):
     return [json.loads(line) for line in p.read_text().splitlines()] if p.exists() else []
 
 
-def agent_status(name):
+def agent_info(name):
     r = sh(["herdr", "agent", "get", name], check=False)
     if r.returncode != 0:
-        return "gone"
+        text = (r.stdout + r.stderr).lower()
+        if "agent_not_found" in text or "not found" in text:
+            return {"state": "gone"}
+        return {"state": "error"}
     try:
-        data = json.loads(r.stdout)
-    except json.JSONDecodeError:
-        return "unknown"
-    stack = [data]
-    while stack:
-        item = stack.pop()
-        if isinstance(item, dict):
-            if "agent_status" in item:
-                return item["agent_status"]
-            stack += list(item.values())
-        elif isinstance(item, list):
-            stack += item
-    return "unknown"
+        agent = json.loads(r.stdout)["result"]["agent"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return {"state": "error"}
+    return {"state": agent.get("agent_status", "unknown"), "kind": agent.get("agent")}
 
 
-def wait_for(predicate, timeout, watch_agent=None, blocked_seen=None):
+def agent_status(name):
+    return agent_info(name)["state"]
+
+
+def sample(watch_agent, samples):
+    status = agent_status(watch_agent)
+    if samples is not None:
+        samples.append(status)
+
+
+def wait_for(predicate, timeout, watch_agent=None, samples=None):
     end = time.time() + timeout
     while time.time() < end:
-        if watch_agent and agent_status(watch_agent) == "blocked" and blocked_seen is not None:
-            blocked_seen.append(time.time())
+        if watch_agent:
+            sample(watch_agent, samples)
         if predicate():
             return True
         time.sleep(3)
     return False
 
 
+def listed_ids(kind, key):
+    r = sh(["herdr", kind, "list"], check=False)
+    try:
+        return sorted(item[key] for item in json.loads(r.stdout)["result"][kind + "s"])
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return None
+
+
+def herdr_ids():
+    return {"workspaces": listed_ids("workspace", "workspace_id"), "tabs": listed_ids("tab", "tab_id")}
+
+
+def tab_closed(handle):
+    tabs = listed_ids("tab", "tab_id")
+    return tabs is not None and handle["tab"] not in tabs
+
+
+def process_lines(needle):
+    r = sh(["ps", "-axo", "args="], check=False)
+    return [line for line in r.stdout.splitlines() if needle in line and "e2e_herdr" not in line]
+
+
+def claude_argv(tid, session_id):
+    return [line for line in process_lines(f"--name {tid}") if session_id in line]
+
+
+def transcript(session_id):
+    found = list((Path.home() / ".claude" / "projects").glob(f"*/{session_id}.jsonl"))
+    return found[0] if found else None
+
+
 def configure_git_user(repo):
     sh(["git", "config", "user.name", "E2E"], cwd=repo)
     sh(["git", "config", "user.email", "e2e@example.com"], cwd=repo)
+
+
+def push_new_commit():
+    seed = ROOT / "seed"
+    (seed / "later.txt").write_text("later\n")
+    sh(["git", "add", "-A"], cwd=seed)
+    sh(["git", "commit", "-m", "later"], cwd=seed)
+    sh(["git", "push", "origin", "HEAD:main"], cwd=seed)
+    return sh(["git", "rev-parse", "HEAD"], cwd=seed).stdout.strip()
 
 
 def create_origin_and_seed():
@@ -127,8 +173,13 @@ def clear_root_keeping_repo():
             shutil.rmtree(child, ignore_errors=True)
 
 
+def repo_is_ready():
+    repo = ROOT / "repo"
+    return repo.is_dir() and not repo.is_symlink()
+
+
 def prepare():
-    if (ROOT / "repo").exists():
+    if repo_is_ready():
         print(f"{ROOT / 'repo'} already exists. Trust is kept.")
         return 0
     ROOT.mkdir(parents=True, exist_ok=True)
@@ -162,14 +213,27 @@ def remember_handle(handle):
         handles.append(handle)
 
 
-def close_recorded_handles():
+def reread_handles():
+    if "fdir" not in state or "tid" not in state:
+        return
+    for archived in (False, True):
+        try:
+            remember_handle(task_json(state["fdir"], state["tid"], archived)["terminal_handle"])
+        except (OSError, KeyError, json.JSONDecodeError):
+            pass
+
+
+def delete_leftover_task():
+    fdir, tid = state.get("fdir"), state.get("tid")
+    if fdir and tid and (fdir / "tasks" / tid).exists():
+        sh(["factory", "delete", tid, "--confirm-unpushed"], cwd=fdir.parent, check=False)
+
+
+def close_recorded_tabs():
+    listed = listed_ids("tab", "tab_id") or []
     for handle in handles:
-        for workspace_id in handle.get("extra_workspaces", []):
-            sh(["herdr", "workspace", "close", workspace_id], check=False)
-        if handle.get("tab"):
+        if handle.get("tab") in listed:
             sh(["herdr", "tab", "close", handle["tab"]], check=False)
-        if handle.get("created_workspace") and handle.get("workspace"):
-            sh(["herdr", "workspace", "close", handle["workspace"]], check=False)
 
 
 def launch_task(repo):
@@ -183,49 +247,78 @@ def launch_task(repo):
 
 def run():
     repo, lib = setup()
+    original_head = sh(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    new_origin_head = push_new_commit()
     worktree_root = ROOT / "worktrees"
 
     sh([BIN, "init", "--library", lib, "--create-library"], cwd=repo)
     sh(["factory", "config", "set", "create-worktree", "worktree_root", worktree_root], cwd=repo)
     fdir = repo / ".factory"
+    state["fdir"] = fdir
     write_pipeline(fdir)
 
     task = launch_task(repo)
     tid, wt = task["id"], Path(task["worktree"])
+    state["tid"] = tid
     remember_handle(task["terminal_handle"])
     head = sh(["git", "rev-parse", "HEAD"], cwd=wt).stdout.strip()
     origin_main = sh(["git", "rev-parse", "origin/main"], cwd=repo).stdout.strip()
-    record("launch fetches origin and creates the worktree from origin/main", wt.exists() and head == origin_main)
-    record("Claude runs in Herdr with the task id as its name", agent_status(tid) != "gone")
+    record("launch fetches origin and creates the worktree from origin/main",
+           wt.exists() and head == new_origin_head == origin_main and head != original_head,
+           f"worktree {head[:8]} new origin {new_origin_head[:8]} clone head {original_head[:8]}")
 
-    blocked = []
-    started = wait_for(lambda: any(e["type"] == "step_started" and e["step"] == "e2e-one" for e in task_events(fdir, tid)), 180, tid, blocked)
+    samples = []
+    live = wait_for(lambda: agent_info(tid)["state"] in LIVE_STATUSES, 60, tid, samples)
+    info = agent_info(tid)
+    argv = claude_argv(tid, task["session_id"])
+    settings_arg = f"--settings {fdir / 'claude-settings.json'}"
+    record("Claude runs in Herdr named with the task id, with the factory settings",
+           live and info.get("kind") == "claude" and len(argv) >= 1
+           and all(f"--name {tid}" in a and settings_arg in a for a in argv),
+           f"status {info['state']} kind {info.get('kind')} processes {len(argv)}")
+
+    started = wait_for(lambda: any(e["type"] == "step_started" and e["step"] == "e2e-one" for e in task_events(fdir, tid)), 180, tid, samples)
     record("Claude receives the first prompt and runs factory next", started)
-    waiting = wait_for(lambda: task_json(fdir, tid)["status"] == "waiting_external", 300, tid, blocked)
+    waiting = wait_for(lambda: task_json(fdir, tid)["status"] == "waiting_external", 300, tid, samples)
     record("first script step runs with factory next and factory done", waiting and (fdir / "tasks" / tid / "artifacts" / "one.txt").exists())
 
+    session_file = transcript(task["session_id"])
+    size_before = session_file.stat().st_size if session_file else None
+    first_handle = task_json(fdir, tid)["terminal_handle"]
     sh(["factory", "pause", tid], cwd=repo)
-    gone = wait_for(lambda: agent_status(tid) == "gone", 30)
-    record("pause closes the task terminal", gone and task_json(fdir, tid)["status"] == "paused")
+    gone = wait_for(lambda: agent_status(tid) == "gone", 30, tid, samples)
+    record("pause closes the task terminal",
+           gone and tab_closed(first_handle) and task_json(fdir, tid)["status"] == "paused")
 
     sh(["factory", "resume", tid], cwd=repo)
     resumed = task_json(fdir, tid)
     remember_handle(resumed["terminal_handle"])
-    record("resume reopens the same Claude session", resumed["session_id"] == task["session_id"] and agent_status(tid) != "gone"
-           and resumed["status"] == "waiting_external")
+    wait_for(lambda: agent_info(tid)["state"] in LIVE_STATUSES, 60, tid, samples)
+    resume_argv = process_lines(f"--resume {task['session_id']}")
+    record("resume reopens the Claude process with --resume and the same session id",
+           resumed["session_id"] == task["session_id"] and agent_status(tid) in LIVE_STATUSES
+           and resumed["status"] == "waiting_external" and len(resume_argv) >= 1
+           and all(f"--name {tid}" in a for a in resume_argv),
+           f"resume processes {len(resume_argv)}")
 
     sh(["factory", "external-done", tid], cwd=repo)
-    finished = wait_for(lambda: task_json(fdir, tid)["status"] == "finished", 300, tid, blocked)
+    finished = wait_for(lambda: task_json(fdir, tid)["status"] == "finished", 300, tid, samples)
     record("the resumed session continues the pipeline to the end", finished and (fdir / "tasks" / tid / "artifacts" / "two.txt").exists())
-    record("the session never waits on a permission prompt", not blocked, f"blocked seen {len(blocked)} times" if blocked else "")
+    size_after = session_file.stat().st_size if session_file and session_file.exists() else None
+    record("the same Claude transcript file exists and grew after resume",
+           size_before is not None and size_after is not None and size_after > size_before,
+           f"{session_file} {size_before} -> {size_after}")
+    record("the session never waits on a permission prompt", bool(samples) and "blocked" not in samples and "error" not in samples,
+           f"{len(samples)} samples, blocked {samples.count('blocked')}, error {samples.count('error')}")
 
     (wt / "uncommitted.txt").write_text("x")
     refused = sh(["factory", "delete", tid], cwd=repo, check=False)
     record("delete asks for approval when there are uncommitted changes", refused.returncode == 1 and "--confirm-unpushed" in refused.stderr)
+    last_handle = task_json(fdir, tid)["terminal_handle"]
     sh(["factory", "delete", tid, "--confirm-unpushed"], cwd=repo)
     archived = (fdir / "tasks" / "archive" / tid / "task.json").exists()
     record("delete closes the terminal, removes the worktree and archives the task",
-           agent_status(tid) == "gone" and not wt.exists() and archived)
+           agent_status(tid) == "gone" and tab_closed(last_handle) and not wt.exists() and archived)
 
 
 def restore_link(previous):
@@ -243,7 +336,7 @@ def clean_up_root():
 def main():
     if "--prepare" in sys.argv[1:]:
         return prepare()
-    if not (ROOT / "repo").exists():
+    if not repo_is_ready():
         print(prepare_instructions())
         return 2
     if os.environ.get("HERDR_ENV") != "1":
@@ -253,6 +346,7 @@ def main():
         print(f"{LINK} exists and is not a link. Stop.")
         return 2
     previous = os.readlink(LINK) if LINK.is_symlink() else None
+    before = herdr_ids()
     try:
         run()
     except TrustDialog:
@@ -260,9 +354,14 @@ def main():
     except Exception as e:
         record("e2e run completed without error", False, str(e))
     finally:
-        close_recorded_handles()
+        delete_leftover_task()
+        reread_handles()
+        close_recorded_tabs()
         restore_link(previous)
         clean_up_root()
+        after = herdr_ids()
+        record("no Herdr workspace or tab is left open after the run", before == after and None not in before.values(),
+               "" if before == after else f"before {before} after {after}")
         RESULTS.write_text(json.dumps(results, indent=2) + "\n")
     return 0 if results and all(r["ok"] for r in results) else 1
 

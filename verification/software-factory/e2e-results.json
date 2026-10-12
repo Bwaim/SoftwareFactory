@@ -2,12 +2,12 @@
   {
     "name": "launch fetches origin and creates the worktree from origin/main",
     "ok": true,
-    "detail": ""
+    "detail": "worktree 3558076f new origin 3558076f clone head 595cd0e0"
   },
   {
-    "name": "Claude runs in Herdr with the task id as its name",
+    "name": "Claude runs in Herdr named with the task id, with the factory settings",
     "ok": true,
-    "detail": ""
+    "detail": "status idle kind claude processes 1"
   },
   {
     "name": "Claude receives the first prompt and runs factory next",
@@ -25,9 +25,9 @@
     "detail": ""
   },
   {
-    "name": "resume reopens the same Claude session",
+    "name": "resume reopens the Claude process with --resume and the same session id",
     "ok": true,
-    "detail": ""
+    "detail": "resume processes 1"
   },
   {
     "name": "the resumed session continues the pipeline to the end",
@@ -35,9 +35,14 @@
     "detail": ""
   },
   {
+    "name": "the same Claude transcript file exists and grew after resume",
+    "ok": true,
+    "detail": "/Users/fabienboismoreau/.claude/projects/-Users-fabienboismoreau-Documents-Projects-SoftwareFactory-SoftwareFactory-verification-software-factory-work-e2e-worktrees-e2e-task/b5f392e2-7f23-4eb5-9e15-083e1d5edd4f.jsonl 346069 -> 371846"
+  },
+  {
     "name": "the session never waits on a permission prompt",
     "ok": true,
-    "detail": ""
+    "detail": "14 samples, blocked 0, error 0"
   },
   {
     "name": "delete asks for approval when there are uncommitted changes",
@@ -46,6 +51,11 @@
   },
   {
     "name": "delete closes the terminal, removes the worktree and archives the task",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "no Herdr workspace or tab is left open after the run",
     "ok": true,
     "detail": ""
   }
