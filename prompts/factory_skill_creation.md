@@ -64,6 +64,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
   - Tasks
     - Launch a new pipeline, from scratch or from a backlog entry
     - Show tasks: lists the tasks with their status
+    - Check waiting tasks: runs `factory poll`, and lets the user mark a manual external event as done
     - Focus a task: switches the terminal to the task session
     - Send a prompt to a task
     - Resume a task: restarts the session of a paused task, or of a task whose session is gone
@@ -137,6 +138,7 @@ steps:
   - `model` and `effort`: optional, used only when `run_in` is `subagent`. Example: `model: opus`, `effort: high`.
   - `requires`: optional list of tools and skills the step needs, for example `[gh]` or `[/superpowers:writing-plans]`
   - `column`: optional board column. The task moves to it when the step starts.
+  - `wait_external`: `true` if the step waits for an external event (see External waiting)
 - The body depends on the type:
   - `prompt`: the instructions the agent follows
   - `skill`: the skill to call and how to use its result
@@ -269,7 +271,7 @@ Save the path with `factory state set plan <path>`.
 - Catalog content for this build:
   - Pipelines:
     - `quick-task`: `implement`, `user-validation`, `commit`
-    - `plan-and-build`: `brainstorm`, `user-validation`, `write-plan`, `user-validation`, `execute-plan`, `run-tests`, `commit`, `push`, `create-pr`
+    - `plan-and-build`: `brainstorm`, `user-validation`, `write-plan`, `user-validation`, `execute-plan`, `run-tests`, `commit`, `push`, `create-pr`, `wait-review`, `wait-qa`
   - Steps:
     - `implement`: prompt step, do the task description
     - `commit`: prompt step, commit the changes with a message that follows the repository's existing commit style
@@ -282,6 +284,8 @@ Save the path with `factory state set plan <path>`.
     - `brainstorm`: wraps `/superpowers:brainstorming`, saves the spec as an artifact
     - `write-plan`: wraps `/superpowers:writing-plans`, saves the plan as an artifact
     - `execute-plan`: wraps `/superpowers:executing-plans` on the plan artifact
+    - `wait-review`: waits until the pull request or merge request is approved. `wait_external: true`, with a `done_check` that uses `gh` or `glab` from `config.forge`. Column: Review.
+    - `wait-qa`: waits until the user marks QA as done. `wait_external: true`, without a `done_check`. Column: QA.
 - The builder reads each wrapped skill to set `run_in`: `session` if the skill asks the user anything, otherwise `subagent`.
 - `config.forge` is `github` or `gitlab`. It is asked once per repository, like any config key.
 
@@ -395,6 +399,8 @@ Save the path with `factory state set plan <path>`.
   - `approval_requested`, with the target
   - `approved`
   - `changes_requested`, with the text
+  - `waiting_started`, with the reason
+  - `external_event`, with how it ended: check or manual
 - With the Claude session id from the task state, this log is enough to split the session transcript by step later.
 
 ##### Task execution
@@ -459,6 +465,20 @@ Save the path with `factory state set plan <path>`.
   - `factory request-changes <text>` sets the task back to `active`. The session gets the text as feedback and continues the step.
 - `factory open-ide` opens the task worktree with the config key `ide_command`, for example `open -a "Android Studio" {path}` or `code {path}`. The key is asked on first use, like any config key.
 - When the dashboard or the menu approves, it sends the message to the session with the adapter `send-prompt`.
+
+##### External waiting
+
+- A step with `wait_external: true` first does its actions, then the agent runs `factory wait`. The task becomes `waiting_external`, with the step `done_when` as the reason.
+- The wait ends in one of two ways:
+  - With a `done_check`: `factory poll` runs the `done_check` of every `waiting_external` task. Each check has a timeout of 60 seconds.
+  - Without a `done_check`: the user marks the event as done with `factory external-done <id>`, from the dashboard or the menu.
+- When the wait ends:
+  - The step is done, the task becomes `active`, and the user gets a notification if the adapter supports `notify`.
+  - The session gets "The external event happened: <done_when>. Run `factory next`." If the session is gone, the factory resumes it first.
+- `factory poll` runs:
+  - Every `poll_minutes` while the dashboard server runs. `poll_minutes` is in `.factory/factory.yaml`, default 5.
+  - From the menu action "Check waiting tasks".
+- `paused` tasks are not polled. Resume restores `waiting_external`, and polling starts again.
 
 ##### Pause and resume
 
@@ -547,6 +567,7 @@ Save the path with `factory state set plan <path>`.
   - `factory terminal focus <id>` and `factory terminal send-prompt <id> <text>`: focus a task session and send it a prompt.
   - `factory clean`: lists finished tasks and whether their work is merged.
   - `factory approve`, `factory request-changes <text>` and `factory open-ide`: approval actions.
+  - `factory wait`, `factory poll` and `factory external-done <id>`: external waiting.
   - `factory library commit <message> <paths...>`: commits the given library files in the repository that contains the library, and nothing else.
 
 ### Terminal adapter
@@ -684,6 +705,7 @@ The library, a folder in any git repository:
   - The CLI runs on a machine with only `uv` installed: `uv` installs the dependencies on the first run.
   - A task starts in `start_column` and moves when a step with a `column` starts. The pipeline entry wins over the manifest. An unknown column is a pipeline check error.
   - `user-validation` sets `awaiting_approval`. `factory approve` lets `factory done` pass. `factory request-changes` sets `active` and sends the text with the fake adapter.
+  - `factory wait` sets `waiting_external`. `factory poll` ends the wait when the `done_check` passes, sends the message with the fake adapter, and skips paused tasks. `factory external-done` ends a wait without a `done_check`.
   - Two processes writing `config.yaml` and `backlog.md` at the same time lose no write.
   - For a task without a worktree, `factory next` prints commands with `--task <id>`, and a command without it fails with a message that says to add it.
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
