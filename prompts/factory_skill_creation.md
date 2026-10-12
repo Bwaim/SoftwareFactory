@@ -247,10 +247,17 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `worktree_root`: the folder where worktrees are created
   - `base_ref`: the branch the worktree starts from, default `main`
 - It always runs `git fetch origin <base_ref>` first, so the worktree starts from the latest version. It never changes the local `<base_ref>` branch. If the fetch fails, it stops and asks the user.
-- If the pipeline has an input named `branch`, the worktree is created on that new branch, from `origin/<base_ref>`.
+- If the pipeline has an input named `branch`:
+  - It also fetches that branch from `origin`, then checks if it already exists, locally or on `origin`.
+  - It tells the user which case applies, new branch or existing branch, and continues after confirmation. This catches a typo in the name.
+  - New branch: the worktree is created on it, from `origin/<base_ref>`.
+  - Existing branch: the worktree is created on it. If the local branch is behind `origin`, it is fast-forwarded. If the local and remote branches have diverged, it stops and asks the user.
+  - If the branch is already checked out in another worktree, it stops and names the task or the folder that uses it.
 - Otherwise, the worktree starts in detached HEAD on `origin/<base_ref>`. A later step creates the branch with `git switch -c <name>` and saves it with `factory state set branch <name>`.
 - It creates the worktree with git only:
-  - With a branch: `git worktree add -b <branch> <worktree_root>/<id> origin/<base_ref>`
+  - New branch: `git worktree add -b <branch> <worktree_root>/<id> origin/<base_ref>`
+  - Existing local branch: `git worktree add <worktree_root>/<id> <branch>`
+  - Branch only on `origin`: `git worktree add --track -b <branch> <worktree_root>/<id> origin/<branch>`
   - Without a branch: `git worktree add --detach <worktree_root>/<id> origin/<base_ref>`
 
 ##### Task delete
@@ -474,6 +481,7 @@ migrations/          # One script per format version change
   - With a fake test adapter that records its calls, launch and delete call only the adapter, never `herdr` directly.
   - `factory block` and `factory unblock` change the status, and `factory tasks` lists blocked tasks first.
   - With the fake test adapter, pause saves the status and closes the terminal, and resume restores the status with the same session id.
+  - Worktree creation on the test repository, with git only: new branch, existing local branch behind `origin` (fast-forwarded), branch only on `origin`, diverged branch (stops), and branch used by another worktree (stops).
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
