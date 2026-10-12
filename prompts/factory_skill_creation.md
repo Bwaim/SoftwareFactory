@@ -51,7 +51,9 @@ A local dashboard shows all tasks as a Kanban board and the backlog, and lets me
 
 ### Runtime
 
-- The factory code is Python 3. Each program (the `factory` CLI, the local server) is a single-file script run with `uv run --script`. It declares its dependencies inline, for example `pyyaml`, so `uv` installs them on first run. Dependencies are kept to the minimum.
+- The factory code is Python 3. There is one entry script, `factory`, run with `uv run --script`. It declares its dependencies inline, for example `pyyaml`, so `uv` installs them on first run. Dependencies are kept to the minimum.
+- The code is split into small modules in a `lib/` folder next to the entry script, one per area, each tested on its own.
+- The local server is the `factory serve` subcommand. `factory dashboard` and `factory pipeline edit` start it in the background. The server and the CLI share the same functions.
 - `uv` can also install the Python version the scripts need, so the machine needs only `uv`.
 - The orchestrator is a Claude session started inside the configured terminal. At start, it runs `factory terminal check`. If the check fails, it says why and stops.
 - The `factory` command can be called by name in every Claude session the factory starts, in the main repository and in worktrees. Init makes this work, for example with a link in `~/.local/bin`.
