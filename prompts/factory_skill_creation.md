@@ -127,6 +127,7 @@ steps:
   - `required`: `true` if the step must never be skipped
   - `run_in`: `session` (default) or `subagent`. Used by `prompt` and `skill` steps.
   - `model` and `effort`: optional, used only when `run_in` is `subagent`. Example: `model: opus`, `effort: high`.
+  - `requires`: optional list of tools and skills the step needs, for example `[gh]` or `[/superpowers:writing-plans]`
 - The body depends on the type:
   - `prompt`: the instructions the agent follows
   - `skill`: the skill to call and how to use its result
@@ -136,23 +137,25 @@ steps:
 
 ```markdown
 ---
-id: create-merge-request
-description: Create a GitLab merge request for the task branch
-category: gitlab
+id: write-plan
+description: Write an implementation plan from the spec
+category: planning
 type: skill
-reads: [branch, jira_ticket]
-writes: [mr_url]
-done_when: The merge request exists and its URL is saved in the task state.
-done_check: test -n "$(factory state get mr_url)"
+reads: [spec]
+writes: [plan]
+done_when: The plan file exists and its path is saved in the task state.
+done_check: test -f "$(factory state get plan)"
 config:
-  target_branch:
-    description: Branch the merge request targets
-    default: main
+  plan_style:
+    description: Extra instructions for the plan, for example the commit size
+    default: small commits
 required: false
+requires: [/superpowers:writing-plans]
 ---
 
-Run `/nextory-create-merge-request` for the task branch, targeting `config.target_branch`.
-Save the merge request URL with `factory state set mr_url <url>`.
+Run `/superpowers:writing-plans` on the spec file at `spec`, following `config.plan_style`.
+Save the plan in the artifacts folder with `factory artifact path plan.md`.
+Save the path with `factory state set plan <path>`.
 ```
 
 - A composite step groups existing steps. Example: `rebase-and-commit` runs `rebase`, then `commit`.
@@ -238,12 +241,26 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - Installing a pipeline lists the steps it uses that are not installed, and installs them after approval.
 - An installed item that already exists is replaced only after the user sees the difference and approves.
 - Init offers the starter pack: the `quick-task` pipeline and its steps.
+- The catalog is generic. It never refers to a project-specific skill or tool.
+- "Browse the catalog" also shows the `requires` of each item that are missing on this machine.
 - Catalog content for this build:
-  - Pipeline `quick-task`: `implement`, `user-validation`, `commit`
-  - Step `implement`: a prompt step, "do the task description"
-  - Steps that wrap existing skills: `commit` (`/nextory-commit`), `create-merge-request` (`/nextory-create-merge-request`), `review-mr` (`/nextory-review-mr`), `address-mr-comments` (`/nextory-address-mr-comments`), `create-ticket` (`/nextory-create-ticket`)
-  - Steps that wrap superpowers skills: `brainstorm` (`/superpowers:brainstorming`) and `write-plan` (`/superpowers:writing-plans`). They save their files in the artifacts folder.
+  - Pipelines:
+    - `quick-task`: `implement`, `user-validation`, `commit`
+    - `plan-and-build`: `brainstorm`, `user-validation`, `write-plan`, `user-validation`, `execute-plan`, `run-tests`, `commit`, `push`, `create-pr`
+  - Steps:
+    - `implement`: prompt step, do the task description
+    - `commit`: prompt step, commit the changes with a message that follows the repository's existing commit style
+    - `rebase`: prompt step, rebase on `origin/<base_ref>` and resolve simple conflicts. It blocks the task for the user on complex conflicts.
+    - `push`: script step, push the branch to `origin`
+    - `run-tests`: script step, runs `config.test_command`. Its `done_check` is the same command.
+    - `create-pr`: prompt step, create a pull request or merge request with `gh` or `glab`, from `config.forge`
+    - `review`: prompt step, review the branch diff against `origin/<base_ref>` and save the findings as an artifact
+    - `address-review-comments`: prompt step, read the open review comments with `gh` or `glab` and fix them
+    - `brainstorm`: wraps `/superpowers:brainstorming`, saves the spec as an artifact
+    - `write-plan`: wraps `/superpowers:writing-plans`, saves the plan as an artifact
+    - `execute-plan`: wraps `/superpowers:executing-plans` on the plan artifact
 - The builder reads each wrapped skill to set `run_in`: `session` if the skill asks the user anything, otherwise `subagent`.
+- `config.forge` is `github` or `gitlab`. It is asked once per repository, like any config key.
 
 #### Library commits
 
@@ -613,6 +630,8 @@ The library, a folder in any git repository:
   - `factory pipeline check` warns about `model` or `effort` on a step that runs in the session.
   - Installing a catalog pipeline copies it and offers its missing steps. The status shows not installed, installed, and installed and changed since.
   - Every `factory` command written in the README exists in the CLI.
+  - No catalog file refers to a project-specific skill or tool.
+  - `factory catalog list` shows the missing `requires` of an item.
   - Two processes writing `config.yaml` and `backlog.md` at the same time lose no write.
   - For a task without a worktree, `factory next` prints commands with `--task <id>`, and a command without it fails with a message that says to add it.
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
