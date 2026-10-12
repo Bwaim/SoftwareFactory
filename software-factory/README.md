@@ -90,6 +90,12 @@ Herdr adapter:
    - Add the new step. Save.
    - Launch the new pipeline.
    - Expected: the task runs the new step.
+6. **Follow a task in the dashboard.**
+   - Choose "Open dashboard". Open the URL it prints in your browser.
+   - Launch `plan-and-build`, or the pipeline from step 5, with the "Launch" button.
+   - Watch the card move from column to column as steps start.
+   - When the card turns amber (`awaiting_approval`), click "Approve".
+   - Expected: the task session receives "The user approved. Run `factory done`." The card moves on.
 
 ## Reference
 
@@ -185,6 +191,104 @@ Local server:
 - `factory serve`: run the local server in the foreground.
 - `factory dashboard`: start the local server if needed and print the dashboard URL.
 - `factory server stop`: stop the local server.
+
+### Dashboard
+
+Open it with the menu action "Open dashboard" or with `factory dashboard`.
+The page refreshes every 5 seconds.
+The header has two views: **Tasks** and **Backlog**.
+
+#### Tasks view
+
+The board has one column for each name in `columns` of `.factory/factory.yaml`, plus a `Done` column.
+A finished task is always in `Done`.
+Any other task is in the column of its current step.
+If the column is unknown, the task goes in the first column.
+The "Columns" buttons hide or show a column. The browser remembers your choice.
+
+Each card shows:
+
+- The ticket, then the task id. The ticket is a link when `ticket_url` is set.
+- The description.
+- The pipeline and the current step.
+- The status, with an icon and the time in this status. The reason is shown below when there is one.
+- A red "Session gone" tag when the terminal session is not there. Not shown for `paused` and `finished` tasks.
+- The artifacts of the task. Click a name to read it.
+- "To validate", when the step waits for your approval. It links to the artifact to read. If the step validates code, it has an "Open in IDE" button.
+
+Colors and icons:
+
+| Status | Color | Icon |
+| --- | --- | --- |
+| `active` | green | ▶ |
+| `blocked` | red | ⛔ |
+| `awaiting_approval` | amber | ✋ |
+| `waiting_external` | blue | ⏳ |
+| `paused` | grey | ⏸ |
+| `finished` | light grey | ✓ |
+
+Card buttons:
+
+- **Focus**: switch the terminal to the task session. Shown when the session exists, the task is not finished and the terminal supports it.
+- **Show MR**: open the merge request. Shown when the task has an MR link.
+- **Approve** and **Request changes**: shown when the status is `awaiting_approval`. "Request changes" asks for a text.
+- **Mark done**: shown when the status is `waiting_external` and the wait has no done check.
+- **Send prompt**: send text to the session. If the session is working, choose "Wait until idle" or "Send now".
+- **Pause**: shown when the session exists and the task is not paused. Choose "Wait until idle" or "Stop now". The card shows "Pausing..." until it ends.
+- **Resume**: shown when the task is paused or its session is gone.
+- A finished task has no Focus, Send prompt, Pause or Resume button.
+
+"Send prompt", "Pause", "Resume", "Launch" and "Check" are disabled when the terminal check fails.
+
+#### Launch form
+
+The "Launch" button opens the form.
+
+1. Pick the pipeline. Write the description. Fill the inputs of the pipeline.
+2. Click "Check". It runs a dry run. The report shows the task id, the worktree, the branch and the base.
+3. Fix what the report shows. Missing inputs are red. For a missing config value, type it and click "Save".
+4. When the report says "Ready to launch.", click "Launch".
+
+Any change in the form turns the check off. Check again before you launch.
+
+#### Clean dialog
+
+The "Clean" button of the `Done` column lists the finished tasks that can be deleted.
+
+1. Tick the tasks. Click "Check selected".
+2. For each task, the dialog shows uncommitted changes, unpushed commits and failed checks.
+3. If something would be lost, tick "I accept losing these changes" for that task.
+4. Click "Delete selected". A task you did not accept is skipped.
+
+#### Backlog view
+
+- **Add**: ask for a title, a summary and an optional pipeline.
+- **Drag** a card to change its priority.
+- **Start**: open the Launch form with the description, the pipeline and the entry filled in. The entry leaves the backlog when the task starts.
+- **Delete**: remove the entry after a confirmation.
+
+#### Banner
+
+When `factory terminal check` fails, an orange banner shows the message at the top of the page.
+The buttons that need the terminal are disabled.
+Fix the problem (see Troubleshooting). The banner goes away at the next refresh.
+
+#### Ticket links
+
+Set `ticket_url` in `.factory/factory.yaml` to make tickets links.
+Use `{key}` where the ticket goes. Example: `ticket_url: https://example.atlassian.net/browse/{key}`.
+Only `http` and `https` URLs are used.
+
+#### Security
+
+- The server listens on `127.0.0.1` only. It uses a random port.
+- Each start makes a new token. The URL holds it: `?token=...`. Every API call must send it.
+- The server checks the `Host` header. It must be `127.0.0.1` and the server port.
+- The server checks the `Origin` header. It must be the server itself.
+- The server stops after 30 minutes without requests. `factory dashboard` starts it again.
+- `factory server stop` stops it now. The menu action "Exit" stops it too.
+- The file `.factory/server.json` holds the port and the token. Only you can read it.
+- The log is `.factory/server.log`.
 
 ### Step manifest fields
 
