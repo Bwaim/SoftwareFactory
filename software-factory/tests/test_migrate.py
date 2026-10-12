@@ -1,10 +1,9 @@
 import json
-import shutil
 
 import pytest
 import yaml
 
-from conftest import commit_all, git, make_task
+from conftest import git, make_task
 from factory import repo
 
 SCRIPT = '''

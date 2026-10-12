@@ -74,6 +74,12 @@ def migrate(ctx, dry_run=False):
             target = backup_path(lib.parent, lib.name)
             shutil.copytree(lib, target)
             p["backups"].append(str(target))
+    if p["library"]["migrate"]:
+        for v in range(p["library"]["from"], p["current"]):
+            load_script(v).migrate_library(lib)
+            bump(lib / "factory.yaml", v + 1)
+        if p["library"]["in_git"]:
+            p["library_commit"] = {"message": f"Factory library: migrate to version {p['current']}", "paths": [str(lib)]}
     if p["repo"]["migrate"]:
         target = backup_path(ctx.main, ".factory")
         shutil.copytree(ctx.fdir, target)
@@ -83,10 +89,4 @@ def migrate(ctx, dry_run=False):
             bump(ctx.fdir / "factory.yaml", v + 1)
             for task in state.list_tasks(ctx):
                 events.log(ctx, task["id"], "migrated", None, from_version=v, to_version=v + 1)
-    if p["library"]["migrate"]:
-        for v in range(p["library"]["from"], p["current"]):
-            load_script(v).migrate_library(lib)
-            bump(lib / "factory.yaml", v + 1)
-        if p["library"]["in_git"]:
-            p["library_commit"] = {"message": f"Factory library: migrate to version {p['current']}", "paths": [str(lib)]}
     return p

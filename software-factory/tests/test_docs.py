@@ -17,8 +17,13 @@ def command_names():
     return names
 
 
+FENCE = re.compile(r"```[^\n]*\n(.*?)```", re.S)
+
+
 def code_spans(text):
-    return "\n".join(re.findall(r"`([^`\n]+)`", text))
+    fenced = FENCE.findall(text)
+    inline = re.findall(r"`([^`\n]+)`", FENCE.sub("", text))
+    return "\n".join(fenced + inline)
 
 
 def used_commands(text):
@@ -55,3 +60,10 @@ def test_readme_sections():
     text = (SF / "README.md").read_text()
     for heading in ("Concepts", "Install", "Tutorial", "Reference", "Troubleshooting"):
         assert heading in text
+
+
+def test_checker_scans_fenced_blocks_and_inline_spans_but_not_prose():
+    names = command_names()
+    assert check("```\nfactory bogus\n```", names) == ["bogus"]
+    assert check("run `factory nope` now", names) == ["nope"]
+    assert check("```\nfactory tasks\n```\nupdate the factory plugin", names) == []
