@@ -147,13 +147,15 @@ def send_prompt(server, tid, query, body):
 @route("POST", f"/api/tasks/{TASK}/approve")
 def approve(server, tid, query, body):
     from . import engine
-    return {"message": engine.approve(server.ctx, tid, send=True)}
+    message, delivery_error = engine.approve(server.ctx, tid, send=True)
+    return {"message": message, "delivery_error": delivery_error}
 
 
 @route("POST", f"/api/tasks/{TASK}/request-changes")
 def request_changes(server, tid, query, body):
     from . import engine
-    return {"message": engine.request_changes(server.ctx, tid, body["text"], send=True)}
+    message, delivery_error = engine.request_changes(server.ctx, tid, body["text"], send=True)
+    return {"message": message, "delivery_error": delivery_error}
 
 
 @route("POST", f"/api/tasks/{TASK}/external-done")

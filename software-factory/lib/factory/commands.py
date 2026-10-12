@@ -1,3 +1,5 @@
+import sys
+
 from . import cli
 from .errors import FactoryError
 
@@ -421,18 +423,24 @@ def artifact_path_cmd(args):
     print(state.artifact_path(ctx, tid, args.name))
 
 
+def print_delivery(message, delivery_error):
+    print(message)
+    if delivery_error:
+        print(f"Warning: the prompt was not delivered to the session: {delivery_error}", file=sys.stderr)
+
+
 @cli.command("approve")
 def approve_cmd(args):
     from . import engine
     ctx, tid = task_of(args)
-    print(engine.approve(ctx, tid, args.send))
+    print_delivery(*engine.approve(ctx, tid, args.send))
 
 
 @cli.command("request-changes")
 def request_changes_cmd(args):
     from . import engine
     ctx, tid = task_of(args)
-    print(engine.request_changes(ctx, tid, args.text, args.send))
+    print_delivery(*engine.request_changes(ctx, tid, args.text, args.send))
 
 
 @cli.command("approval check")
@@ -468,7 +476,7 @@ def poll_cmd(args):
     if not results:
         print("No task waits on a done check.")
     for r in results:
-        print(f"{r['id']}: " + ("the wait ended." if r["ended"] else "still waiting."))
+        print(f"{r['id']}: " + ("the wait ended." if r["ended"] else "still waiting.") + (f" Error: {r['error']}" if r["error"] else ""))
 
 
 @cli.command("external-done")

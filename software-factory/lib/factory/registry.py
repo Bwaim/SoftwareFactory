@@ -8,7 +8,11 @@ from . import fsio
 from .errors import FactoryError
 from .repo import PLUGIN_ROOT
 
-STEP_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+STEP_ID_RE = re.compile(r"[a-z][a-z0-9_-]{0,63}")
+
+
+def is_valid_id(value):
+    return isinstance(value, str) and STEP_ID_RE.fullmatch(value) is not None
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.S)
 NO_WORKTREE_PIPELINES = {"new-step-assistant"}
 CREATE_WORKTREE = "create-worktree"
@@ -152,12 +156,12 @@ class Registry:
         return reg
 
     def step(self, sid):
-        if sid not in self.steps:
+        if not isinstance(sid, str) or sid not in self.steps:
             raise FactoryError(f"The step `{sid}` does not exist.")
         return self.steps[sid]
 
     def pipeline(self, pid):
-        if pid not in self.pipelines:
+        if not isinstance(pid, str) or pid not in self.pipelines:
             raise FactoryError(f"The pipeline `{pid}` does not exist.")
         return self.pipelines[pid]
 

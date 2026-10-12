@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from .errors import FactoryError
-from .registry import CREATE_WORKTREE, STEP_ID_RE, normalize_entry
+from .registry import CREATE_WORKTREE, is_valid_id, normalize_entry
 
 ALWAYS_AVAILABLE = {"summary", "branch", "ticket"}
 
@@ -24,7 +24,7 @@ def check(reg, data, columns, save_level=None):
     error = lambda m: problems.append(Problem("error", m))
     warning = lambda m: problems.append(Problem("warning", m))
     pid = data.get("id") or ""
-    if not STEP_ID_RE.match(pid):
+    if not is_valid_id(pid):
         error(f"The pipeline id `{pid}` must be lowercase: letters, digits, `-` or `_`, starting with a letter.")
     entries = [normalize_entry(e) for e in data.get("steps") or []]
     if not entries:

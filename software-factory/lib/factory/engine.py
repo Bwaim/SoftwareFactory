@@ -41,6 +41,8 @@ def run_check(ctx, task, command, timeout, values=None):
                            capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return False, f"Timed out after {timeout} s."
+    except OSError as e:
+        return False, f"Cannot run the check: {e.strerror or e}."
     return r.returncode == 0, (r.stdout + r.stderr).strip()
 
 
@@ -195,8 +197,17 @@ def next_step(ctx, tid):
     return render(ctx, task, entry, step, values)
 
 
+def require_open(task):
+    if task["status"] in ("finished", "paused"):
+        raise FactoryError(f"Task {task['id']} is {task['status']}.")
+
+
 def block(ctx, tid, reason):
-    task = state.update(ctx, tid, lambda t: state.set_status(t, "blocked", reason))
+    def change(t):
+        require_open(t)
+        state.set_status(t, "blocked", reason)
+
+    task = state.update(ctx, tid, change)
     events.log(ctx, tid, "task_blocked", state.step_path_str(task), reason=reason)
     session.notify(ctx, f"Task {tid} is blocked: {reason}")
     return f"Task {tid} is blocked. Ask the user, then run `{cmd(task, 'unblock')}` when the user has answered."
@@ -223,6 +234,14 @@ def require_awaiting(task):
         raise FactoryError(f"Task {task['id']} is not waiting for an approval.")
 
 
+def deliver_quietly(ctx, tid, text):
+    try:
+        session.deliver(ctx, tid, text)
+    except FactoryError as e:
+        return str(e)
+    return None
+
+
 def approve(ctx, tid, send=False):
     def change(t):
         require_awaiting(t)
@@ -231,9 +250,8 @@ def approve(ctx, tid, send=False):
 
     task = state.update(ctx, tid, change)
     events.log(ctx, tid, "approved", state.step_path_str(task))
-    if send:
-        session.deliver(ctx, tid, f"The user approved. Run `{cmd(task, 'done')}`.")
-    return f"Approved. Run `{cmd(task, 'done')}`."
+    delivery_error = deliver_quietly(ctx, tid, f"The user approved. Run `{cmd(task, 'done')}`.") if send else None
+    return f"Approved. Run `{cmd(task, 'done')}`.", delivery_error
 
 
 def request_changes(ctx, tid, text, send=False):
@@ -245,9 +263,10 @@ def request_changes(ctx, tid, text, send=False):
 
     task = state.update(ctx, tid, change)
     events.log(ctx, tid, "changes_requested", state.step_path_str(task), text=text)
+    delivery_error = None
     if send:
-        session.deliver(ctx, tid, f"The user requested changes: {text}\nMake the changes, then run `{cmd(task, 'next')}`.")
-    return f"Changes requested. Make them, then run `{cmd(task, 'next')}`."
+        delivery_error = deliver_quietly(ctx, tid, f"The user requested changes: {text}\nMake the changes, then run `{cmd(task, 'next')}`.")
+    return f"Changes requested. Make them, then run `{cmd(task, 'next')}`.", delivery_error
 
 
 def approval_check(ctx, tid):
@@ -351,11 +370,12 @@ def find_target(task, target):
 
 def goto(ctx, tid, target, reason):
     task = state.load(ctx, tid)
-    require_running(task)
+    require_open(task)
     index = find_target(task, target)
     from_path, to_path = state.step_path_str(task), state.step_path_str(task, index)
 
     def change(t):
+        require_unchanged(t, task["position"], ADVANCE_STATUSES)
         key = str(index)
         t["goto_counts"][key] = t["goto_counts"].get(key, 0) + 1
         t["position"] = index
@@ -398,7 +418,19 @@ def end_wait(ctx, tid, how):
     task = state.load(ctx, tid)
     happened = (step.done_when or "An external event.").removesuffix(".")
     session.notify(ctx, f"Task {tid}: {step.done_when or 'the external event happened'}")
+    if task["status"] == "finished":
+        return
     session.deliver(ctx, tid, f"The external event happened: {happened}. Run `{cmd(task, 'next')}`.")
+
+
+def poll_task(ctx, task):
+    entry, step = load_step(ctx, task)
+    values, _ = config.resolve(ctx, step, entry.get("with"))
+    ok, output = run_check(ctx, task, step.done_check, POLL_CHECK_TIMEOUT, values)
+    row = {"id": task["id"], "ended": ok, "output": None if ok else output[-500:], "error": None}
+    if ok:
+        end_wait(ctx, task["id"], "check")
+    return row
 
 
 def poll(ctx):
@@ -406,18 +438,13 @@ def poll(ctx):
     for task in state.list_tasks(ctx):
         if task["status"] != "waiting_external":
             continue
-        entry, step = load_step(ctx, task)
-        if not step.done_check:
-            continue
-        values, _ = config.resolve(ctx, step, entry.get("with"))
-        ok, output = run_check(ctx, task, step.done_check, POLL_CHECK_TIMEOUT, values)
-        row = {"id": task["id"], "ended": ok, "output": None if ok else output[-500:], "error": None}
-        if ok:
-            try:
-                end_wait(ctx, task["id"], "check")
-            except FactoryError as e:
-                row["error"] = str(e)
-        results.append(row)
+        try:
+            entry, step = load_step(ctx, task)
+            if not step.done_check:
+                continue
+            results.append(poll_task(ctx, task))
+        except Exception as e:
+            results.append({"id": task["id"], "ended": False, "output": None, "error": str(e)})
     return results
 
 

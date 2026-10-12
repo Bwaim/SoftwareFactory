@@ -83,7 +83,8 @@ def test_end_wait_refused_when_not_waiting(inited):
 
 def test_end_wait_adds_period_to_done_when(inited):
     write_step(inited.fdir, "qa", {"wait_external": True, "done_when": "QA is done"})
-    write_pipeline(inited.fdir, {"id": "q", "steps": ["qa"]})
+    write_step(inited.fdir, "after-qa", {})
+    write_pipeline(inited.fdir, {"id": "q", "steps": ["qa", "after-qa"]})
     task_from_pipeline(inited, "q", terminal_handle={"agent": "t1"})
     run = lambda *a: inited.factory(*a, "--task", "t1")
     run("next"); run("wait"); run("external-done", "t1")

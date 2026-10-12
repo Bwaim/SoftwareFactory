@@ -5,7 +5,7 @@ from . import fsio
 from .errors import FactoryError
 
 STATUSES = ("active", "blocked", "awaiting_approval", "waiting_external", "paused", "finished")
-ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+ARTIFACT_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 TASK_ID_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 
 
@@ -52,12 +52,17 @@ def update(ctx, tid, fn):
 
 def create(ctx, task):
     d = task_dir(ctx, task["id"])
-    (d / "artifacts").mkdir(parents=True, exist_ok=True)
+    try:
+        d.mkdir(parents=True)
+    except FileExistsError:
+        raise FactoryError(f"A task with the id `{task['id']}` already exists.")
+    (d / "artifacts").mkdir()
     fsio.write_json(task_file(ctx, task["id"]), task)
 
 
 def list_tasks(ctx):
-    return [fsio.read_json(p) for p in sorted(tasks_dir(ctx).glob("*/task.json"))]
+    tasks = (fsio.read_json(p) for p in sorted(tasks_dir(ctx).glob("*/task.json")))
+    return [t for t in tasks if t is not None]
 
 
 def current_entry(task):
@@ -90,7 +95,7 @@ def set_key(ctx, tid, key, value):
 
 
 def artifact_file(ctx, tid, name):
-    if not ARTIFACT_NAME_RE.match(name):
+    if not isinstance(name, str) or not ARTIFACT_NAME_RE.fullmatch(name):
         raise FactoryError("The artifact name must be a simple file name, for example `plan.md`.")
     folder = (task_dir(ctx, tid) / "artifacts").resolve()
     path = (folder / name).resolve()

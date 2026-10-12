@@ -1,6 +1,6 @@
 from . import fsio, library, pipeline_check
 from .errors import ExistsError, FactoryError
-from .registry import STEP_ID_RE, Registry, normalize_entry
+from .registry import Registry, is_valid_id, normalize_entry
 
 
 def step_summary(step):
@@ -25,7 +25,7 @@ def load(reg, pid):
 
 
 def copy(reg, source_id, new_id):
-    if not isinstance(new_id, str) or not STEP_ID_RE.fullmatch(new_id):
+    if not is_valid_id(new_id):
         raise FactoryError("Invalid pipeline id.")
     if new_id in reg.pipelines:
         raise FactoryError(f"A pipeline named `{new_id}` already exists. Choose another id.")
@@ -85,7 +85,7 @@ def save(ctx, data, level, original_id=None, original_level=None, replace=False)
     if errors:
         raise FactoryError("The pipeline has errors:\n" + "\n".join(errors))
     pid = data["id"]
-    if not isinstance(pid, str) or not STEP_ID_RE.fullmatch(pid):
+    if not is_valid_id(pid):
         raise FactoryError("Invalid pipeline id.")
     path = target_root(ctx, level) / "pipelines" / f"{pid}.yaml"
     require_may_overwrite(path, pid, level, original_id, original_level, replace)

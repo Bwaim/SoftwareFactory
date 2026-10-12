@@ -102,12 +102,22 @@ def plan_branch(ctx, report, branch):
         report["branch_case"] = "new"
 
 
+def check_arguments(description, inputs, task_id=None):
+    if task_id is not None and not isinstance(task_id, str):
+        raise FactoryError("The task id must be text.")
+    if not isinstance(description, str):
+        raise FactoryError("The description must be text.")
+    if not isinstance(inputs, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in inputs.items()):
+        raise FactoryError("The inputs must be text values.")
+
+
 def plan_launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlog=None):
     report = {
         "ok": False, "errors": [], "task_id": None, "pipeline": pipeline_id, "description": description,
         "worktree": None, "base_ref": None, "branch": None, "branch_case": "none", "fast_forward": False,
         "missing_inputs": [], "missing_config": [], "summary": None,
     }
+    check_arguments(description, inputs, task_id)
     reg = Registry.load(ctx)
     pipeline = reg.pipeline(pipeline_id)
     for problem in pipeline_check.errors(pipeline_check.check(reg, pipeline.data, ctx.columns(), pipeline.level)):
