@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from . import adapters, api, fsio, repo
-from .errors import FactoryError
+from .errors import ExistsError, FactoryError
 
 IDLE_SECONDS = int(os.environ.get("FACTORY_SERVER_IDLE_SECONDS", "1800"))
 START_TIMEOUT = 30
@@ -176,6 +176,8 @@ def make_handler(server):
                 self.reply(404, {"error": "Not found."})
             except KeyError as e:
                 self.reply(400, {"error": f"Missing field: {e.args[0]}."})
+            except ExistsError as e:
+                self.reply(409, {"error": str(e)})
             except FactoryError as e:
                 self.reply(400, {"error": str(e)})
             except Exception as e:

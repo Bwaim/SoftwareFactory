@@ -1,5 +1,5 @@
 from . import fsio, library, pipeline_check
-from .errors import FactoryError
+from .errors import ExistsError, FactoryError
 from .registry import STEP_ID_RE, Registry, normalize_entry
 
 
@@ -25,6 +25,10 @@ def load(reg, pid):
 
 
 def copy(reg, source_id, new_id):
+    if not isinstance(new_id, str) or not STEP_ID_RE.fullmatch(new_id):
+        raise FactoryError("Invalid pipeline id.")
+    if new_id in reg.pipelines:
+        raise FactoryError(f"A pipeline named `{new_id}` already exists. Choose another id.")
     data = dict(reg.pipeline(source_id).data)
     data["id"] = new_id
     return {"data": data}
@@ -69,15 +73,22 @@ def target_root(ctx, level):
     raise FactoryError("Save as `generic` or `local`.")
 
 
-def save(ctx, data, level):
+def require_may_overwrite(path, pid, level, original_id, original_level, replace):
+    same_pipeline = original_id == pid and original_level == level
+    if path.exists() and not same_pipeline and not replace:
+        raise ExistsError(f"A {level} pipeline named `{pid}` already exists.")
+
+
+def save(ctx, data, level, original_id=None, original_level=None, replace=False):
     problems = check(ctx, data, level)
     errors = [p["message"] for p in problems if p["level"] == "error"]
     if errors:
         raise FactoryError("The pipeline has errors:\n" + "\n".join(errors))
     pid = data["id"]
-    if not STEP_ID_RE.match(pid):
+    if not isinstance(pid, str) or not STEP_ID_RE.fullmatch(pid):
         raise FactoryError("Invalid pipeline id.")
     path = target_root(ctx, level) / "pipelines" / f"{pid}.yaml"
+    require_may_overwrite(path, pid, level, original_id, original_level, replace)
     existed = path.exists()
     fsio.write_yaml(path, compact(data))
     offer = None

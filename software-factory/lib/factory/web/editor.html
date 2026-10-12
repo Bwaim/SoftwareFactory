@@ -66,7 +66,7 @@ dd { margin: 0; word-break: break-word; }
 const params = new URLSearchParams(location.search);
 const TOKEN = params.get("token");
 const CHECK_DELAY_MS = 300;
-const state = { steps: [], columns: [], pipelines: [], loadedLevel: null, saveLevel: "local", model: null, checkTimer: null, checkCount: 0, hasError: true, commit: null, savedPath: null };
+const state = { steps: [], columns: [], pipelines: [], loadedLevel: null, saveLevel: "local", model: null, checkTimer: null, checkCount: 0, hasError: true, commit: null, savedPath: null, original: null, confirmReplace: false };
 const byId = (id) => document.getElementById(id);
 
 async function api(path, body) {
@@ -74,6 +74,7 @@ async function api(path, body) {
   if (body !== undefined) { opts.method = "POST"; opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
   const r = await fetch(path, opts);
   const data = await r.json();
+  if (r.status === 409) { const conflict = new Error(data.error); conflict.conflict = true; throw conflict; }
   if (!r.ok) { showError(data.error || r.statusText); throw new Error(data.error || r.statusText); }
   hideError();
   return data;
@@ -292,9 +293,15 @@ function renderSave() {
   const box = clear(byId("save"));
   const localLabel = state.loadedLevel === "generic" ? "Save a local override" : "Save local";
   box.append(el("div", { class: "row" }, radio("generic", "Save generic"), radio("local", localLabel)));
-  const save = el("button", { type: "button", class: "primary", onclick: guard(savePipeline) }, "Save");
+  const save = el("button", { type: "button", class: "primary", onclick: guard(() => savePipeline(false)) }, "Save");
   save.disabled = state.hasError;
   box.append(save);
+  if (state.confirmReplace) {
+    box.append(el("div", { class: "problem warning" }, "A pipeline with this id already exists at this level. Replace it?"),
+      el("div", { class: "row" },
+        el("button", { type: "button", class: "primary", onclick: guard(() => savePipeline(true)) }, "Replace"),
+        el("button", { type: "button", onclick: () => { state.confirmReplace = false; renderSave(); } }, "Cancel")));
+  }
   if (state.savedPath) box.append(el("div", { class: "muted" }, "Saved to " + state.savedPath));
   if (state.commit) {
     box.append(el("div", {}, "The library is a git repository. Files:"));
@@ -303,8 +310,20 @@ function renderSave() {
       el("button", { type: "button", onclick: guard(commitLibrary) }, "Commit to library"));
   }
 }
-async function savePipeline() {
-  const result = await api("/api/pipelines/save", { data: dataOf(state.model), level: state.saveLevel });
+async function savePipeline(replace) {
+  const body = { data: dataOf(state.model), level: state.saveLevel, replace };
+  if (state.original) { body.original_id = state.original.id; body.original_level = state.original.level; }
+  let result;
+  try {
+    result = await api("/api/pipelines/save", body);
+  } catch (e) {
+    if (!e.conflict) throw e;
+    state.confirmReplace = true;
+    renderSave();
+    return;
+  }
+  state.confirmReplace = false;
+  state.original = { id: body.data.id, level: result.level };
   state.savedPath = result.path;
   state.commit = result.library_commit;
   state.loadedLevel = result.level;
@@ -317,8 +336,10 @@ async function commitLibrary() {
   renderSave();
 }
 
-function openModel(model, level) {
+function openModel(model, level, original = null) {
   state.model = model;
+  state.original = original;
+  state.confirmReplace = false;
   state.loadedLevel = level;
   state.saveLevel = level === "generic" ? "generic" : "local";
   byId("start").hidden = true;
@@ -330,7 +351,7 @@ function openModel(model, level) {
 }
 async function loadPipeline(id) {
   const loaded = await api("/api/pipelines/" + encodeURIComponent(id));
-  openModel(modelOf(loaded.data), loaded.level);
+  openModel(modelOf(loaded.data), loaded.level, { id: loaded.data.id, level: loaded.level });
 }
 function pipelineSelect() {
   const s = el("select");

@@ -106,7 +106,7 @@ def library_commit(server, query, body):
 @route("POST", "/api/pipelines/save")
 def pipeline_save(server, query, body):
     from . import pipeline_store
-    return pipeline_store.save(server.ctx, body["data"], body["level"])
+    return pipeline_store.save(server.ctx, body["data"], body["level"], body.get("original_id"), body.get("original_level"), bool(body.get("replace")))
 
 
 TASK = "([a-z][a-z0-9_-]{0,31})"

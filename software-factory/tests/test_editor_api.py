@@ -63,3 +63,41 @@ def test_save_drops_empty_nested_fields(ed):
     stored = yaml.safe_load((inited.fdir / "pipelines" / "tidy.yaml").read_text())
     assert "claude" not in stored and "description" not in stored
     assert stored["steps"] == ["gen"] and stored["inputs"] == {"a": {}}
+
+
+def save_body(data, **extra):
+    return {"data": data, "level": "local", **extra}
+
+
+def test_copy_to_existing_id_refused(ed):
+    inited, i = ed
+    status, body = request(i, "POST", "/api/pipelines/copy", {"source": "base", "new_id": "base"})
+    assert status == 400 and "already exists" in body["error"]
+
+
+def test_new_pipeline_over_existing_file_refused_then_replaced(ed):
+    inited, i = ed
+    path = inited.fdir / "pipelines" / "base.yaml"
+    before = path.read_text()
+    data = {"id": "base", "description": "other", "steps": ["gen"]}
+    status, body = request(i, "POST", "/api/pipelines/save", save_body(data))
+    assert status == 409 and "already exists" in body["error"]
+    assert path.read_text() == before
+    status, body = request(i, "POST", "/api/pipelines/save", save_body(data, replace=True))
+    assert status == 200
+    assert yaml.safe_load(path.read_text())["description"] == "other"
+
+
+def test_editing_the_same_pipeline_at_the_same_level_is_allowed(ed):
+    inited, i = ed
+    data = {"id": "base", "description": "edited", "steps": ["gen", "loc"]}
+    status, _ = request(i, "POST", "/api/pipelines/save", save_body(data, original_id="base", original_level="local"))
+    assert status == 200
+    assert yaml.safe_load((inited.fdir / "pipelines" / "base.yaml").read_text())["description"] == "edited"
+
+
+def test_editing_another_pipeline_or_level_over_existing_refused(ed):
+    inited, i = ed
+    data = {"id": "base", "steps": ["gen"]}
+    assert request(i, "POST", "/api/pipelines/save", save_body(data, original_id="other", original_level="local"))[0] == 409
+    assert request(i, "POST", "/api/pipelines/save", save_body(data, original_id="base", original_level="generic"))[0] == 409
