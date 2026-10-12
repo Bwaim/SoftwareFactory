@@ -1,0 +1,257 @@
+import os
+import re
+import subprocess
+from pathlib import Path
+
+from . import config, events, repo, session, state
+from .errors import FactoryError
+from .registry import Registry
+
+DONE_CHECK_TIMEOUT = 300
+POLL_CHECK_TIMEOUT = 60
+FACTORY_SPAN_RE = re.compile(r"`(factory [^`]*)`")
+
+
+def cmd(task, text):
+    return f"factory {text}{repo.task_flag(task)}"
+
+
+def with_task_flag(text, tid):
+    def add(m):
+        inner = m.group(1)
+        return m.group(0) if "--task" in inner else f"`{inner} --task {tid}`"
+    return FACTORY_SPAN_RE.sub(add, text)
+
+
+def task_cwd(ctx, task):
+    return Path(task["worktree"]) if task.get("worktree") else ctx.main
+
+
+def artifacts_dir(ctx, task):
+    return (state.task_dir(ctx, task["id"]) / "artifacts").resolve()
+
+
+def run_check(ctx, task, command, timeout, values=None):
+    env = script_env(ctx, task, values or {})
+    try:
+        r = subprocess.run(command, shell=True, cwd=task_cwd(ctx, task), env=env,
+                           capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return False, f"Timed out after {timeout} s."
+    return r.returncode == 0, (r.stdout + r.stderr).strip()
+
+
+def load_step(ctx, task):
+    entry = state.current_entry(task)
+    if entry is None:
+        raise FactoryError("The pipeline is finished.")
+    return entry, Registry.load(ctx).step(entry["id"])
+
+
+def settings(entry, step):
+    return entry.get("model") or step.model, entry.get("effort") or step.effort
+
+
+def require_running(task):
+    if task["status"] == "paused":
+        raise FactoryError("The task is paused. Resume it first.")
+
+
+def on_start(ctx, task, entry, step):
+    return []
+
+
+def start(ctx, tid, entry, step):
+    pending = []
+
+    def change(t):
+        t["started"] = t["position"]
+        pending.extend(on_start(ctx, t, entry, step))
+
+    task = state.update(ctx, tid, change)
+    path = state.step_path_str(task)
+    model, effort = settings(entry, step)
+    events.log(ctx, tid, "step_started", path, run_in=step.run_in, model=model, effort=effort)
+    for event_type, details in pending:
+        events.log(ctx, tid, event_type, path, **details)
+    return task
+
+
+def header(task, step):
+    lines = [
+        f"Task `{task['id']}`, step {task['position'] + 1} of {len(task['steps'])}: {state.step_path_str(task)}",
+        f"Type: {step.type}. Runs in: {step.run_in}.",
+    ]
+    if step.done_when:
+        lines.append(f"Done when: {step.done_when}")
+    return lines
+
+
+def context_lines(ctx, task, step, values):
+    lines = []
+    if values:
+        lines += ["", "Config:"] + [f"- {k}: {v}" for k, v in values.items()]
+    reads = step.get("reads") or []
+    if reads:
+        lines += ["", "Task state:"] + [f"- {k}: {task['state'].get(k, '(not set)')}" for k in reads]
+    writes = step.get("writes") or []
+    if writes:
+        lines += ["", f"Save these task state keys with `factory state set <key> <value>`: {', '.join(writes)}."]
+    lines += ["", f"Artifacts folder: {artifacts_dir(ctx, task)}"]
+    return lines
+
+
+def subagent_block(ctx, task, entry, step, values):
+    model, effort = settings(entry, step)
+    prompt = [
+        f"You run one step of the factory task `{task['id']}`: {state.step_path_str(task)}.",
+        f"Working folder: {task_cwd(ctx, task)}",
+        *context_lines(ctx, task, step, values),
+        "",
+        "Instructions:",
+        step.body.strip(),
+        "",
+        "Write your outputs with `factory state set <key> <value>`.",
+        "End with a short report. If you need an answer from the user, say so in the report and stop.",
+    ]
+    return [
+        "Run this step in a subagent. Call the Agent tool with:",
+        f"- model: {model or 'inherit'}",
+        f"- effort: {effort or 'inherit'}",
+        "- prompt:",
+        "<<<",
+        with_task_flag("\n".join(prompt), task["id"]),
+        ">>>",
+    ]
+
+
+def end_line(step):
+    if step.wait_external:
+        return "When the actions of this step are done, run `factory wait`. The factory tells you when the external event happens."
+    if step.run_in == "subagent":
+        return "When the subagent ends, read its report. If it needs the user, ask the user, then run `factory next` again. Otherwise run `factory done`."
+    return "When the step is done, run `factory done`."
+
+
+def render(ctx, task, entry, step, values):
+    lines = header(task, step)
+    if step.run_in == "subagent" and step.type in ("prompt", "skill"):
+        lines += [""] + subagent_block(ctx, task, entry, step, values)
+    else:
+        lines += context_lines(ctx, task, step, values)
+        if step.type == "script":
+            lines += ["", "Run the step script with `factory run-script`. It prints the script output and its exit code."]
+        else:
+            lines += ["", "Instructions:", step.body.strip()]
+    lines += ["", end_line(step)]
+    text = "\n".join(lines)
+    return with_task_flag(text, task["id"]) if not task.get("worktree") else text
+
+
+def render_missing(task, step, missing):
+    lines = header(task, step) + ["", "Some config values are missing. Ask the user for each one, then save it:"]
+    for key in missing:
+        desc = step.config_spec[key].get("description", "")
+        lines.append(f"- `{key}`: {desc} Save it with `factory config set {step.id} {key} <value>`.")
+    lines.append("Then run `factory next` again.")
+    text = "\n".join(lines)
+    return with_task_flag(text, task["id"]) if not task.get("worktree") else text
+
+
+def next_step(ctx, tid):
+    task = state.load(ctx, tid)
+    if task["status"] == "finished":
+        return "The pipeline is finished."
+    require_running(task)
+    entry, step = load_step(ctx, task)
+    values, missing = config.resolve(ctx, step, entry.get("with"))
+    if missing:
+        for key in missing:
+            events.log(ctx, tid, "config_asked", state.step_path_str(task), key=key)
+        return render_missing(task, step, missing)
+    if task.get("started") != task["position"]:
+        task = start(ctx, tid, entry, step)
+    return render(ctx, task, entry, step, values)
+
+
+def advance(ctx, tid, event_type):
+    before = state.load(ctx, tid)
+    events.log(ctx, tid, event_type, state.step_path_str(before))
+
+    def change(t):
+        t["position"] += 1
+        t["started"] = None
+        t["approval"] = None
+        if t["position"] >= len(t["steps"]):
+            state.set_status(t, "finished")
+            t["column"] = repo.DONE_COLUMN
+        elif t["status"] != "active":
+            state.set_status(t, "active")
+
+    task = state.update(ctx, tid, change)
+    if task["status"] != "finished":
+        return f"Step done. Run `{cmd(task, 'next')}`."
+    if before["column"] != repo.DONE_COLUMN:
+        events.log(ctx, tid, "column_changed", None, **{"from": before["column"], "to": repo.DONE_COLUMN})
+    events.log(ctx, tid, "task_finished")
+    session.notify(ctx, f"Task {tid} is finished.")
+    return "The pipeline is finished. Tell the user that the task is finished."
+
+
+def done(ctx, tid):
+    task = state.load(ctx, tid)
+    if task["status"] == "finished":
+        return "The pipeline is finished."
+    require_running(task)
+    entry, step = load_step(ctx, task)
+    if step.done_check:
+        values, _ = config.resolve(ctx, step, entry.get("with"))
+        ok, output = run_check(ctx, task, step.done_check, DONE_CHECK_TIMEOUT, values)
+        if not ok:
+            events.log(ctx, tid, "done_check_failed", state.step_path_str(task), output=output)
+            raise FactoryError(f"The done check failed. The step is not done.\nCheck: {step.done_check}\n{output}")
+    return advance(ctx, tid, "step_done")
+
+
+def skip(ctx, tid):
+    task = state.load(ctx, tid)
+    require_running(task)
+    entry, step = load_step(ctx, task)
+    if step.required:
+        raise FactoryError(f"The step `{step.id}` is required. It cannot be skipped.")
+    return advance(ctx, tid, "step_skipped")
+
+
+def script_env(ctx, task, values):
+    env = {**os.environ, "FACTORY_TASK": task["id"]}
+    for key, value in values.items():
+        env["FACTORY_CONFIG_" + key.upper().replace("-", "_")] = str(value)
+    return env
+
+
+def run_script(ctx, tid):
+    task = state.load(ctx, tid)
+    require_running(task)
+    entry, step = load_step(ctx, task)
+    if step.type != "script":
+        raise FactoryError(f"The step `{step.id}` is not a script step.")
+    first_line = step.body.strip().splitlines()[0].strip() if step.body.strip() else ""
+    script = (step.path.parent / first_line).resolve()
+    if not first_line or not script.is_file():
+        raise FactoryError(f"The script of step `{step.id}` does not exist: {script}")
+    values, _ = config.resolve(ctx, step, entry.get("with"))
+    r = subprocess.run(["bash", str(script)], cwd=task_cwd(ctx, task), env=script_env(ctx, task, values))
+    print(f"Script exit code: {r.returncode}")
+    return r.returncode
+
+
+def status_text(ctx, tid):
+    task = state.load(ctx, tid)
+    lines = [
+        f"Task: {task['id']}",
+        f"Description: {task['description']}",
+        f"Pipeline: {task['pipeline']}",
+        f"Step: {state.step_path_str(task)} ({min(task['position'] + 1, len(task['steps']))} of {len(task['steps'])})",
+        f"Status: {task['status']}" + (f" ({task['status_reason']})" if task.get("status_reason") else ""),
+    ]
+    return "\n".join(lines)

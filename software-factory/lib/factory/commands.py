@@ -19,12 +19,49 @@ def register(sub, common):
     g = ss.add_parser("get", parents=[common]); g.add_argument("key")
     s = ss.add_parser("set", parents=[common]); s.add_argument("key"); s.add_argument("value")
     sub.add_parser("status", parents=[common])
+    for name in ("next", "done", "skip", "run-script"):
+        sub.add_parser(name, parents=[common])
     p = sub.add_parser("artifact")
     a = p.add_subparsers(dest="action", required=True)
     ap = a.add_parser("path", parents=[common]); ap.add_argument("name")
     p = sub.add_parser("terminal")
     ts = p.add_subparsers(dest="action", required=True)
     ts.add_parser("check", parents=[common])
+
+
+@cli.command("next")
+def next_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.next_step(ctx, tid))
+
+
+@cli.command("done")
+def done_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.done(ctx, tid))
+
+
+@cli.command("skip")
+def skip_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.skip(ctx, tid))
+
+
+@cli.command("run-script")
+def run_script_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    return engine.run_script(ctx, tid)
+
+
+@cli.command("status")
+def status_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.status_text(ctx, tid))
 
 
 @cli.command("terminal check")

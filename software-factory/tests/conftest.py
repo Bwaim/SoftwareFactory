@@ -190,3 +190,13 @@ def make_task(ctx, tid="t1", worktree=None, steps=None, **fields):
     }
     state.create(ctx, task)
     return task
+
+
+def task_from_pipeline(inited, pid, tid="t1", worktree=None, **fields):
+    from factory import repo
+    from factory.registry import Registry
+    ctx = repo.load_ctx(cwd=inited.repo)
+    reg = Registry.load(ctx)
+    snapshot = reg.expand(reg.pipeline(pid))
+    position = 1 if snapshot and snapshot[0]["id"] == "create-worktree" else 0
+    return make_task(ctx, tid=tid, worktree=worktree, steps=snapshot, position=position, pipeline=pid, **fields)
