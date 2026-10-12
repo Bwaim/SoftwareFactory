@@ -82,6 +82,17 @@ def register(sub, common):
     p = sub.add_parser("server")
     svs = p.add_subparsers(dest="action", required=True)
     svs.add_parser("stop", parents=[common])
+    p = sub.add_parser("catalog")
+    cts = p.add_subparsers(dest="action", required=True)
+    cts.add_parser("list", parents=[common])
+    ci = cts.add_parser("install", parents=[common])
+    ci.add_argument("id")
+    where = ci.add_mutually_exclusive_group(required=True)
+    where.add_argument("--generic", action="store_true")
+    where.add_argument("--local", action="store_true")
+    ci.add_argument("--with-steps", action="store_true")
+    ci.add_argument("--replace", action="store_true")
+    ci.add_argument("--dry-run", action="store_true")
 
 
 @cli.command("next")
@@ -530,3 +541,30 @@ def step_show_cmd(args):
         cli.emit(detail, True)
     else:
         print(f"{detail['path']}\n\n{detail['body']}")
+
+
+@cli.command("catalog list")
+def catalog_list_cmd(args):
+    from . import catalog
+    rows = catalog.items(ctx_of(args))
+    if args.json:
+        cli.emit(rows, True)
+        return
+    for r in rows:
+        where = f" ({r['location']})" if r["location"] else ""
+        missing = f" Missing: {', '.join(r['missing_requires'])}." if r["missing_requires"] else ""
+        print(f"{r['kind']} {r['id']} [{r['category']}]: {r['description']}. {r['status']}{where}.{missing}")
+
+
+@cli.command("catalog install")
+def catalog_install_cmd(args):
+    from . import catalog
+    target = "generic" if args.generic else "local"
+    result = catalog.install(ctx_of(args), args.id, target, args.with_steps, args.replace, args.dry_run)
+    if args.json:
+        cli.emit(result, True)
+        return
+    for path in result["written"] or result["files"]:
+        print(path)
+    if result["missing_steps"] and not args.with_steps:
+        print("Steps not installed: " + ", ".join(result["missing_steps"]) + ". Add --with-steps to install them.")

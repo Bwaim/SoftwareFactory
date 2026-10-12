@@ -1,0 +1,21 @@
+id: plan-and-build
+description: Brainstorm a spec, write a plan, build it, and follow review and QA
+start_column: Discovery
+steps:
+  - brainstorm
+  - id: user-validation
+    with:
+      target: artifact
+      artifact_key: spec
+  - write-plan
+  - id: user-validation
+    with:
+      target: artifact
+      artifact_key: plan
+  - execute-plan
+  - run-tests
+  - commit
+  - push
+  - create-pr
+  - wait-review
+  - wait-qa
