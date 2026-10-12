@@ -56,6 +56,7 @@ Later, a local dashboard will show all tasks as a Kanban board. It is not part o
 - It can do the following actions:
   - Init the factory. When the factory is not initialized in the repository, this is the only action shown. After init, it is never shown.
   - Launch a new pipeline, from scratch or from a backlog entry
+  - Show tasks: lists the tasks with their status
   - Delete a task: runs the built-in step `delete-task`
   - Create or edit a pipeline: opens the pipeline editor next to the orchestrator
   - Create a new step: runs the built-in pipeline `new-step-assistant`
@@ -211,7 +212,11 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - The pipeline id.
 - The pipeline inputs.
 - The current step path.
-- A status: `active` while the pipeline runs, `finished` when the last step is done.
+- A status:
+  - `active`: the pipeline runs
+  - `blocked`: the task waits for the user, with a reason
+  - `paused`: the factory stopped the session (see Pause and resume)
+  - `finished`: the last step is done
 - An optional branch name.
 - An optional worktree path. It is empty for `new-step-assistant`.
 - The Claude session id.
@@ -273,6 +278,8 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `config_asked`, with the key
   - `migrated`, with the versions
   - `task_deleted`
+  - `task_blocked`, with the reason
+  - `task_unblocked`
 - With the Claude session id from the task state, this log is enough to split the session transcript by step later.
 
 ##### Task execution
@@ -281,6 +288,22 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - The first prompt of a task is short: "You run factory task `<id>`. Run `factory next` and follow its instructions. When the step is done, run `factory done`. Repeat until `factory next` says the pipeline is finished."
 - A step file changed during a task applies from the next step.
 - A step with `required: true` cannot be skipped. Other steps can be skipped with `factory skip`, only after user approval.
+
+##### Task list
+
+- "Show tasks" prints one line per task, not archived:
+  - Id and description
+  - Pipeline and current step path
+  - Status, with the reason when blocked
+  - Live session state from the terminal adapter, or `unknown` if the adapter does not support it
+- Blocked tasks are listed first.
+
+##### Blocked status
+
+- `factory block <reason>` sets the task to `blocked`. `factory unblock` sets it back to `active`.
+- The agent runs `factory block` when it cannot continue without the user, and `factory unblock` when the user has answered.
+- The `user-validation` step always blocks the task while it waits for approval.
+- When a task becomes blocked and the adapter supports `notify`, the user gets a notification.
 
 #### Backlog
 
@@ -328,6 +351,8 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory backlog list`, `factory backlog add <description> [--pipeline <id>]` and `factory backlog remove <number>`: read and change the backlog.
   - `factory pipeline edit [<id>]`: opens the pipeline editor.
   - `factory pipeline check <id>`: runs the pipeline checks and prints the errors and warnings.
+  - `factory block <reason>` and `factory unblock`: change the blocked status of the task.
+  - `factory tasks`: prints the task list.
 
 ### Terminal adapter
 
@@ -338,7 +363,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `start-session <name> <cwd> <prompt> -- <claude args>`: opens a new terminal in `cwd`, starts Claude with the args and the first prompt, and returns a handle
   - `run <cwd> <command>`: opens a terminal next to the caller for an interactive program, like the pipeline editor
   - `close <handle>`: stops the Claude session and closes its terminal
-  - Optional: `send-prompt <handle> <text>` and `focus <handle>`. An adapter that does not support them says so, and the factory hides the actions that need them.
+  - Optional: `send-prompt <handle> <text>`, `focus <handle>`, `state <handle>` (the live session state) and `notify <text>`. An adapter that does not support them says so, and the factory hides the actions that need them.
 - This build ships one adapter: `herdr`.
 
 #### Herdr adapter
@@ -351,7 +376,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - The handle is the Herdr agent name and the workspace or tab id.
 - `run`: `herdr pane split`, then `herdr pane run`.
 - `close`: closes the workspace or the tab. Check that this also stops the Claude process. If it does not, stop it first.
-- `send-prompt`: `herdr agent prompt`. `focus`: `herdr agent focus`.
+- `send-prompt`: `herdr agent prompt`. `focus`: `herdr agent focus`. `state`: `herdr agent get`. `notify`: `herdr notification`. Check the exact syntax with the installed `herdr` binary.
 
 ### Versioning and migration
 
@@ -427,6 +452,7 @@ migrations/          # One script per format version change
   - `factory pipeline check` reports each error and warning type on test pipelines.
   - The pipeline editor load, copy, check and save functions are tested without the screen.
   - With a fake test adapter that records its calls, launch and delete call only the adapter, never `herdr` directly.
+  - `factory block` and `factory unblock` change the status, and `factory tasks` lists blocked tasks first.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
