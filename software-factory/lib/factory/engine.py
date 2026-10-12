@@ -203,11 +203,19 @@ def block(ctx, tid, reason):
 
 
 def unblock(ctx, tid):
-    if state.load(ctx, tid)["status"] != "blocked":
-        raise FactoryError(f"Task {tid} is not blocked.")
-    task = state.update(ctx, tid, lambda t: state.set_status(t, "active"))
+    def change(t):
+        if t["status"] != "blocked":
+            raise FactoryError(f"Task {tid} is not blocked.")
+        state.set_status(t, "active")
+
+    task = state.update(ctx, tid, change)
     events.log(ctx, tid, "task_unblocked", state.step_path_str(task))
     return f"Task {tid} is active again."
+
+
+def require_unchanged(task, position, statuses):
+    if task["position"] != position or task["status"] not in statuses:
+        raise FactoryError(f"Task {task['id']} changed while this command ran. Check its state and try again.")
 
 
 def require_awaiting(task):
@@ -216,9 +224,8 @@ def require_awaiting(task):
 
 
 def approve(ctx, tid, send=False):
-    require_awaiting(state.load(ctx, tid))
-
     def change(t):
+        require_awaiting(t)
         t["approval"]["approved"] = True
         state.set_status(t, "active")
 
@@ -230,9 +237,8 @@ def approve(ctx, tid, send=False):
 
 
 def request_changes(ctx, tid, text, send=False):
-    require_awaiting(state.load(ctx, tid))
-
     def change(t):
+        require_awaiting(t)
         t["approval"] = None
         t["started"] = None
         state.set_status(t, "active")
@@ -271,11 +277,18 @@ def open_ide(ctx, tid):
     return argv
 
 
-def advance(ctx, tid, event_type):
-    before = state.load(ctx, tid)
-    events.log(ctx, tid, event_type, state.step_path_str(before))
+ADVANCE_STATUSES = ("active", "blocked", "awaiting_approval", "waiting_external")
+
+
+def advance(ctx, tid, event_type, position, statuses=ADVANCE_STATUSES, first_event=None):
+    before = {}
 
     def change(t):
+        require_unchanged(t, position, statuses)
+        before.update(column=t["column"], path=state.step_path_str(t))
+        if first_event:
+            first_event()
+        events.log(ctx, tid, event_type, before["path"])
         t["position"] += 1
         t["started"] = None
         t["approval"] = None
@@ -307,7 +320,7 @@ def done(ctx, tid):
         if not ok:
             events.log(ctx, tid, "done_check_failed", state.step_path_str(task), output=output)
             raise FactoryError(f"The done check failed. The step is not done.\nCheck: {step.done_check}\n{output}")
-    return advance(ctx, tid, "step_done")
+    return advance(ctx, tid, "step_done", task["position"])
 
 
 def skip(ctx, tid):
@@ -316,7 +329,7 @@ def skip(ctx, tid):
     entry, step = load_step(ctx, task)
     if step.required:
         raise FactoryError(f"The step `{step.id}` is required. It cannot be skipped.")
-    return advance(ctx, tid, "step_skipped")
+    return advance(ctx, tid, "step_skipped", task["position"])
 
 
 def find_target(task, target):
@@ -379,8 +392,9 @@ def end_wait(ctx, tid, how):
     if task["status"] != "waiting_external":
         raise FactoryError(f"Task {tid} is not waiting for an external event.")
     entry, step = load_step(ctx, task)
-    events.log(ctx, tid, "external_event", state.step_path_str(task), how=how)
-    advance(ctx, tid, "step_done")
+    path = state.step_path_str(task)
+    advance(ctx, tid, "step_done", task["position"], ("waiting_external",),
+            lambda: events.log(ctx, tid, "external_event", path, how=how))
     task = state.load(ctx, tid)
     happened = (step.done_when or "An external event.").removesuffix(".")
     session.notify(ctx, f"Task {tid}: {step.done_when or 'the external event happened'}")
