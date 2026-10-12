@@ -328,9 +328,12 @@ Save the path with `factory state set plan <path>`.
 
 ##### Task launch
 
-- Launching a pipeline runs the built-in step `create-task` in the orchestrator session.
-- It asks the user for a short description and for the pipeline `inputs`.
-- It builds the task id from the description: lowercase, matching `[a-z][a-z0-9_-]{0,31}`, unique among the tasks. The id never changes.
+- A pipeline is launched with `factory launch <pipeline> --description <text> [--input <key>=<value> ...] [--id <id>] [--from-backlog <number>]`. It does not use Claude. It is the built-in step `create-task`.
+- The orchestrator menu and the dashboard both use it. They only collect the values: the menu asks the user, the dashboard shows a form.
+- `factory launch --dry-run` with the same values prints what would happen: the task id, the worktree path, the branch case (new, existing or detached), the missing inputs and the errors. The caller shows it, and launches only after the user confirms.
+- The task id is a slug of the description: lowercase, matching `[a-z][a-z0-9_-]{0,31}`. If the id is taken, a suffix `-2`, `-3` is added. `--id` sets it by hand. The id never changes.
+- If a part of the launch fails, it removes what it already created (worktree, branch, task folder, terminal) and reports the error.
+- With `--from-backlog`, the backlog entry is removed only after the launch succeeds.
 - The same id is used for the task folder, the terminal name and the Claude session name.
 - It runs the `create-worktree` step. The built-in pipeline `new-step-assistant` runs in the main repository instead.
 - It creates the task folder and the task state file, with the inputs, before the session starts.
@@ -344,14 +347,14 @@ Save the path with `factory state set plan <path>`.
 - To explore without a branch, the user starts a Claude session manually, outside the factory.
 - Every other pipeline starts with the built-in step `create-worktree`. The factory adds it when the pipeline does not list it.
 - A pipeline lists `create-worktree` only to set `with` values, and only as its first step. The factory refuses a pipeline that lists it anywhere else.
-- It runs in the orchestrator session at launch, before the task session starts.
+- It runs inside `factory launch`, before the task session starts.
 - Config keys:
   - `worktree_root`: the folder where worktrees are created
   - `base_ref`: the branch the worktree starts from, default `main`
 - It always runs `git fetch origin <base_ref>` first, so the worktree starts from the latest version. It never changes the local `<base_ref>` branch. If the fetch fails, it stops and asks the user.
 - If the pipeline has an input named `branch`:
   - It also fetches that branch from `origin`, then checks if it already exists, locally or on `origin`.
-  - It tells the user which case applies, new branch or existing branch, and continues after confirmation. This catches a typo in the name.
+  - `factory launch --dry-run` reports which case applies, new branch or existing branch, so the user confirms it before the launch. This catches a typo in the name.
   - New branch: the worktree is created on it, from `origin/<base_ref>`.
   - Existing branch: the worktree is created on it. If the local branch is behind `origin`, it is fast-forwarded. If the local and remote branches have diverged, it stops and asks the user.
   - If the branch is already checked out in another worktree, it stops and names the task or the folder that uses it.
@@ -511,7 +514,7 @@ Save the path with `factory state set plan <path>`.
 - Built-in steps, run in the orchestrator session:
   - `backlog-add`: asks for the description and the optional pipeline, then adds the entry.
   - `backlog-remove`: lists the entries and removes the one the user selects.
-- When the user launches a pipeline, the orchestrator offers to start from a backlog entry. The entry gives the description and the pipeline. The entry is removed once the task is created.
+- When the user launches a pipeline, the orchestrator offers to start from a backlog entry. The entry gives the description and the pipeline. The launch uses `--from-backlog`, so the entry is removed once the task is created.
 - At the end of Init, the orchestrator asks if the user wants to import backlog entries. The user pastes a list or gives a file path. The orchestrator shows the parsed entries and adds them with `backlog-add` after approval.
 
 ### Orchestrator
@@ -549,6 +552,7 @@ Save the path with `factory state set plan <path>`.
   2. Generic: `<library>/`, with `library` read from `.factory/factory.yaml`
   3. Built-in: read from the installed plugin, next to the CLI, so they always match the CLI version
 - Commands:
+  - `factory launch <pipeline> ...` and `factory launch --dry-run ...`: create a task, or show what the launch would do.
   - `factory next`: prints the current step instructions, with the task state keys it reads.
   - `factory done`: runs the step `done_check` if present. If it passes, it saves the step end and prints the next step. If it fails, it prints why and stays on the step.
   - `factory skip`: skips the current step, refused for required steps.
@@ -706,6 +710,8 @@ The library, a folder in any git repository:
   - A task starts in `start_column` and moves when a step with a `column` starts. The pipeline entry wins over the manifest. An unknown column is a pipeline check error.
   - `user-validation` sets `awaiting_approval`. `factory approve` lets `factory done` pass. `factory request-changes` sets `active` and sends the text with the fake adapter.
   - `factory wait` sets `waiting_external`. `factory poll` ends the wait when the `done_check` passes, sends the message with the fake adapter, and skips paused tasks. `factory external-done` ends a wait without a `done_check`.
+  - `factory launch --dry-run` reports the id, the worktree path and the branch case, and changes nothing. A taken id gets a suffix.
+  - When the fake adapter fails to start the session, `factory launch` removes the worktree, the branch and the task folder it created.
   - Two processes writing `config.yaml` and `backlog.md` at the same time lose no write.
   - For a task without a worktree, `factory next` prints commands with `--task <id>`, and a command without it fails with a message that says to add it.
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
