@@ -29,6 +29,7 @@ def register(sub, common):
     p = sub.add_parser("resume", parents=[common]); p.add_argument("id")
     for name in ("next", "done", "skip", "run-script"):
         sub.add_parser(name, parents=[common])
+    p = sub.add_parser("goto", parents=[common]); p.add_argument("step_path"); p.add_argument("--reason", required=True)
     p = sub.add_parser("artifact")
     a = p.add_subparsers(dest="action", required=True)
     ap = a.add_parser("path", parents=[common]); ap.add_argument("name")
@@ -76,6 +77,13 @@ def done_cmd(args):
     from . import engine
     ctx, tid = task_of(args)
     print(engine.done(ctx, tid))
+
+
+@cli.command("goto")
+def goto_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.goto(ctx, tid, args.step_path, args.reason))
 
 
 @cli.command("skip")

@@ -6,12 +6,13 @@ from pathlib import Path
 
 from . import config, events, repo, session, state
 from .errors import FactoryError
-from .registry import Registry
+from .registry import CREATE_WORKTREE, Registry
 
 DONE_CHECK_TIMEOUT = 300
 POLL_CHECK_TIMEOUT = 60
 APPROVAL_STEP = "user-validation"
 FACTORY_SPAN_RE = re.compile(r"`(factory [^`]*)`")
+MAX_JUMPS = 3
 
 
 def cmd(task, text):
@@ -301,6 +302,49 @@ def skip(ctx, tid):
     if step.required:
         raise FactoryError(f"The step `{step.id}` is required. It cannot be skipped.")
     return advance(ctx, tid, "step_skipped")
+
+
+def find_target(task, target):
+    parts = [p.strip() for p in target.split(">") if p.strip()]
+
+    def matches(i):
+        path = task["steps"][i]["path"]
+        return path == parts or (len(parts) == 1 and path[-1] == parts[0])
+
+    if parts and parts[-1] == CREATE_WORKTREE:
+        raise FactoryError("`create-worktree` cannot run again.")
+    earlier = [i for i in range(task["position"]) if matches(i)]
+    if earlier:
+        return earlier[-1]
+    if any(matches(i) for i in range(task["position"], len(task["steps"]))):
+        raise FactoryError("This step is not before the current step. To move forward, skip steps with `factory skip`, after user approval.")
+    raise FactoryError(f"This task has no step `{target}`.")
+
+
+def goto(ctx, tid, target, reason):
+    task = state.load(ctx, tid)
+    require_running(task)
+    index = find_target(task, target)
+    from_path, to_path = state.step_path_str(task), state.step_path_str(task, index)
+
+    def change(t):
+        key = str(index)
+        t["goto_counts"][key] = t["goto_counts"].get(key, 0) + 1
+        t["position"] = index
+        t["started"] = None
+        t["approval"] = None
+        if t["goto_counts"][key] >= MAX_JUMPS:
+            state.set_status(t, "blocked", f"loop on {to_path}")
+        else:
+            state.set_status(t, "active")
+
+    task = state.update(ctx, tid, change)
+    events.log(ctx, tid, "step_goto", to_path, **{"from": from_path, "to": to_path, "reason": reason})
+    if task["status"] == "blocked":
+        events.log(ctx, tid, "task_blocked", to_path, reason=task["status_reason"])
+        session.notify(ctx, f"Task {tid} is blocked: {task['status_reason']}")
+        return f"The task is blocked: {task['status_reason']}. Ask the user what to do."
+    return f"Moved back to {to_path}. Run `{cmd(task, 'next')}`."
 
 
 def wait(ctx, tid):
