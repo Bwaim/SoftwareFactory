@@ -2653,10 +2653,13 @@ This task talks to the real Herdr session. Create only objects with labels start
 
 - [ ] **Step 1: Probe Herdr and write `herdr-probe.md`**
 
-Run each command, paste its JSON output in `verification/software-factory/herdr-probe.md` with one heading per question:
+Probe two setups. Run the full sequence below once per setup, and paste each JSON output in `verification/software-factory/herdr-probe.md` under one heading per setup and question:
+
+- Setup S1, inside a trusted folder: `P=verification/software-factory/work/probe-s1` (absolute path under `PROJECT_ROOT`).
+- Setup S2, outside any trusted project: `P="${TMPDIR:-/tmp}/sf-probe-s2-$(uuidgen | cut -c1-6)"`.
 
 ```bash
-P=verification/software-factory/work/probe; rm -rf "$P"; mkdir -p "$P"
+rm -rf "$P"; mkdir -p "$P"
 git init -q -b main "$P/repo" && git -C "$P/repo" commit -q --allow-empty -m init
 git -C "$P/repo" worktree add -q --detach "$P/wt"
 herdr worktree open --cwd "$P/repo" --path "$P/wt" --label sf-probe --no-focus
@@ -2670,20 +2673,22 @@ herdr workspace close <workspace_id>
 pgrep -fl "$SID"
 ```
 
-Answer these questions in the file:
+If Claude shows the trust dialog, do not accept it. Record the screen text, then close the workspace.
+
+Answer these questions in the file. Q2 is answered for S1 and for S2 separately. The other questions need only one setup where Claude starts.
 
 1. Q1: JSON keys of `worktree open`. Does `result.root_pane` hold `pane_id` and `workspace_id`, like `tab create`?
-2. Q2: Does Claude show the folder trust dialog in the new worktree? What text? What does `agent start` return then?
+2. Q2: Does Claude show the folder trust dialog in the new worktree? What text? What does `agent start` return then? Answer for S1 and for S2.
 3. Q3: Key path of the agent status in `agent get`.
 4. Q4: After `workspace close`, is the Claude process still running (`pgrep`)?
 5. Q5: Resume. Open a tab with `herdr tab create --cwd "$P/wt" --label sf-probe-2 --no-focus`, start with `-- --name sf-probe --resume "$SID"`, and check that Claude remembers the first prompt. Also try `--session-id "$SID" --resume "$SID"` and record the error (A5).
 6. Q6: Does `agent start` accept arguments with spaces and quotes after `--` unchanged?
 
-Close every workspace and tab you created, using the recorded ids only. Then `rm -rf "$P"`.
+Close every workspace and tab you created, using the recorded ids only. Then remove both probe folders.
 
-- [ ] **Step 2: STOP and report the trust finding to the user**
+- [ ] **Step 2: STOP and report the trust findings to the user**
 
-The controller sends the user the answer to Q2 (and Q4, Q5) and asks which trust fix to use (spec D7): `worktree_root` under a trusted folder, if trust is inherited, or ask the user to accept the dialog once. Do not continue this task before the user answers. Write the decision at the end of `herdr-probe.md`.
+The controller sends the user the Q2 answers for S1 and S2 side by side, plus Q4 and Q5, and asks which trust fix to use (spec D7): `worktree_root` under a trusted folder, if trust is inherited, or ask the user to accept the dialog once. Do not continue this task before the user answers. Write the decision, and the `worktree_root` setup it implies, at the end of `herdr-probe.md`.
 
 - [ ] **Step 3: Write the fake `herdr` binary for tests**
 
@@ -3086,6 +3091,18 @@ def test_failed_start_rolls_back_but_keeps_existing_branch(lp):
     assert not git("branch", "--list", "feat/created", cwd=lp.repo)
 
 
+def test_failure_after_start_closes_the_terminal(lp, monkeypatch):
+    def broken_update(*args, **kwargs):
+        raise FactoryError("disk full")
+    monkeypatch.setattr(launch.state, "update", broken_update)
+    with pytest.raises(FactoryError, match="disk full"):
+        launch.launch(ctx(lp), "branchy", "Late", {"branch": "feat/late"})
+    ops = [c["op"] for c in fake_calls(lp.fdir)]
+    assert ops == ["start_session", "close"]
+    assert not (lp.worktrees / "late").exists()
+    assert not git("branch", "--list", "feat/late", cwd=lp.repo)
+
+
 def test_create_worktree_listed_late_refused(lp):
     write_pipeline(lp.fdir, {"id": "late", "steps": ["work", "create-worktree"]})
     rep = launch.plan_launch(ctx(lp), "late", "L", {})
@@ -3195,10 +3212,11 @@ def notify(ctx, text):
 ```python
 import re
 import shutil
+import sys
 import unicodedata
 from pathlib import Path
 
-from . import config, events, pipeline_check, repo, session, state
+from . import adapters, config, events, pipeline_check, repo, session, state
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, NO_WORKTREE_PIPELINES, Registry
 
@@ -3396,6 +3414,14 @@ def new_task(ctx, reg, report, inputs):
     }
 
 
+def rollback(undo):
+    for action in reversed(undo):
+        try:
+            action()
+        except Exception as e:
+            print(f"Rollback step failed: {e}", file=sys.stderr)
+
+
 def launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlog=None):
     report = plan_launch(ctx, pipeline_id, description, inputs, task_id, from_backlog)
     if not report["ok"]:
@@ -3405,17 +3431,17 @@ def launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlog=Non
     try:
         if report["worktree"]:
             created_branch = create_worktree(ctx, report)
-            undo.append(lambda: repo.git(["worktree", "remove", "--force", report["worktree"]], ctx.main, check=False))
             if created_branch:
-                undo.append(lambda: repo.git(["branch", "-D", report["branch"]], ctx.main, check=False))
+                undo.append(lambda: repo.git(["branch", "-D", report["branch"]], ctx.main))
+            undo.append(lambda: repo.git(["worktree", "remove", "--force", report["worktree"]], ctx.main))
         task = new_task(ctx, reg, report, inputs)
         state.create(ctx, task)
         undo.append(lambda: shutil.rmtree(state.task_dir(ctx, task["id"]), ignore_errors=True))
         handle = session.start(ctx, task, session.first_prompt(task))
+        undo.append(lambda: adapters.get_adapter(ctx).close(handle))
         task = state.update(ctx, task["id"], lambda t: t.__setitem__("terminal_handle", handle))
     except Exception:
-        for action in reversed(undo):
-            action()
+        rollback(undo)
         raise
     events.log(ctx, task["id"], "task_created", None, pipeline=task["pipeline"], description=task["description"])
     if task["position"] == 1:
@@ -8198,7 +8224,9 @@ This script runs real Claude sessions in Herdr. It creates only the Herdr object
 
 - [ ] **Step 1: Write the script**
 
-Apply the trust decision from Task 9: when the decision was "worktree_root under a trusted folder", set `WORKTREE_ROOT` below to that folder plus a unique subfolder. Otherwise keep it under `VERIF/work`.
+Use the setup chosen in Task 9 (end of `herdr-probe.md`):
+- "worktree_root under a trusted folder": set `worktree_root` in `run()` to that trusted folder plus the unique `root.name` subfolder, and remove that subfolder in the `finally` block.
+- "accept the dialog once": keep `worktree_root` under `root`, and accept the dialog once by hand before the run, as the README tells users to do.
 
 ```python
 import json
@@ -8317,6 +8345,7 @@ def close_created():
 def run(root):
     repo, lib = setup(root)
     worktree_root = root / "worktrees"
+
     sh([BIN, "init", "--library", lib, "--create-library"], cwd=repo)
     sh(["factory", "config", "set", "create-worktree", "worktree_root", worktree_root], cwd=repo)
     fdir = repo / ".factory"
