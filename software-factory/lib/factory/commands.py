@@ -52,6 +52,12 @@ def register(sub, common):
     p.add_argument("--library", required=True)
     p.add_argument("--create-library", action="store_true")
     sub.add_parser("link", parents=[common])
+    sub.add_parser("open-ide", parents=[common])
+    p = sub.add_parser("approve", parents=[common]); p.add_argument("--send", action="store_true")
+    p = sub.add_parser("request-changes", parents=[common]); p.add_argument("text"); p.add_argument("--send", action="store_true")
+    p = sub.add_parser("approval")
+    aps = p.add_subparsers(dest="action", required=True)
+    aps.add_parser("check", parents=[common])
     sub.add_parser("menu", parents=[common])
 
 
@@ -303,3 +309,33 @@ def artifact_path_cmd(args):
     from . import state
     ctx, tid = task_of(args)
     print(state.artifact_path(ctx, tid, args.name))
+
+
+@cli.command("approve")
+def approve_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.approve(ctx, tid, args.send))
+
+
+@cli.command("request-changes")
+def request_changes_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print(engine.request_changes(ctx, tid, args.text, args.send))
+
+
+@cli.command("approval check")
+def approval_check_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    ok = engine.approval_check(ctx, tid)
+    print("Approved." if ok else "Not approved yet.")
+    return 0 if ok else 1
+
+
+@cli.command("open-ide")
+def open_ide_cmd(args):
+    from . import engine
+    ctx, tid = task_of(args)
+    print("Opened: " + " ".join(engine.open_ide(ctx, tid)))

@@ -1,5 +1,6 @@
 import os
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from .registry import Registry
 
 DONE_CHECK_TIMEOUT = 300
 POLL_CHECK_TIMEOUT = 60
+APPROVAL_STEP = "user-validation"
 FACTORY_SPAN_RE = re.compile(r"`(factory [^`]*)`")
 
 
@@ -63,6 +65,12 @@ def on_start(ctx, task, entry, step):
     if column and column != task["column"]:
         pending.append(("column_changed", {"from": task["column"], "to": column}))
         task["column"] = column
+    if step.id == APPROVAL_STEP:
+        values, _ = config.resolve(ctx, step, entry.get("with"))
+        target = values.get("target") or "worktree"
+        task["approval"] = {"position": task["position"], "approved": False, "target": target, "artifact_key": values.get("artifact_key") or None}
+        state.set_status(task, "awaiting_approval")
+        pending.append(("approval_requested", {"target": target}))
     return pending
 
 
@@ -192,6 +200,59 @@ def unblock(ctx, tid):
     task = state.update(ctx, tid, lambda t: state.set_status(t, "active"))
     events.log(ctx, tid, "task_unblocked", state.step_path_str(task))
     return f"Task {tid} is active again."
+
+
+def require_awaiting(task):
+    if task["status"] != "awaiting_approval" or not task.get("approval"):
+        raise FactoryError(f"Task {task['id']} is not waiting for an approval.")
+
+
+def approve(ctx, tid, send=False):
+    require_awaiting(state.load(ctx, tid))
+
+    def change(t):
+        t["approval"]["approved"] = True
+        state.set_status(t, "active")
+
+    task = state.update(ctx, tid, change)
+    events.log(ctx, tid, "approved", state.step_path_str(task))
+    if send:
+        session.deliver(ctx, tid, f"The user approved. Run `{cmd(task, 'done')}`.")
+    return f"Approved. Run `{cmd(task, 'done')}`."
+
+
+def request_changes(ctx, tid, text, send=False):
+    require_awaiting(state.load(ctx, tid))
+
+    def change(t):
+        t["approval"] = None
+        t["started"] = None
+        state.set_status(t, "active")
+
+    task = state.update(ctx, tid, change)
+    events.log(ctx, tid, "changes_requested", state.step_path_str(task), text=text)
+    if send:
+        session.deliver(ctx, tid, f"The user requested changes: {text}\nMake the changes, then run `{cmd(task, 'next')}`.")
+    return f"Changes requested. Make them, then run `{cmd(task, 'next')}`."
+
+
+def approval_check(ctx, tid):
+    task = state.load(ctx, tid)
+    approval = task.get("approval")
+    return bool(approval and approval.get("position") == task["position"] and approval.get("approved"))
+
+
+def open_ide(ctx, tid):
+    command = config.get_value(ctx, APPROVAL_STEP, "ide_command")
+    if not command:
+        raise FactoryError(
+            "The IDE command is not set. Ask the user, then run "
+            "`factory config set user-validation ide_command '<command with {path}>'`, for example `code {path}`."
+        )
+    path = str(task_cwd(ctx, state.load(ctx, tid)))
+    argv = [part.replace("{path}", path) for part in shlex.split(command)]
+    subprocess.Popen(argv)
+    return argv
 
 
 def advance(ctx, tid, event_type):
