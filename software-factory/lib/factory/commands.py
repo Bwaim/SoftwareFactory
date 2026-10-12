@@ -22,6 +22,11 @@ def register(sub, common):
     p = sub.add_parser("block", parents=[common]); p.add_argument("reason")
     sub.add_parser("unblock", parents=[common])
     sub.add_parser("tasks", parents=[common])
+    p = sub.add_parser("pause", parents=[common])
+    p.add_argument("id", nargs="?")
+    p.add_argument("--all", action="store_true")
+    p.add_argument("--wait", action="store_true")
+    p = sub.add_parser("resume", parents=[common]); p.add_argument("id")
     for name in ("next", "done", "skip", "run-script"):
         sub.add_parser(name, parents=[common])
     p = sub.add_parser("artifact")
@@ -37,6 +42,8 @@ def register(sub, common):
     p = sub.add_parser("terminal")
     ts = p.add_subparsers(dest="action", required=True)
     ts.add_parser("check", parents=[common])
+    tf = ts.add_parser("focus", parents=[common]); tf.add_argument("id")
+    tp = ts.add_parser("send-prompt", parents=[common]); tp.add_argument("id"); tp.add_argument("text"); tp.add_argument("--wait", action="store_true")
     p = sub.add_parser("delete", parents=[common])
     p.add_argument("id")
     p.add_argument("--dry-run", action="store_true")
@@ -105,6 +112,40 @@ def tasks_cmd(args):
         cli.emit(rows, True)
     else:
         print(board.render_rows(rows))
+
+
+@cli.command("pause")
+def pause_cmd(args):
+    from . import session
+    ctx = ctx_of(args)
+    if args.all:
+        ids = session.pause_all(ctx, args.wait)
+        print("Paused: " + (", ".join(ids) if ids else "none"))
+        return
+    if not args.id:
+        raise FactoryError("Give a task id, or --all.")
+    session.pause(ctx, args.id, args.wait)
+    print(f"Task {args.id} paused.")
+
+
+@cli.command("resume")
+def resume_cmd(args):
+    from . import session
+    session.resume(ctx_of(args), args.id)
+    print(f"Task {args.id} resumed.")
+
+
+@cli.command("terminal focus")
+def focus_cmd(args):
+    from . import session
+    session.focus(ctx_of(args), args.id)
+
+
+@cli.command("terminal send-prompt")
+def send_prompt_cmd(args):
+    from . import session
+    session.send_prompt(ctx_of(args), args.id, args.text, args.wait)
+    print("Prompt sent.")
 
 
 @cli.command("terminal check")

@@ -1,13 +1,15 @@
 import uuid
 
-from . import adapters, state
+from . import adapters, events, state
 from .adapters.base import AdapterError
+from .errors import FactoryError
 from .registry import NO_WORKTREE_PIPELINES
 
 FIRST_PROMPT = (
     "You run factory task `{id}`. Run `{next}` and follow its instructions. "
     "When the step is done, run `{done}`. Repeat until `{next}` says the pipeline is finished."
 )
+PAUSE_WAIT_SECONDS = 3600
 RESUME_PROMPT = "The factory resumed this task. Run `{status}`, then continue with `{next}`."
 
 
@@ -71,3 +73,89 @@ def live_state(ctx, task):
         return adapter.state(handle)
     except AdapterError:
         return "unknown"
+
+
+def adapter_of(ctx):
+    return adapters.get_adapter(ctx)
+
+
+def pause(ctx, tid, wait=False, timeout_s=PAUSE_WAIT_SECONDS):
+    task = state.load(ctx, tid)
+    if task["status"] in ("paused", "finished"):
+        raise FactoryError(f"Task {tid} is already {task['status']}.")
+    adapter = adapter_of(ctx)
+    handle = task.get("terminal_handle")
+    if handle:
+        if wait and "wait_idle" in adapter.capabilities():
+            adapter.wait_idle(handle, timeout_s)
+        try:
+            adapter.close(handle)
+        except AdapterError:
+            pass
+
+    def change(t):
+        t["saved_status"] = {"status": t["status"], "reason": t.get("status_reason")}
+        state.set_status(t, "paused")
+        t["terminal_handle"] = None
+
+    task = state.update(ctx, tid, change)
+    events.log(ctx, tid, "task_paused", state.step_path_str(task))
+
+
+def pause_all(ctx, wait=False):
+    ids = [t["id"] for t in state.list_tasks(ctx) if t["status"] not in ("paused", "finished")]
+    for tid in ids:
+        pause(ctx, tid, wait)
+    return ids
+
+
+def resume(ctx, tid, extra=None):
+    task = state.load(ctx, tid)
+    if task["status"] == "finished":
+        raise FactoryError(f"Task {tid} is finished.")
+    if task["status"] != "paused":
+        live = live_state(ctx, task)
+        if live not in ("gone", "unknown"):
+            raise FactoryError(f"The session of task {tid} is still running ({live}).")
+    handle = start(ctx, task, resume_prompt(task, extra), resume=True)
+
+    def change(t):
+        t["terminal_handle"] = handle
+        if t["status"] == "paused":
+            saved = t.get("saved_status") or {"status": "active", "reason": None}
+            state.set_status(t, saved["status"], saved.get("reason"))
+            t["saved_status"] = None
+
+    task = state.update(ctx, tid, change)
+    events.log(ctx, tid, "task_resumed", state.step_path_str(task))
+    return task
+
+
+def deliver(ctx, tid, text):
+    task = state.load(ctx, tid)
+    if task["status"] == "paused" or live_state(ctx, task) == "gone":
+        resume(ctx, tid, text)
+        return "resumed"
+    adapter_of(ctx).send_prompt(task["terminal_handle"], text)
+    return "sent"
+
+
+def live_handle(ctx, tid):
+    task = state.load(ctx, tid)
+    if not task.get("terminal_handle"):
+        raise FactoryError(f"Task {tid} has no live session. Resume it first.")
+    return task, task["terminal_handle"]
+
+
+def send_prompt(ctx, tid, text, wait=False):
+    task, handle = live_handle(ctx, tid)
+    adapter = adapter_of(ctx)
+    if wait and "wait_idle" in adapter.capabilities():
+        adapter.wait_idle(handle, PAUSE_WAIT_SECONDS)
+    adapter.send_prompt(handle, text)
+    events.log(ctx, tid, "prompt_sent", state.step_path_str(task), text=text)
+
+
+def focus(ctx, tid):
+    _, handle = live_handle(ctx, tid)
+    adapter_of(ctx).focus(handle)
