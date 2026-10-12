@@ -232,7 +232,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - The same id is used for the task folder, the terminal name and the Claude session name.
 - It runs the `create-worktree` step. The built-in pipeline `new-step-assistant` runs in the main repository instead.
 - It creates the task folder and the task state file, with the inputs, before the session starts.
-- It starts the task session with `factory terminal start-session`, in the worktree or in the main repository. Claude starts with `--name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json` and receives the first prompt (see Task execution).
+- It starts the task session with `factory terminal start-session`, in the worktree or in the main repository. Claude starts with `--name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json --add-dir <main repository>/.factory/tasks/<id>/artifacts` and receives the first prompt (see Task execution).
 - It saves the terminal handle in the task state.
 - The orchestrator goes back to its menu without waiting for the task.
 
@@ -330,11 +330,19 @@ Save the merge request URL with `factory state set mr_url <url>`.
 - At start, after the version check, if paused tasks exist, the orchestrator lists them and offers to resume all of them, some of them or none.
 - Resuming a task:
   - It starts a new terminal with `factory terminal start-session` in the task worktree, or in the main repository for `new-step-assistant`.
-  - Claude starts with `--resume <session-id> --name <id> --settings <main repository>/.factory/claude-settings.json`, so the conversation continues.
+  - Claude starts with `--resume <session-id> --name <id> --settings <main repository>/.factory/claude-settings.json --add-dir <main repository>/.factory/tasks/<id>/artifacts`, so the conversation continues.
   - The prompt is: "The factory resumed this task. Run `factory status`, then continue with `factory next`."
   - It restores the saved status and saves the new terminal handle.
 - "Resume a task" in the menu lists the paused tasks, and the `active` or `blocked` tasks whose session state is `gone`.
 - If the adapter does not support `state`, the user can still resume an `active` or `blocked` task. The orchestrator first warns that a second session could start if the first one is still running.
+
+##### Artifacts
+
+- Files made during a task are saved in `.factory/tasks/<id>/artifacts/`: specs, plans, analyses, notes. This folder is outside git, so these files are never committed to the shared repository.
+- A step that makes a file saves its path in a task state key, so later steps find it with `reads`. Example: `analyze-crash` writes `analysis` = the path of `artifacts/analysis.md`.
+- `factory artifact path <name>` creates the folder if needed and prints the absolute path for a file name.
+- When a step calls a skill that saves files, the step body tells the skill to save them in the artifacts folder.
+- Archived tasks keep their artifacts.
 
 #### Backlog
 
@@ -386,6 +394,7 @@ Save the merge request URL with `factory state set mr_url <url>`.
   - `factory tasks`: prints the task list.
   - `factory pause <id>`, `factory pause --all` and `factory resume <id>`: pause and resume tasks.
   - `factory goto <step-path> --reason <text>`: moves the task back to an earlier step.
+  - `factory artifact path <name>`: prints the absolute path of a task artifact file.
 
 ### Terminal adapter
 
@@ -449,6 +458,7 @@ In the main repository, never committed:
     <id>/
       task.json      # Task state
       events.jsonl   # Event log, written by the factory CLI
+      artifacts/     # Files made during the task
     archive/         # Deleted tasks, kept for history
 ```
 
@@ -489,6 +499,7 @@ migrations/          # One script per format version change
   - With the fake test adapter, pause saves the status and closes the terminal, and resume restores the status with the same session id.
   - Worktree creation on the test repository, with git only: new branch, existing local branch behind `origin` (fast-forwarded), branch only on `origin`, diverged branch (stops), and branch used by another worktree (stops).
   - `factory goto` moves back to an earlier step, refuses a later step, and blocks the task on the 3rd jump back to the same step.
+  - `factory artifact path` creates the artifacts folder and prints an absolute path in the main repository, also when called from a worktree.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
