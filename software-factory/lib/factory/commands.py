@@ -22,6 +22,18 @@ def register(sub, common):
     p = sub.add_parser("artifact")
     a = p.add_subparsers(dest="action", required=True)
     ap = a.add_parser("path", parents=[common]); ap.add_argument("name")
+    p = sub.add_parser("terminal")
+    ts = p.add_subparsers(dest="action", required=True)
+    ts.add_parser("check", parents=[common])
+
+
+@cli.command("terminal check")
+def terminal_check(args):
+    from . import adapters, repo
+    ctx = repo.load_ctx(task_opt=args.task)
+    ok, message = adapters.get_adapter(ctx).check()
+    print(("OK: " if ok else "FAILED: ") + message)
+    return 0 if ok else 1
 
 
 @cli.command("version check")
