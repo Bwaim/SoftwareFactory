@@ -77,6 +77,7 @@ def register(sub, common):
     m = bs.add_parser("move", parents=[common]); m.add_argument("id"); m.add_argument("--to", type=int, required=True)
     i = bs.add_parser("import", parents=[common]); i.add_argument("--file", default=None); i.add_argument("--dry-run", action="store_true")
     sub.add_parser("menu", parents=[common])
+    p = sub.add_parser("migrate", parents=[common]); p.add_argument("--dry-run", action="store_true")
     sub.add_parser("serve", parents=[common])
     sub.add_parser("dashboard", parents=[common])
     p = sub.add_parser("server")
@@ -578,3 +579,16 @@ def catalog_install_cmd(args):
         print(path)
     if result["missing_steps"] and not args.with_steps:
         print("Steps not installed: " + ", ".join(result["missing_steps"]) + ". Add --with-steps to install them.")
+
+
+@cli.command("migrate")
+def migrate_cmd(args):
+    from . import migrate, repo
+    result = migrate.migrate(repo.load_ctx(task_opt=args.task), args.dry_run)
+    if args.json:
+        cli.emit(result, True)
+        return
+    print(f"Repository data: version {result['repo']['from']} -> {result['current']}" if result["repo"]["migrate"] else "Repository data: up to date.")
+    print(f"Library: version {result['library']['from']} -> {result['current']}" if result["library"]["migrate"] else "Library: up to date.")
+    for b in result["backups"]:
+        print(f"Backup: {b}")
