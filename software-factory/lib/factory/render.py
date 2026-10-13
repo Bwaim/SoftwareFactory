@@ -54,8 +54,14 @@ def end_line(step):
     return WAIT_END if step.wait_external else SESSION_END
 
 
-def footer(step_line, step, outputs, last, help_lines):
-    lines = [SEPARATOR, step_line] + output_lines(outputs, "Outputs to set:")
+def loop_lines(step, loop_keys):
+    if step.type == "command":
+        return [f"This step controls a loop. The command sets `{key}` to `none` when nothing is left." for key in loop_keys]
+    return [f"This step controls a loop. Set `{key}` to `none` when nothing is left." for key in loop_keys]
+
+
+def footer(step_line, step, outputs, last, help_lines, extra=()):
+    lines = [SEPARATOR, step_line] + output_lines(outputs, "Outputs to set:") + list(extra)
     if step.done_when:
         lines.append(f"Done when: {step.done_when}")
     if help_lines:
@@ -63,29 +69,31 @@ def footer(step_line, step, outputs, last, help_lines):
     return lines + [last]
 
 
-def prompt_with_footer(prompt, step_line, step, outputs, last, help_lines):
-    return "\n".join([prompt.rstrip("\n"), ""] + footer(step_line, step, outputs, last, help_lines))
+def prompt_with_footer(prompt, step_line, step, outputs, last, help_lines, extra=()):
+    return "\n".join([prompt.rstrip("\n"), ""] + footer(step_line, step, outputs, last, help_lines, extra))
 
 
-def subagent_text(prompt, step_line, step, outputs, model, effort):
-    inner = prompt_with_footer(prompt, step_line, step, outputs, SUBAGENT_END, False)
+def subagent_text(prompt, step_line, step, outputs, model, effort, extra=()):
+    inner = prompt_with_footer(prompt, step_line, step, outputs, SUBAGENT_END, False, extra)
     return "\n".join([step_line, "Run this step in a subagent. Call the Agent tool with:",
                       f"- model: {model or 'inherit'}", f"- effort: {effort or 'inherit'}",
                       "- prompt:", "<<<", inner, ">>>", WAIT_END if step.wait_external else SUBAGENT_AFTER])
 
 
-def command_text(step_line, step, outputs):
+def command_text(step_line, step, outputs, extra=()):
     lines = [step_line, COMMAND_RUN]
     if outputs:
         lines += [COMMAND_OUTPUTS] + [output_name_line(name, out) for name, out in outputs.items()]
+    lines += list(extra)
     if step.done_when:
         lines.append(f"Done when: {step.done_when}")
     return "\n".join(lines + [COMMAND_RETRY] + IF_NEEDED + [end_line(step)])
 
 
-def step_text(step, prompt, step_line, outputs, model=None, effort=None):
+def step_text(step, prompt, step_line, outputs, model=None, effort=None, loop_keys=()):
+    extra = loop_lines(step, loop_keys)
     if step.type == "command":
-        return command_text(step_line, step, outputs)
+        return command_text(step_line, step, outputs, extra)
     if step.run_in == "subagent":
-        return subagent_text(prompt, step_line, step, outputs, model, effort)
-    return prompt_with_footer(prompt, step_line, step, outputs, end_line(step), True)
+        return subagent_text(prompt, step_line, step, outputs, model, effort, extra)
+    return prompt_with_footer(prompt, step_line, step, outputs, end_line(step), True, extra)

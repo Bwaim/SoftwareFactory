@@ -314,3 +314,63 @@ def test_old_task_without_loops(inited):
     run("next")
     assert "The pipeline is finished" in run("done").stdout
     assert ", loop" not in run("status").stdout
+
+
+FOOTER = "This step controls a loop. Set `k` to `none` when nothing is left."
+
+
+def test_footer_line_only_on_the_controlling_step(inited):
+    out_k = {"outputs": {"k": {"type": "text", "description": "K"}}}
+    write_step(inited.fdir, "pre", out_k)
+    write_step(inited.fdir, "a", {})
+    write_step(inited.fdir, "b", out_k)
+    write_step(inited.fdir, "post", out_k)
+    write_pipeline(inited.fdir, {"id": "ft", "steps": ["pre", "a", {"id": "b", "loop": loop("a", "k", 2)}, "post"]})
+    task_from_pipeline(inited, "ft")
+    run = runner(inited)
+    seen = {}
+    for sid in ("pre", "a", "b", "post"):
+        out = run("next").stdout
+        seen[sid] = FOOTER in out
+        if sid != "a":
+            run("state", "set", "k", "none")
+        run("done")
+    assert seen == {"pre": False, "a": False, "b": True, "post": False}
+
+
+def test_footer_line_for_subagent_and_command(inited):
+    write_step(inited.fdir, "sub", {"run_in": "subagent", "outputs": {"k": {"type": "text", "description": "K"}}})
+    write_step(inited.fdir, "cmd", {"type": "command", "outputs": {"k": {"type": "text", "description": "K"}}},
+               body="factory state set k none\n")
+    write_step(inited.fdir, "end", {})
+    write_pipeline(inited.fdir, {"id": "sc", "steps": [{"id": "sub", "loop": loop("sub", "k", 2)},
+                                                        {"id": "cmd", "loop": loop("cmd", "k", 2)}, "end"]})
+    task_from_pipeline(inited, "sc")
+    run = runner(inited)
+    sub = run("next").stdout
+    assert FOOTER in sub.split("<<<", 1)[1].split(">>>", 1)[0]
+    run("state", "set", "k", "none")
+    run("done")
+    cmd = run("next").stdout
+    assert "This step controls a loop. The command sets `k` to `none` when nothing is left." in cmd
+    assert "factory state set" not in cmd
+
+
+def test_status_shows_loop_count(inited):
+    run = review_pipeline(inited)
+    assert ", loop" not in run("status").stdout
+    review_round(run, "bugs")
+    assert "Step: write (2 of 4), loop 1 of 2" in run("status").stdout
+
+
+def test_status_shows_the_innermost_loop(inited):
+    run = nested_pipeline(inited)
+    step_with(run)
+    step_with(run, "inner", "x")
+    step_with(run, "inner", "x")
+    run("unblock")
+    step_with(run, "outer", "y")
+    assert "Step: a (2 of 5), loop 1 of 2" in run("status").stdout
+    step_with(run)
+    step_with(run, "inner", "x")
+    assert "Step: b (3 of 5), loop 1 of 1" in run("status").stdout

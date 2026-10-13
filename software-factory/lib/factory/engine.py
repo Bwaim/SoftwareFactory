@@ -95,7 +95,7 @@ def step_line(task):
 def render_step(task, entry, step, values):
     prompt = render.fill(step.body, key_values(task), values) if step.type == "ai" else ""
     model, effort = settings(entry, step)
-    return render.step_text(step, prompt, step_line(task), keys.outputs_of(step), model, effort)
+    return render.step_text(step, prompt, step_line(task), keys.outputs_of(step), model, effort, loops.controlled_keys(task, step))
 
 
 def render_missing(task, step, missing):
@@ -515,13 +515,18 @@ def set_state(ctx, tid, key, value):
     return value
 
 
+def loop_suffix(task):
+    loop = loops.current_loop(task)
+    return f", loop {loop['n']} of {loop['max']}" if loop else ""
+
+
 def status_text(ctx, tid):
     task = state.load(ctx, tid)
     lines = [
         f"Task: {task['id']}",
         f"Description: {task['description']}",
         f"Pipeline: {task['pipeline']}",
-        f"Step: {state.step_path_str(task)} ({min(task['position'] + 1, len(task['steps']))} of {len(task['steps'])})",
+        f"Step: {state.step_path_str(task)} ({min(task['position'] + 1, len(task['steps']))} of {len(task['steps'])})" + loop_suffix(task),
         f"Status: {task['status']}" + (f" ({task['status_reason']})" if task.get("status_reason") else ""),
     ]
     return "\n".join(lines)
