@@ -19,6 +19,14 @@ def message(action, kind, item_id):
     return f"Factory library: {action} {kind} {item_id}"
 
 
+def library_yaml_change(lib, top, rels):
+    rel = str((Path(lib).resolve() / "factory.yaml").relative_to(top))
+    if rel in rels or not (top / rel).exists():
+        return []
+    changed = repo.git(["status", "--porcelain", "--", rel], top).stdout.strip()
+    return [rel] if changed else []
+
+
 def commit(ctx, message_text, paths):
     lib = ctx.library()
     top = repo_root(lib)
@@ -33,6 +41,7 @@ def commit(ctx, message_text, paths):
         rels.append(str(full.relative_to(top)))
     if not rels:
         raise FactoryError("No file to commit.")
+    rels += library_yaml_change(lib, top, rels)
     repo.git(["add", "-A", "--", *rels], top)
     repo.git(["commit", "--only", "-m", message_text, "--", *rels], top)
     return repo.git(["rev-parse", "HEAD"], top).stdout.strip()

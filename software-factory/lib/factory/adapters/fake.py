@@ -40,6 +40,9 @@ class FakeAdapter(Adapter):
         self.require("send_prompt")
         self.record("send_prompt", handle=handle, text=text)
 
+    def question_box(self, handle):
+        return bool(self.cfg().get("question_box"))
+
     def focus(self, handle):
         self.require("focus")
         self.record("focus", handle=handle)

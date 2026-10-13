@@ -37,3 +37,23 @@ def test_disabled_without_git(inited, work, monkeypatch):
     assert not library.in_git(lib)
     with pytest.raises(FactoryError, match="disabled"):
         library.commit(repo.load_ctx(cwd=inited.repo), "x", [str(lib / "s.md")])
+
+
+def test_commit_adds_new_library_factory_yaml(inited):
+    root = inited.library.parent
+    (inited.library / "steps" / "a.md").write_text("a\n")
+    inited.factory("library", "commit", "Factory library: add step a", inited.library / "steps" / "a.md")
+    committed = git("show", "--name-only", "--format=", "HEAD", cwd=root).splitlines()
+    assert sorted(committed) == ["factory-library/factory.yaml", "factory-library/steps/a.md"]
+    assert git("status", "--porcelain", "--", "factory-library/factory.yaml", cwd=root) == ""
+
+
+def test_commit_adds_changed_library_factory_yaml(inited):
+    root = inited.library.parent
+    git("add", "-A", cwd=root)
+    git("commit", "-m", "library", cwd=root)
+    (inited.library / "factory.yaml").write_text("version: 2\n")
+    (inited.library / "steps" / "b.md").write_text("b\n")
+    inited.factory("library", "commit", "Factory library: add step b", inited.library / "steps" / "b.md")
+    committed = git("show", "--name-only", "--format=", "HEAD", cwd=root).splitlines()
+    assert sorted(committed) == ["factory-library/factory.yaml", "factory-library/steps/b.md"]

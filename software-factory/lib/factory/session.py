@@ -5,12 +5,18 @@ from .adapters.base import AdapterError
 from .errors import FactoryError
 from .registry import NO_WORKTREE_PIPELINES
 
+ASK_IN_TEXT = (
+    "Ask the user in plain text, never with the AskUserQuestion tool, then end your turn. "
+    "The answer can come from this tab, the orchestrator or the dashboard."
+)
 FIRST_PROMPT = (
     "You run factory task `{id}`. Run `{next}` and follow its instructions. "
-    "When the step is done, run `{done}`. Repeat until `{next}` says the pipeline is finished."
+    "When the step is done, run `{done}`. Repeat until `{next}` says the pipeline is finished. "
+    "When you need an answer from the user: " + ASK_IN_TEXT
 )
 PAUSE_WAIT_SECONDS = 3600
 RESUME_PROMPT = "The factory resumed this task. Run `{status}`, then continue with `{next}`."
+QUESTION_BOX = "The session shows a question box. Answer it in the task tab: factory terminal focus {id}."
 
 
 def factory_cmd(task, sub):
@@ -131,29 +137,57 @@ def resume(ctx, tid, extra=None):
     return task
 
 
+def require_handle(task):
+    if not task.get("terminal_handle"):
+        raise FactoryError(f"Task {task['id']} has no live session. Resume it first.")
+    return task["terminal_handle"]
+
+
+def type_prompt(adapter, task, handle, text):
+    if adapter.question_box(handle):
+        raise FactoryError(QUESTION_BOX.format(id=task["id"]))
+    adapter.send_prompt(handle, text)
+
+
+def logged_delivery(ctx, task, text, send):
+    try:
+        result = send()
+    except FactoryError as e:
+        events.log(ctx, task["id"], "prompt_failed", state.step_path_str(task), text=text, reason=str(e))
+        raise
+    events.log(ctx, task["id"], "prompt_sent", state.step_path_str(task), text=text)
+    return result
+
+
 def deliver(ctx, tid, text):
     task = state.load(ctx, tid)
-    if task["status"] == "paused" or live_state(ctx, task) == "gone":
-        resume(ctx, tid, text)
-        return "resumed"
-    adapter_of(ctx).send_prompt(task["terminal_handle"], text)
-    return "sent"
+
+    def send():
+        if task["status"] == "paused" or live_state(ctx, task) == "gone":
+            resume(ctx, tid, text)
+            return "resumed"
+        type_prompt(adapter_of(ctx), task, require_handle(task), text)
+        return "sent"
+
+    return logged_delivery(ctx, task, text, send)
 
 
 def live_handle(ctx, tid):
     task = state.load(ctx, tid)
-    if not task.get("terminal_handle"):
-        raise FactoryError(f"Task {tid} has no live session. Resume it first.")
-    return task, task["terminal_handle"]
+    return task, require_handle(task)
 
 
 def send_prompt(ctx, tid, text, wait=False):
-    task, handle = live_handle(ctx, tid)
-    adapter = adapter_of(ctx)
-    if wait and "wait_idle" in adapter.capabilities():
-        adapter.wait_idle(handle, PAUSE_WAIT_SECONDS)
-    adapter.send_prompt(handle, text)
-    events.log(ctx, tid, "prompt_sent", state.step_path_str(task), text=text)
+    task = state.load(ctx, tid)
+
+    def send():
+        handle = require_handle(task)
+        adapter = adapter_of(ctx)
+        if wait and "wait_idle" in adapter.capabilities():
+            adapter.wait_idle(handle, PAUSE_WAIT_SECONDS)
+        type_prompt(adapter, task, handle, text)
+
+    logged_delivery(ctx, task, text, send)
 
 
 def focus(ctx, tid):

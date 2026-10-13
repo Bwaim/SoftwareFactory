@@ -7,6 +7,8 @@ from .base import OPTIONAL, Adapter, AdapterError
 
 TRUST_MARKERS = ("is this a project you created or one you trust", "yes, i trust this folder")
 START_TIMEOUT_MS = 60000
+QUESTION_BOX_MARKERS = ("enter to select", "↑/↓ to navigate", "esc to cancel")
+SCREEN_BOTTOM_LINES = 15
 
 
 def run(args, timeout=60, check=True):
@@ -186,6 +188,13 @@ class HerdrAdapter(Adapter):
     def send_prompt(self, handle, text):
         self.require_owned(handle)
         run(["agent", "prompt", handle["agent"], text])
+
+    def question_box(self, handle):
+        self.require_owned(handle)
+        screen = run(["agent", "read", handle["agent"], "--source", "visible"]).stdout
+        bottom = [line for line in screen.splitlines() if line.strip()][-SCREEN_BOTTOM_LINES:]
+        text = "\n".join(bottom).lower()
+        return any(marker in text for marker in QUESTION_BOX_MARKERS)
 
     def focus(self, handle):
         self.require_owned(handle)

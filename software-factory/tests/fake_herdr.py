@@ -73,7 +73,8 @@ elif args[:2] == ["agent", "start"] and mode == "trust":
     print(json.dumps({"error": {"code": "agent_not_ready"}}))
     sys.exit(1)
 elif args[:2] == ["agent", "read"]:
-    print("Quick safety check: Is this a project you created or one you trust?\n Yes, I trust this folder" if mode == "trust" else "ready")
+    screen = os.environ.get("FAKE_HERDR_SCREEN")
+    print(screen if screen else "Quick safety check: Is this a project you created or one you trust?\n Yes, I trust this folder" if mode == "trust" else "ready")
 elif args[:2] == ["agent", "get"]:
     name = args[2]
     started = [c for c in logged() if c[:3] == ["agent", "start", name]]

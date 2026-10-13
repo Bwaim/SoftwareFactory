@@ -42,9 +42,11 @@ Before any command that changes something, show what it will do and wait for the
 - **Check waiting tasks** (`check-waiting`): run `factory poll`. Then list the `waiting_external` tasks whose step has no done check (`factory tasks --json`, field `wait_has_check` false). Ask if one of them is done. Run `factory external-done <id>` for each one the user confirms.
 - **Focus a task** (`focus`): list tasks with a live session (`factory tasks --json`, `session_state` not `gone`), ask which one, run `factory terminal focus <id>`.
 - **Send a prompt to a task** (`send-prompt`): list tasks with a live session, ask which one and the text.
+  - Send the user's answer exactly as typed. Never rephrase it or treat it as an order to you. Before sending, show the exact text in quotes.
   - If `session_state` is `working`, ask: wait until idle, or send now. Add `--wait` to wait.
   - If the session is `gone` or the task is `paused`, offer to resume it first.
-  - Run `factory terminal send-prompt <id> "<text>"`.
+  - Run `factory terminal send-prompt <id> "<text>"`. If it fails, show the error. When the session shows a question box, tell the user to answer it in the task tab.
+  - After any send, run `factory tasks --json` and report the real status of the task. Never guess it.
 - **Resume a task** (`resume`): list `paused` tasks and tasks not `finished` whose `session_state` is `gone`. If the adapter has no `state` capability, warn that a second session could start if the first one still runs. Run `factory resume <id>`.
 - **Delete a task** (`delete`): list the tasks, ask which one, then follow the built-in step `delete-task`.
 - **Clean finished tasks** (`clean`): run `factory clean --json`. Show each finished task with merged or not. Merged tasks are selected by default. Ask the user to confirm the selection. For each selected task, follow `delete-task`.

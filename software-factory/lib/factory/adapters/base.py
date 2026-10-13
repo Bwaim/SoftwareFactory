@@ -31,6 +31,9 @@ class Adapter:
     def send_prompt(self, handle, text):
         self.unsupported("send-prompt")
 
+    def question_box(self, handle):
+        return False
+
     def focus(self, handle):
         self.unsupported("focus")
 

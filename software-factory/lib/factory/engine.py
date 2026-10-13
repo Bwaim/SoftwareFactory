@@ -210,7 +210,7 @@ def block(ctx, tid, reason):
     task = state.update(ctx, tid, change)
     events.log(ctx, tid, "task_blocked", state.step_path_str(task), reason=reason)
     session.notify(ctx, f"Task {tid} is blocked: {reason}")
-    return f"Task {tid} is blocked. Ask the user, then run `{cmd(task, 'unblock')}` when the user has answered."
+    return f"Task {tid} is blocked. {session.ASK_IN_TEXT} When the user has answered, run `{cmd(task, 'unblock')}`."
 
 
 def unblock(ctx, tid):
