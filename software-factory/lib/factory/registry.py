@@ -134,24 +134,35 @@ def level_roots(ctx):
     return roots
 
 
+def all_pipeline_files(ctx):
+    out = []
+    for level, root in level_roots(ctx):
+        for p in sorted((root / "pipelines").glob("*.yaml")):
+            data = fsio.read_yaml(p, {}) or {}
+            out.append((level, data.get("id") or p.stem, data))
+    return out
+
+
 class Registry:
-    def __init__(self, steps, pipelines):
+    def __init__(self, steps, pipelines, variants=None):
         self.steps = steps
         self.pipelines = pipelines
+        self.variants = variants if variants is not None else {sid: [s] for sid, s in steps.items()}
 
     @classmethod
     def load(cls, ctx):
-        steps, pipelines = {}, {}
+        steps, pipelines, variants = {}, {}, {}
         for level, root in level_roots(ctx):
             for p in sorted((root / "steps").glob("*.md")):
                 manifest, body = parse_step_text(p.read_text(), p)
                 sid = manifest.get("id") or p.stem
                 steps[sid] = Step(sid, level, p, manifest, body)
+                variants.setdefault(sid, []).append(steps[sid])
             for p in sorted((root / "pipelines").glob("*.yaml")):
                 data = fsio.read_yaml(p, {}) or {}
                 pid = data.get("id") or p.stem
                 pipelines[pid] = Pipeline(pid, level, p, data)
-        reg = cls(steps, pipelines)
+        reg = cls(steps, pipelines, variants)
         reg.check_loops()
         return reg
 
