@@ -4,7 +4,8 @@ import pytest
 import yaml
 
 from conftest import git, make_task, task_json, write_pipeline, write_step
-from factory import catalog, hidden, repo
+from factory import catalog, hidden, repo, step_delete
+from factory.errors import FactoryError
 from factory.registry import Registry, all_pipeline_files
 
 
@@ -47,3 +48,182 @@ def test_hidden_ids_and_discard(inited, ctx):
     before = (inited.fdir / "factory.yaml").read_text()
     hidden.discard(ctx, "zzz")
     assert (inited.fdir / "factory.yaml").read_text() == before
+
+
+def commit_library(inited):
+    root = inited.library.parent
+    git("add", "-A", cwd=root)
+    git("commit", "-m", "library", cwd=root)
+    return root
+
+
+def snapshot(root):
+    return {str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
+
+
+def entry(sid, path=None):
+    return {"id": sid, "path": path or [sid], "with": {}, "column": None, "model": None, "effort": None}
+
+
+def test_plan_local_step(inited, ctx):
+    write_step(inited.fdir, "solo", {})
+    out = step_delete.plan(ctx, "solo")
+    assert out["level"] == "local" and [Path(p).name for p in out["files"]] == ["solo.md"]
+    assert out["replaced_by"] is None and out["in_use_stays"] is None and out["users"] == []
+    assert out["warnings"] == [] and out["blocked"] is False
+
+
+def test_delete_local_step_removes_file(inited, ctx):
+    write_step(inited.fdir, "solo", {})
+    out = step_delete.delete(ctx, "solo")
+    assert not (inited.fdir / "steps" / "solo.md").exists()
+    assert [Path(p).name for p in out["removed"]] == ["solo.md"] and out["library_commit"] is None
+
+
+def test_local_override_is_replaced_by_generic(inited, ctx):
+    write_step(inited.library, "dup", {"description": "generic one"})
+    write_step(inited.fdir, "dup", {"description": "local one"})
+    write_pipeline(inited.fdir, {"id": "uses-dup", "steps": ["dup"]})
+    out = step_delete.plan(ctx, "dup")
+    assert out["level"] == "local" and out["replaced_by"] == "generic" and out["users"] == [] and not out["blocked"]
+    step_delete.delete(ctx, "dup")
+    assert Registry.load(ctx).steps["dup"].level == "generic"
+
+
+def test_generic_under_local_override(inited, ctx):
+    write_step(inited.library, "dup", {})
+    write_step(inited.fdir, "dup", {})
+    write_pipeline(inited.fdir, {"id": "p", "steps": ["dup"]})
+    out = step_delete.delete(ctx, "dup", "generic")
+    assert out["in_use_stays"] == "local" and out["replaced_by"] is None and not out["blocked"]
+    assert not (inited.library / "steps" / "dup.md").exists() and (inited.fdir / "steps" / "dup.md").exists()
+    with pytest.raises(FactoryError, match="There is no generic step `dup`."):
+        step_delete.plan(ctx, "dup", "generic")
+
+
+def test_unknown_step(inited, ctx):
+    with pytest.raises(FactoryError, match="The step `nope` does not exist."):
+        step_delete.plan(ctx, "nope")
+
+
+def test_generic_step_offers_commit_of_removed_file_only(inited, ctx):
+    write_step(inited.library, "gstep", {})
+    root = commit_library(inited)
+    (root / "other.txt").write_text("staged\n")
+    git("add", "other.txt", cwd=root)
+    out = step_delete.delete(ctx, "gstep")
+    assert out["warnings"] == ["Other repositories that use this library are not checked."]
+    offer = out["library_commit"]
+    assert offer["message"] == "Factory library: delete step gstep"
+    assert [Path(p).name for p in offer["paths"]] == ["gstep.md"]
+    inited.factory("library", "commit", offer["message"], *offer["paths"])
+    assert git("show", "--name-status", "--format=", "HEAD", cwd=root) == "D\tfactory-library/steps/gstep.md"
+    assert git("diff", "--cached", "--name-only", cwd=root) == "other.txt"
+
+
+def test_untracked_generic_step_has_no_commit_offer(inited, ctx):
+    commit_library(inited)
+    write_step(inited.library, "fresh", {})
+    out = step_delete.delete(ctx, "fresh")
+    assert out["library_commit"] is None and not (inited.library / "steps" / "fresh.md").exists()
+
+
+def test_script_step_removes_its_script(inited, ctx):
+    write_step(inited.fdir, "runner", {"type": "script"}, body="runner.sh\n")
+    (inited.fdir / "steps" / "runner.sh").write_text("echo hi\n")
+    out = step_delete.plan(ctx, "runner")
+    assert [Path(p).name for p in out["files"]] == ["runner.md", "runner.sh"]
+    step_delete.delete(ctx, "runner")
+    assert not (inited.fdir / "steps" / "runner.sh").exists()
+
+
+def test_shared_script_stays(inited, ctx):
+    for sid in ("one", "two"):
+        write_step(inited.fdir, sid, {"type": "script"}, body="shared.sh\n")
+    (inited.fdir / "steps" / "shared.sh").write_text("echo hi\n")
+    out = step_delete.delete(ctx, "one")
+    assert [Path(p).name for p in out["removed"]] == ["one.md"]
+    assert (inited.fdir / "steps" / "shared.sh").exists()
+
+
+def test_script_step_with_missing_script(inited, ctx):
+    write_step(inited.fdir, "broken", {"type": "script"}, body="missing.sh\n")
+    out = step_delete.delete(ctx, "broken")
+    assert [Path(p).name for p in out["removed"]] == ["broken.md"]
+
+
+def test_builtin_step_cannot_be_deleted(inited, ctx):
+    message = "Built-in steps cannot be deleted. Hide the step instead: `factory step hide user-validation`."
+    for level in (None, "local", "generic"):
+        with pytest.raises(FactoryError) as e:
+            step_delete.plan(ctx, "user-validation", level)
+        assert str(e.value) == message
+
+
+def test_refused_while_used(inited, ctx):
+    write_step(inited.library, "core", {})
+    write_pipeline(inited.library, {"id": "gp", "steps": [{"id": "core", "with": {}}]})
+    write_step(inited.fdir, "combo", {"type": "composite", "steps": ["core"]}, body="")
+    make_task(ctx, tid="t1", steps=[entry("core", ["combo", "core"])])
+    make_task(ctx, tid="t2", status="finished", steps=[entry("core")])
+    out = step_delete.plan(ctx, "core")
+    assert out["blocked"] is True
+    assert {(u["kind"], u["id"], u["level"]) for u in out["users"]} == {
+        ("pipeline", "gp", "generic"), ("composite", "combo", "local"), ("task", "t1", None)}
+    with pytest.raises(FactoryError) as e:
+        step_delete.delete(ctx, "core")
+    text = str(e.value)
+    assert text.startswith("Step core is still used. Remove it from these first:")
+    for line in ("- pipeline gp (generic)", "- composite step combo (local)", "- task t1"):
+        assert line in text
+    assert "t2" not in text
+    assert (inited.library / "steps" / "core.md").exists()
+
+
+def test_overridden_pipeline_is_a_user(inited, ctx):
+    write_step(inited.fdir, "old", {})
+    write_step(inited.fdir, "new", {})
+    write_pipeline(inited.library, {"id": "same", "steps": ["old"]})
+    write_pipeline(inited.fdir, {"id": "same", "steps": ["new"]})
+    users = step_delete.plan(ctx, "old")["users"]
+    assert users == [{"kind": "pipeline", "id": "same", "level": "generic"}]
+
+
+def test_dry_run_changes_nothing(inited, ctx):
+    write_step(inited.library, "gone", {"type": "script"}, body="gone.sh\n")
+    (inited.library / "steps" / "gone.sh").write_text("echo\n")
+    write_step(inited.fdir, "gone", {})
+    set_hidden(inited, ["gone"])
+    before = snapshot(inited.fdir), snapshot(inited.library)
+    for level in (None, "local", "generic"):
+        step_delete.plan(ctx, "gone", level)
+    inited.factory("step", "delete", "gone", "--dry-run")
+    inited.factory("step", "delete", "gone", "--level", "generic", "--dry-run")
+    assert (snapshot(inited.fdir), snapshot(inited.library)) == before
+
+
+def test_delete_removes_id_from_hidden_steps(inited, ctx):
+    write_step(inited.fdir, "lonely", {})
+    write_step(inited.library, "both", {})
+    write_step(inited.fdir, "both", {})
+    set_hidden(inited, ["lonely", "both"])
+    step_delete.delete(ctx, "lonely")
+    step_delete.delete(ctx, "both")
+    assert hidden.ids(ctx) == ["both"]
+
+
+def test_config_section_is_kept(inited, ctx):
+    write_step(inited.fdir, "cfg", {"config": {"k": {"description": "d"}}})
+    inited.factory("config", "set", "cfg", "k", "v")
+    step_delete.delete(ctx, "cfg")
+    assert yaml.safe_load((inited.fdir / "config.yaml").read_text())["cfg"]["k"] == "v"
+
+
+def test_deleted_catalog_step_shows_not_installed(inited, ctx):
+    inited.factory("catalog", "install", "push", "--local")
+    rows = {i["id"]: i for i in catalog.items(ctx)}
+    assert rows["push"]["status"] == "installed"
+    out = step_delete.delete(ctx, "push")
+    assert sorted(Path(p).name for p in out["removed"]) == ["push.md", "push.sh"]
+    rows = {i["id"]: i for i in catalog.items(ctx)}
+    assert rows["push"]["status"] == "not installed"
