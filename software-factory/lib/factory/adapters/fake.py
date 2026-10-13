@@ -23,8 +23,8 @@ class FakeAdapter(Adapter):
             raise RuntimeError(cfg["check_raises"])
         return bool(cfg.get("check_ok", True)), cfg.get("check_message", "Fake terminal is available.")
 
-    def start_session(self, name, cwd, prompt, claude_args, in_worktree):
-        self.record("start_session", name=name, cwd=str(cwd), prompt=prompt, args=list(claude_args), in_worktree=in_worktree)
+    def start_session(self, name, cwd, prompt, claude_args):
+        self.record("start_session", name=name, cwd=str(cwd), prompt=prompt, args=list(claude_args))
         if self.cfg().get("fail_start"):
             raise AdapterError("The fake adapter failed to start the session.")
         return {"agent": name, "fake": True}

@@ -12,7 +12,7 @@ def waits(inited):
     write_step(inited.fdir, "wait-qa", {"wait_external": True, "done_when": "QA is done."})
     write_step(inited.fdir, "after", {})
     write_pipeline(inited.fdir, {"id": "w", "steps": ["wait-review", "wait-qa", "after"]})
-    task_from_pipeline(inited, "w", terminal_handle={"agent": "t1"})
+    task_from_pipeline(inited, "w", worktree=str(inited.repo), terminal_handle={"agent": "t1"})
     return inited, flag
 
 

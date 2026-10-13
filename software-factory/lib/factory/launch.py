@@ -8,8 +8,6 @@ from . import adapters, config, events, pipeline_check, repo, session, state
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, Registry
 
-NO_WORKTREE_PIPELINES = frozenset()
-
 TASK_ID_RE = state.TASK_ID_RE
 ID_BASE_MAX = 29
 
@@ -140,8 +138,7 @@ def plan_launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlo
         report["task_id"] = task_id
     else:
         report["task_id"] = unique_id(ctx, slugify(report["description"] or "task"))
-    if pipeline_id not in NO_WORKTREE_PIPELINES:
-        plan_worktree(ctx, reg, pipeline, report, inputs)
+    plan_worktree(ctx, reg, pipeline, report, inputs)
     report["ok"] = not report["errors"] and not report["missing_inputs"] and not report["missing_config"]
     return report
 
@@ -229,11 +226,10 @@ def launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlog=Non
     reg = Registry.load(ctx)
     undo = []
     try:
-        if report["worktree"]:
-            created_branch = create_worktree(ctx, report)
-            if created_branch:
-                undo.append(lambda: repo.git(["branch", "-D", report["branch"]], ctx.main))
-            undo.append(lambda: repo.git(["worktree", "remove", "--force", report["worktree"]], ctx.main))
+        created_branch = create_worktree(ctx, report)
+        if created_branch:
+            undo.append(lambda: repo.git(["branch", "-D", report["branch"]], ctx.main))
+        undo.append(lambda: repo.git(["worktree", "remove", "--force", report["worktree"]], ctx.main))
         task = new_task(ctx, reg, report, inputs)
         state.create(ctx, task)
         undo.append(lambda: shutil.rmtree(state.task_dir(ctx, task["id"]), ignore_errors=True))

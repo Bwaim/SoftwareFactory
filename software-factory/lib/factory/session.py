@@ -4,8 +4,6 @@ from . import adapters, events, state
 from .adapters.base import AdapterError
 from .errors import FactoryError
 
-NO_WORKTREE_PIPELINES = frozenset()
-
 ASK_IN_TEXT = (
     "Ask the user in plain text, never with the AskUserQuestion tool, then end your turn. "
     "The answer can come from this tab, the orchestrator or the dashboard."
@@ -38,8 +36,6 @@ def claude_args(ctx, task, resume=False):
     args += ["--resume", task["session_id"]] if resume else ["--session-id", task["session_id"]]
     args += ["--settings", str(ctx.fdir / "claude-settings.json")]
     args += ["--add-dir", str(state.task_dir(ctx, task["id"]) / "artifacts")]
-    if task["pipeline"] in NO_WORKTREE_PIPELINES and ctx.library():
-        args += ["--add-dir", str(ctx.library())]
     claude = task.get("claude") or {}
     if claude.get("model"):
         args += ["--model", str(claude["model"])]
@@ -49,10 +45,9 @@ def claude_args(ctx, task, resume=False):
 
 
 def start(ctx, task, prompt, resume=False):
-    cwd = task["worktree"] or str(ctx.main)
-    return adapters.get_adapter(ctx).start_session(
-        task["id"], cwd, prompt, claude_args(ctx, task, resume), bool(task.get("worktree"))
-    )
+    if not task.get("worktree"):
+        raise FactoryError(f"Task {task['id']} has no worktree. Every task runs in its own worktree.")
+    return adapters.get_adapter(ctx).start_session(task["id"], task["worktree"], prompt, claude_args(ctx, task, resume))
 
 
 def notify(ctx, text):

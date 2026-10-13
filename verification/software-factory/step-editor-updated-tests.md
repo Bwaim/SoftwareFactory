@@ -17,3 +17,16 @@
 - tests/test_question_box.py::test_prompts_ask_in_plain_text: `factory next` now prints the exact prompt and footer, never `--task`
 - tests/test_engine.py::test_run_script_gets_config_and_task: deleted; Task 6 replaces it with the run-command tests
 - tests/test_minor_fixes.py::test_run_check_reports_missing_folder: run_check now takes the step as its third argument.
+- tests/test_step_assistant.py (whole file): tasks without a worktree and the step assistant are removed
+- tests/test_launch.py::test_no_worktree_pipeline_uses_task_flag: deleted; tasks without a worktree and the step assistant are removed
+- tests/test_launch.py (start-session call check): tasks without a worktree and the step assistant are removed
+- tests/test_terminal_cli.py::test_start_session_close_state_notify_wait_idle: tasks without a worktree and the step assistant are removed
+- tests/test_terminal_cli.py::test_start_session_without_worktree_flag_or_args: replaced by test_start_session_has_no_worktree_flag; tasks without a worktree are removed
+- tests/test_herdr_adapter.py::test_main_repo_uses_existing_workspace, test_main_repo_creates_workspace_when_missing: deleted; tasks without a worktree are removed
+- tests/test_herdr_adapter.py (all start_session calls): in_worktree argument removed
+- tests/test_adapters.py::start_session call: in_worktree argument removed
+- tests/test_minor_fixes.py::test_pipeline_id_must_be_a_plain_string: tasks without a worktree and the step assistant are removed
+- tests/test_step_hide.py::test_docs_describe_hide: tasks without a worktree and the step assistant are removed
+- tests/test_session.py (live fixture): a task now needs a worktree to start a session
+- tests/test_dashboard_api.py::test_actions_call_cli_functions: a task now needs a worktree to start a session
+- tests/test_waiting.py (waits fixture): a task now needs a worktree to start a session

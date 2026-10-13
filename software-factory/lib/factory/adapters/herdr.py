@@ -87,30 +87,19 @@ class HerdrAdapter(Adapter):
         after = self.main_repo_workspace_ids(self.workspaces(check=False))
         return [w for w in after if w not in before and w != handle.get("workspace")]
 
-    def open_main_repo(self, handle, cwd):
-        existing = self.main_repo_workspace_ids(self.workspaces())
-        if existing:
-            return self.create_tab(handle, existing[0], cwd)
-        result = parse(run(["workspace", "create", "--cwd", str(cwd), "--label", handle["agent"], "--no-focus"]))["result"]
-        pane = result["root_pane"]
-        handle["workspace"] = pane["workspace_id"]
-        handle["created_workspace"] = True
-        handle["tab"] = pane["tab_id"]
-        return pane["pane_id"]
-
     def screen(self, name):
         r = run(["agent", "read", name, "--source", "recent-unwrapped", "--lines", "60"], check=False)
         return r.stdout
 
-    def start_session(self, name, cwd, prompt, claude_args, in_worktree):
+    def start_session(self, name, cwd, prompt, claude_args):
         if self.find_agent(name) is not None:
             raise AdapterError(f"A Herdr agent named {name} already exists. Close it or launch with another --id.")
-        before = set(self.main_repo_workspace_ids(self.workspaces())) if in_worktree else set()
+        before = set(self.main_repo_workspace_ids(self.workspaces()))
         handle = {"agent": name}
         agent_started = False
         try:
-            pane = self.open_worktree(handle, cwd) if in_worktree else self.open_main_repo(handle, cwd)
-            if in_worktree and "workspace" in handle:
+            pane = self.open_worktree(handle, cwd)
+            if "workspace" in handle:
                 extra = self.find_extra_workspaces(before, handle)
                 if extra:
                     handle["extra_workspaces"] = extra

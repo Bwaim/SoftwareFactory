@@ -114,7 +114,7 @@ def test_pipeline_id_must_be_a_plain_string(inited, ctx, bad):
     problems = pipeline_check.check(reg, {"id": bad, "steps": ["user-validation"]}, ctx.columns())
     assert any(p.level == "error" and "pipeline id" in p.message for p in problems)
     with pytest.raises(FactoryError):
-        pipeline_store.copy(reg, "new-step-assistant", bad)
+        pipeline_store.copy(reg, "user-validation", bad)
 
 
 def test_api_rejects_non_string_values_with_400(inited):

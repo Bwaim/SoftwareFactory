@@ -53,7 +53,7 @@ def test_launch_detached(lp):
     assert task_json(lp.fdir, task["id"])["position"] == 1
     call = fake_calls(lp.fdir)[0]
     args = call["args"]
-    assert call["in_worktree"] is True and call["cwd"] == str(wt)
+    assert "in_worktree" not in call and call["cwd"] == str(wt)
     assert args[args.index("--name") + 1] == task["id"]
     assert args[args.index("--session-id") + 1] == task["session_id"]
     assert args[args.index("--settings") + 1] == str(lp.fdir / "claude-settings.json")
@@ -148,18 +148,6 @@ def test_create_worktree_listed_late_refused(lp):
     write_pipeline(lp.fdir, {"id": "late", "steps": ["work", "create-worktree"]})
     rep = launch.plan_launch(ctx(lp), "late", "L", {})
     assert not rep["ok"] and "not as the first step" in " ".join(rep["errors"])
-
-
-def test_no_worktree_pipeline_uses_task_flag(lp):
-    write_step(lp.fdir, "new-step", {})
-    write_pipeline(lp.fdir, {"id": "new-step-assistant", "steps": ["new-step"]})
-    task = launch.launch(ctx(lp), "new-step-assistant", "Make a step", {})
-    call = fake_calls(lp.fdir)[0]
-    assert call["in_worktree"] is False and call["cwd"] == str(lp.repo)
-    assert f"--task {task['id']}" in call["prompt"]
-    assert str(lp.library) in call["args"]
-    r = lp.factory("next", check=False)
-    assert r.returncode == 1 and "--task <id>" in r.stderr
 
 
 def test_missing_input_and_config(lp):

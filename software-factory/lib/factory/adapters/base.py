@@ -19,7 +19,7 @@ class Adapter:
     def check(self):
         raise NotImplementedError
 
-    def start_session(self, name, cwd, prompt, claude_args, in_worktree):
+    def start_session(self, name, cwd, prompt, claude_args):
         raise NotImplementedError
 
     def close(self, handle):

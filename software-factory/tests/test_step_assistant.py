@@ -1,17 +1,25 @@
-from conftest import fake_calls
-from factory import launch, repo
+import pytest
+
+from conftest import make_task, task_from_pipeline, write_pipeline, write_step
+from factory import repo, session
+from factory.errors import FactoryError
 from factory.registry import Registry
 
 
-def test_builtin_assistant_runs_in_main_repo(inited):
+def test_assistant_pipeline_and_step_do_not_exist(inited):
+    reg = Registry.load(repo.load_ctx(cwd=inited.repo))
+    assert "new-step-assistant" not in reg.pipelines and "new-step" not in reg.steps
+
+
+def test_next_never_prints_task_flag(inited):
+    write_step(inited.fdir, "s", {"done_when": "Done."}, body="Run `factory status` first.\n")
+    write_pipeline(inited.fdir, {"id": "p", "steps": ["s"]})
+    task_from_pipeline(inited, "p")
+    assert "--task" not in inited.factory("next", "--task", "t1").stdout
+
+
+def test_task_without_worktree_cannot_start(inited):
     ctx = repo.load_ctx(cwd=inited.repo)
-    reg = Registry.load(ctx)
-    assert reg.pipeline("new-step-assistant").level == "builtin"
-    assert [e["id"] for e in reg.expand(reg.pipeline("new-step-assistant"))] == ["new-step"]
-    task = launch.launch(ctx, "new-step-assistant", "Create merge request step", {})
-    assert task["worktree"] is None
-    call = fake_calls(inited.fdir)[-1]
-    assert call["in_worktree"] is False
-    assert call["args"].count("--add-dir") == 2 and str(inited.library) in call["args"]
-    out = inited.factory("next", "--task", task["id"]).stdout
-    assert "`factory step list --task" in out
+    task = make_task(ctx, tid="nowt")
+    with pytest.raises(FactoryError, match="has no worktree"):
+        session.start(ctx, task, "hi")

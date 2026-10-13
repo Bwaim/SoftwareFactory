@@ -8,7 +8,7 @@ from factory.errors import FactoryError
 @pytest.fixture
 def live(inited):
     ctx = repo.load_ctx(cwd=inited.repo)
-    make_task(ctx, tid="t1", terminal_handle={"agent": "t1"}, status="awaiting_approval", status_reason="check")
+    make_task(ctx, tid="t1", worktree=str(inited.repo), terminal_handle={"agent": "t1"}, status="awaiting_approval", status_reason="check")
     return inited, ctx
 
 

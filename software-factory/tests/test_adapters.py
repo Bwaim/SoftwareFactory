@@ -5,7 +5,7 @@ from factory import adapters, repo
 def test_fake_records_calls(inited):
     ctx = repo.load_ctx(cwd=inited.repo)
     a = adapters.get_adapter(ctx)
-    h = a.start_session("t1", inited.repo, "say \"hi\" $HOME `x`", ["--name", "t1"], False)
+    h = a.start_session("t1", inited.repo, "say \"hi\" $HOME `x`", ["--name", "t1"])
     a.send_prompt(h, "next")
     calls = fake_calls(inited.fdir)
     assert calls[0]["op"] == "start_session"

@@ -57,7 +57,7 @@ def register(sub, common):
     tf = ts.add_parser("focus", parents=[common]); tf.add_argument("id")
     tp = ts.add_parser("send-prompt", parents=[common]); tp.add_argument("id"); tp.add_argument("text"); tp.add_argument("--wait", action="store_true")
     tt = ts.add_parser("start-session", parents=[common])
-    tt.add_argument("name"); tt.add_argument("cwd"); tt.add_argument("prompt"); tt.add_argument("--worktree", action="store_true")
+    tt.add_argument("name"); tt.add_argument("cwd"); tt.add_argument("prompt")
     tc = ts.add_parser("close", parents=[common]); tc.add_argument("handle")
     tg = ts.add_parser("state", parents=[common]); tg.add_argument("handle")
     tw = ts.add_parser("wait-idle", parents=[common]); tw.add_argument("handle"); tw.add_argument("--timeout", type=float, default=3600)
@@ -237,7 +237,7 @@ def parse_handle(text):
 
 @cli.command("terminal start-session")
 def terminal_start_session(args):
-    handle = adapter_of(args).start_session(args.name, args.cwd, args.prompt, args.passthrough, args.worktree)
+    handle = adapter_of(args).start_session(args.name, args.cwd, args.prompt, args.passthrough)
     cli.emit(handle, True)
 
 
@@ -284,7 +284,7 @@ def launch_cmd(args):
         cli.emit(report, True) if args.json else print(launch.render_report(report))
         return 0 if report["ok"] else 1
     task = launch.launch(ctx, args.pipeline, args.description, inputs, args.id, args.from_backlog)
-    cli.emit(task, True) if args.json else print(f"Task {task['id']} started." + (f" Worktree: {task['worktree']}" if task["worktree"] else ""))
+    cli.emit(task, True) if args.json else print(f"Task {task['id']} started. Worktree: {task['worktree']}")
 
 
 @cli.command("delete")

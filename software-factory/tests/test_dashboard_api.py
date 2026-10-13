@@ -32,7 +32,7 @@ def test_launch_dry_run_then_launch(dash):
 def test_actions_call_cli_functions(dash):
     inited, i = dash
     ctx = repo.load_ctx(cwd=inited.repo)
-    make_task(ctx, tid="t1", terminal_handle={"agent": "t1"})
+    make_task(ctx, tid="t1", worktree=str(inited.repo), terminal_handle={"agent": "t1"})
     assert request(i, "POST", "/api/tasks/t1/focus", {})[0] == 200
     assert request(i, "POST", "/api/tasks/t1/send-prompt", {"text": "hi"})[0] == 200
     ops = [c["op"] for c in fake_calls(inited.fdir)]
@@ -98,7 +98,7 @@ def test_clean_and_delete_routes(dash):
 def test_missing_body_field_is_400(dash):
     inited, i = dash
     ctx = repo.load_ctx(cwd=inited.repo)
-    make_task(ctx, tid="t1", terminal_handle={"agent": "t1"})
+    make_task(ctx, tid="t1", worktree=str(inited.repo), terminal_handle={"agent": "t1"})
     status, err = request(i, "POST", "/api/tasks/t1/send-prompt", {})
     assert status == 400 and "text" in err["error"]
 
