@@ -1,7 +1,7 @@
 import yaml
 
 from conftest import SF
-from factory import requires
+from factory import requires, step_format
 from factory.registry import parse_step_text
 
 FORBIDDEN = ["nextory", "android", "kotlin", "gradlew", "crashlytics", "jira", "herdr", "fabien"]
@@ -28,7 +28,8 @@ def test_list_and_install_pipeline_with_missing_steps(inited):
 def test_replace_needs_flag_and_shows_diff(inited):
     inited.factory("catalog", "install", "push", "--generic")
     assert (inited.library / "steps" / "push.sh").exists()
-    (inited.library / "steps" / "push.md").write_text("changed\n")
+    push_md = inited.library / "steps" / "push.md"
+    push_md.write_text(push_md.read_text() + "\nchanged\n")
     dry = inited.factory.json("catalog", "install", "push", "--generic", "--dry-run")
     assert dry["conflicts"] and "changed" in dry["conflicts"][0]["diff"]
     r = inited.factory("catalog", "install", "push", "--generic", check=False)
@@ -74,3 +75,33 @@ def test_catalog_steps_parse_with_registry():
     wait_review, _ = parse_step_text((SF / "catalog" / "steps" / "wait-review.md").read_text(), "wait-review")
     assert wait_review["done_check"].startswith('if [ "$FACTORY_CONFIG_FORGE" = github ]; then gh pr view')
     assert wait_review["done_check"].endswith('json.load(sys.stdin).get(\\"approved\\") else 1)"; else exit 1; fi')
+
+
+TYPED_OUTPUTS = {"brainstorm": {"spec": ("file", False)}, "write-plan": {"plan": ("file", False)},
+                 "review": {"review": ("file", False)}, "create-pr": {"mr_url": ("text", False)},
+                 "commit": {"branch": ("text", True)}}
+
+
+def test_catalog_steps_are_version_2():
+    for path in sorted((SF / "catalog" / "steps").glob("*.md")):
+        manifest, body = parse_step_text(path.read_text(), path)
+        assert step_format.validate(manifest, body)[0] == [], path.name
+        assert manifest["type"] in ("ai", "command")
+        assert "factory state get" not in str(manifest.get("done_check") or ""), path.name
+        for key, (ktype, optional) in TYPED_OUTPUTS.get(manifest["id"], {}).items():
+            out = manifest["outputs"][key]
+            assert out["type"] == ktype and bool(out.get("optional")) is optional and out["description"]
+    for sid, script in (("push", "push.sh"), ("run-tests", "run-tests.sh")):
+        manifest, body = parse_step_text((SF / "catalog" / "steps" / f"{sid}.md").read_text(), sid)
+        assert manifest["type"] == "command" and body.strip() == f'bash "$FACTORY_STEP_DIR/{script}"'
+
+
+def test_catalog_prompts_use_placeholders():
+    expected = {"brainstorm": ["{{description}}", "{{summary}}"], "write-plan": ["{{spec}}", "{{config.plan_style}}"],
+                "execute-plan": ["{{plan}}"], "create-pr": ["{{branch}}", "{{config.forge}}"],
+                "implement": ["{{description}}", "{{summary}}"], "address-review-comments": ["{{mr_url}}"],
+                "wait-review": ["{{mr_url}}"]}
+    for sid, needles in expected.items():
+        text = (SF / "catalog" / "steps" / f"{sid}.md").read_text()
+        for needle in needles:
+            assert needle in text, (sid, needle)

@@ -2,7 +2,7 @@
 id: wait-qa
 description: Wait until the user marks QA as done
 category: qa
-type: prompt
+type: ai
 done_when: QA is done.
 wait_external: true
 required: false

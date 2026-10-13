@@ -2,7 +2,7 @@
 id: backlog-remove
 description: Remove an entry from the backlog
 category: backlog
-type: prompt
+type: ai
 done_when: The entry is no longer in the backlog.
 required: false
 ---

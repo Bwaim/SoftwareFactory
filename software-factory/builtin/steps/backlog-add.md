@@ -2,7 +2,7 @@
 id: backlog-add
 description: Add an entry at the end of the backlog
 category: backlog
-type: prompt
+type: ai
 done_when: The entry is in the backlog.
 required: false
 ---

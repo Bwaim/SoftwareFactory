@@ -2,9 +2,7 @@
 id: create-worktree
 description: Create the task worktree from the latest origin base branch
 category: git
-type: prompt
-reads: [branch]
-writes: [branch]
+type: ai
 done_when: The worktree exists.
 required: true
 config:
