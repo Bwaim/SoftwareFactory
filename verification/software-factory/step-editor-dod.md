@@ -67,12 +67,16 @@
 - Form fields and form data (categories, columns, levels): covered by `test_step_editor_api::test_form_data`. Drag and drop of group children and the look of the form: manual check 4.
 - Duplicate id refused, hidden included: covered by `test_step_editor_api::test_duplicate_id_refused_hidden_included`.
 - Available keys next to the body, insert by click: the keys by `test_pipeline_keys::test_keys_route`; the click is manual check 1 and 5.
+- In a command, a key click inserts `"$FACTORY_KEY_<KEY>"` with the double quotes: covered by `test_step_editor_api::test_command_key_insert_is_quoted`. The click itself is manual check 5.
 - Preview: covered by `test_step_editor_api::test_preview`. Browser check: manual check 1.
 - Save impact (pipelines, unfinished tasks, other repositories text): covered by `test_step_editor_api::test_impact`, `test_check_returns_uses_and_group_problems`. Browser check: manual check 2.
 - Errors block, warnings do not: covered by `test_step_editor_api::test_errors_block_save_warnings_do_not`.
 - Save new local and generic step, library commit offer: covered by `test_step_editor_api::test_save_new_local_step`, `test_save_generic_offers_commit`, `test_save_drops_empty_fields`. Real commit: manual check 2.
 - Built-in cannot be edited, copy to local: covered by `test_step_editor_api::test_builtin_edit_refused_and_copy_to_local`. Browser check: manual check 3.
 - Detail panel keys, outputs, children: covered by `test_editor_api::test_steps_list_and_detail`. Browser look: manual check 4.
+- An empty id in the step form says "The id is empty.": covered by `test_step_format::test_empty_id`.
+- The step list shows a `run_in` tag only for `ai` steps: covered by `test_step_editor_api::test_run_in_only_for_ai_steps`.
+- The detail panel of a `group` step has no "Body" box: covered by `test_step_editor_api::test_group_detail_has_no_body_box`. Browser look: manual check 4.
 - Requests without the token are rejected: covered by `test_step_editor_api::test_routes_need_token`.
 
 ### Orchestrator

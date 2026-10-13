@@ -43,6 +43,12 @@ def test_load_errors(manifest, body, text):
     assert text in errors(manifest, body)
 
 
+@pytest.mark.parametrize("sid", [None, "", "  "])
+def test_empty_id(sid):
+    text = errors({"id": sid})
+    assert "The id is empty." in text and "None" not in text and "must be lowercase" not in text
+
+
 def test_warnings():
     _, w = ok({"type": "command", "run_in": "subagent", "description": "", "outputs": {"a": {"type": "text"}}}, "echo hi")
     text = " | ".join(w)

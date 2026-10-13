@@ -150,6 +150,33 @@ def test_editor_page_has_step_form_controls(se):
         assert text in page, text
 
 
+def test_command_key_insert_is_quoted(se):
+    inited, i = se
+    status, page = request(i, "GET", "/editor")
+    assert '`"$FACTORY_KEY_${name.toUpperCase()}"`' in page
+    assert '`"$FACTORY_CONFIG_${name.toUpperCase()}"`' in page
+
+
+def test_run_in_only_for_ai_steps(se):
+    inited, i = se
+    write_step(inited.fdir, "cmd", {"type": "command"}, body="true\n")
+    write_step(inited.fdir, "grp", {"type": "group", "steps": ["loc"]}, body="")
+    status, rows = request(i, "GET", "/api/steps")
+    run_in = {r["id"]: r["run_in"] for r in rows}
+    assert run_in["loc"] == "session" and run_in["cmd"] is None and run_in["grp"] is None
+    status, page = request(i, "GET", "/editor")
+    assert 's.run_in ? el("span", { class: "tag" }, s.run_in) : ""' in page
+    out = inited.factory("step", "list").stdout
+    lines = {line.split(" ", 1)[0]: line for line in out.splitlines()}
+    assert "(local):" in lines["cmd"] and "(local):" in lines["grp"] and "(local, session):" in lines["loc"]
+
+
+def test_group_detail_has_no_body_box(se):
+    inited, i = se
+    status, page = request(i, "GET", "/editor")
+    assert 'if (d.type !== "group") box.append(el("div", { class: "muted" }, "Body")' in page
+
+
 def test_check_warns_about_a_missing_command_script(se):
     inited, i = se
     manifest = {"id": "runit", "description": "Run", "category": "test", "type": "command"}

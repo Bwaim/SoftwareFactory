@@ -98,7 +98,9 @@ def validate(manifest, body):
         return ["The manifest must be a YAML mapping."], []
     errors, warnings = [], []
     sid = manifest.get("id")
-    if not is_valid_id(sid):
+    if sid is None or str(sid).strip() == "":
+        errors.append("The id is empty.")
+    elif not is_valid_id(sid):
         errors.append(f"The id `{sid}` must be lowercase: letters, digits, `-` or `_`, starting with a letter.")
     stype = manifest.get("type")
     if stype in OLD_TYPES:

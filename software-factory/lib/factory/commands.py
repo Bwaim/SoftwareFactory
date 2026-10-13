@@ -625,7 +625,8 @@ def step_list_cmd(args):
         return
     for r in rows:
         mark = ", hidden" if r["hidden"] else ""
-        print(f"{r['id']} [{r['category']}] ({r['level']}, {r['run_in']}{mark}): {r['description']}")
+        run_in = f", {r['run_in']}" if r["run_in"] else ""
+        print(f"{r['id']} [{r['category']}] ({r['level']}{run_in}{mark}): {r['description']}")
 
 
 @cli.command("step show")

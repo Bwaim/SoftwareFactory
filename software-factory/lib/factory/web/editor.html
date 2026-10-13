@@ -267,7 +267,7 @@ function renderAvailable() {
       el("strong", {}, s.id), " ",
       el("span", { class: "tag" }, s.category || "no category"),
       el("span", { class: "tag" }, s.level),
-      el("span", { class: "tag" }, s.run_in),
+      s.run_in ? el("span", { class: "tag" }, s.run_in) : "",
       el("button", { type: "button", onclick: (e) => { e.stopPropagation(); guard(() => setHidden(s.id, !s.hidden))(); } }, s.hidden ? "Unhide" : "Hide"),
       el("div", { class: "muted" }, s.description));
     card.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "new:" + s.id); e.dataTransfer.effectAllowed = "copy"; });
@@ -321,7 +321,7 @@ async function showDetail(id, position = null) {
     for (const c of d.children) kids.append(el("div", {}, el("span", { class: "link", onclick: guard(() => showDetail(c)) }, c)));
     box.append(kids);
   }
-  box.append(el("div", { class: "muted" }, "Body"), el("pre", {}, d.body));
+  if (d.type !== "group") box.append(el("div", { class: "muted" }, "Body"), el("pre", {}, d.body));
   const actions = el("div", { class: "row" });
   if (d.level !== "builtin") actions.append(el("button", { type: "button", onclick: () => openStepForm({ mode: "edit", detail: d, position }) }, "Edit"));
   if (d.level !== "local") actions.append(el("button", { type: "button", onclick: () => openStepForm({ mode: "copy-local", detail: d, position }) }, "Copy to local"));
@@ -517,7 +517,7 @@ function insertAtCursor(text) {
 function insertKey(name, isConfig) {
   const f = state.form.f;
   if (f.type === "ai") insertAtCursor(isConfig ? `{{config.${name}}}` : `{{${name}}}`);
-  else if (f.type === "command") insertAtCursor(isConfig ? `$FACTORY_CONFIG_${name.toUpperCase()}` : `$FACTORY_KEY_${name.toUpperCase()}`);
+  else if (f.type === "command") insertAtCursor(isConfig ? `"$FACTORY_CONFIG_${name.toUpperCase()}"` : `"$FACTORY_KEY_${name.toUpperCase()}"`);
 }
 
 function renderStepForm() {
