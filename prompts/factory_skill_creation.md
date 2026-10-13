@@ -47,6 +47,7 @@ A local dashboard shows all tasks as a Kanban board and the backlog, and lets me
 - Your completed implementation plan exists under `PLAN_DIR/`
     - It was written before implementation, and the build followed its build step.
 - The `software-factory` skill exists under `YOUR_WORKING_DIR`.
+- The `factory-authoring` skill exists under `YOUR_WORKING_DIR` (see Authoring skill).
 - `PROJECT_ROOT/.claude-plugin/marketplace.json` exists. It defines a marketplace named `software-factory` with one plugin that points to `YOUR_WORKING_DIR`. The user can install it from any repository with `/plugin marketplace add <PROJECT_ROOT>`.
 
 ### Runtime
@@ -686,6 +687,14 @@ Users ask for a dark theme. Start with the settings screen only.
 - The menu is a numbered text list, with one heading per group and one number sequence for the whole menu. The user answers with a number. Do not use the `AskUserQuestion` tool for the menu, because it allows at most 4 options.
 - When an action is done, the orchestrator shows the menu again.
 
+### Authoring skill
+
+- A second skill in the plugin, `skills/factory-authoring/SKILL.md`. It loads in any Claude session, without the orchestrator, when the user asks to create or change factory pipelines or steps, or gives a file that describes them. The user can also call `/factory-authoring <file or request>`.
+- It contains the full format reference for steps and pipelines, with one example of each step type and one example pipeline.
+- The agent writes the step and pipeline files directly, at the local level unless the request says generic. It reuses existing steps, plans the key flow, and never edits built-in files or task files.
+- It runs `factory pipeline check <id>` on each new or changed pipeline and on each pipeline that uses a changed step, and fixes the files until there is no error. It checks the keys with `factory pipeline keys <id>`.
+- For generic files, it offers the library commit. It reports the files and the check results.
+
 ### Init
 
 - Init checks the prerequisites and reports each one as OK or failing with the fix:
@@ -853,6 +862,7 @@ The library, a folder in any git repository:
     5. Copy `quick-task` in the pipeline editor, add the new step, save, and run it.
     6. Open the dashboard, follow a task across the columns, and approve a `user-validation` from a card.
   - A reference: the menu actions, the `factory` commands, and the step and pipeline fields.
+  - The `factory-authoring` skill: what it does, how to call it, and an example request with a prompt file.
   - Troubleshooting: terminal check failed, data version mismatch, session gone.
 - The README uses simple English and short sentences.
 
@@ -896,6 +906,7 @@ The library, a folder in any git repository:
   - `factory pipeline check` warns about `model` or `effort` on a step that runs in the session.
   - Installing a catalog pipeline copies it and offers its missing steps. The status shows not installed, installed, and installed and changed since.
   - Every `factory` command written in the README exists in the CLI.
+  - Every `factory` command written in the `factory-authoring` skill exists in the CLI. Its example steps and pipeline pass `factory pipeline check` with no error and no warning in a test repository.
   - No catalog file refers to a project-specific skill or tool.
   - `factory catalog list` shows the missing `requires` of an item.
   - The CLI runs on a machine with only `uv` installed: `uv` installs the dependencies on the first run.
