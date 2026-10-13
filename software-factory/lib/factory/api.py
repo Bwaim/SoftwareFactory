@@ -281,3 +281,33 @@ def config_set(server, query, body):
     from . import config
     config.set_value(server.ctx, body["step"], body["key"], body["value"])
     return {"ok": True}
+
+
+@route("GET", "/api/step-form")
+def step_form(server, query, body):
+    from . import step_store
+    return step_store.form_data(server.ctx)
+
+
+@route("POST", "/api/steps/check")
+def step_check(server, query, body):
+    from . import step_store
+    return step_store.check(server.ctx, body["manifest"], body.get("body", ""))
+
+
+@route("POST", "/api/steps/preview")
+def step_preview(server, query, body):
+    from . import step_store
+    return step_store.preview(server.ctx, body["manifest"], body.get("body", ""))
+
+
+@route("POST", "/api/steps/impact")
+def step_impact(server, query, body):
+    from . import step_store
+    return step_store.impact(server.ctx, body["id"])
+
+
+@route("POST", "/api/steps/save")
+def step_save(server, query, body):
+    from . import step_store
+    return step_store.save(server.ctx, body["manifest"], body["body"], body.get("level", "local"), body["mode"])
