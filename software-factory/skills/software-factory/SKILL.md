@@ -53,7 +53,7 @@ Before any command that changes something, show what it will do and wait for the
 - **Create or edit a pipeline** (`pipeline-edit`): ask for an id to edit, or nothing for a new one. Run `factory pipeline edit [<id>]`. Tell the user the editor is open in the browser.
 - **Create a new step** (`new-step`): run `factory launch new-step-assistant --description "<goal in a few words>"`. Tell the user the assistant runs in a new tab.
 - **Delete a step** (`step-delete`):
-  1. Run `factory step list --json`. List the local and generic steps with their level and category. Do not list built-in steps.
+  1. Run `factory step list --all --json`. List the local and generic steps with their level and category. Mark hidden steps `hidden`. Do not list built-in steps.
   2. Ask which one. Run `factory step delete <id> --level <level> --dry-run --json`. Show the files, the step that replaces it, the users and the warnings.
   3. If `blocked` is true, show the users and tell the user to remove the step from them first. Stop.
   4. Delete only after the user confirms: `factory step delete <id> --level <level> --json`.

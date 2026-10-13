@@ -186,7 +186,9 @@ Pipelines, steps and the library:
 - `factory pipeline list`: list the pipelines.
 - `factory pipeline check <id>`: check a pipeline.
 - `factory pipeline edit [<id>]`: open the pipeline editor.
-- `factory step list`: list the steps.
+- `factory step list [--all]`: list the steps. Hidden steps are left out. `--all` lists them too, marked `hidden`.
+- `factory step hide <id>`: hide a step from the pipeline editor and from `factory step list`. Pipelines that use it still run it.
+- `factory step unhide <id>`: show a hidden step again.
 - `factory step show <id>`: show a step.
 - `factory step delete <id> [--level local|generic] [--dry-run]`: delete a step. `--dry-run` only shows the files it removes, the step that replaces it and the users that block it. Built-in steps cannot be deleted.
 - `factory catalog list`: list the catalog items and their status.
@@ -211,6 +213,10 @@ Local server:
   - A step that is still used cannot be deleted. Remove it from its users first.
   - "Confirm delete" removes the files. The list of steps reloads.
   - For a generic step, the editor offers the library commit.
+- Hide: each available step has a "Hide" button. A hidden step is not in the list. Pipelines that use it still run it. The choice is saved in `.factory/factory.yaml` and is never committed.
+  - "Show hidden steps" shows the hidden steps, greyed, each with an "Unhide" button. The browser remembers this choice.
+  - A hidden step in the pipeline has a `hidden` mark. The checks warn: "A hidden step is used". It does not block the save.
+  - Built-in steps cannot be deleted. Hide them instead.
 
 ### Dashboard
 
@@ -325,7 +331,7 @@ Only `http` and `https` URLs are used.
 
 ### `.factory/factory.yaml` fields
 
-`version`, `library`, `terminal`, `columns`, `poll_minutes`, `ticket_url`.
+`version`, `library`, `terminal`, `columns`, `poll_minutes`, `ticket_url`, `hidden_steps` (optional: the ids of hidden steps).
 
 ## Troubleshooting
 

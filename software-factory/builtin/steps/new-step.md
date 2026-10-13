@@ -25,7 +25,7 @@ You create one new factory step with the user. Ask one question at a time.
 11. Ask its board column, if any (`factory menu` is not needed: the columns are in `.factory/factory.yaml`).
 
 Before writing:
-- Run `factory step list`. If a similar generic or local step exists, show it with `factory step show <id>` and propose to reuse or update it.
+- Run `factory step list --all`. Hidden steps count too. If a similar generic or local step exists, show it with `factory step show <id>` and propose to reuse or update it. The id must not be used by any step, hidden or not.
 - Choose a unique lowercase id: letters, digits, `-` or `_`, starting with a letter.
 
 Then:

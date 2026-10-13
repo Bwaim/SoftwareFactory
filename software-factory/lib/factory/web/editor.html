@@ -37,6 +37,7 @@ pre { white-space: pre-wrap; border: 1px solid var(--line); border-radius: 6px; 
 dl { display: grid; grid-template-columns: 110px 1fr; gap: 4px 8px; margin: 8px 0; }
 dt { color: var(--muted); }
 dd { margin: 0; word-break: break-word; }
+.dim { opacity: 0.5; }
 .tag { border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; font-size: 11px; color: var(--muted); margin-right: 4px; }
 </style>
 </head>
@@ -66,7 +67,10 @@ dd { margin: 0; word-break: break-word; }
 const params = new URLSearchParams(location.search);
 const TOKEN = params.get("token");
 const CHECK_DELAY_MS = 300;
-const state = { steps: [], columns: [], pipelines: [], loadedLevel: null, saveLevel: "local", model: null, checkTimer: null, checkCount: 0, hasError: true, commit: null, savedPath: null, original: null, confirmReplace: false };
+const SHOW_HIDDEN_KEY = "factory-editor-show-hidden";
+function readShowHidden() { try { return localStorage.getItem(SHOW_HIDDEN_KEY) === "1"; } catch (e) { return false; } }
+function saveShowHidden(value) { try { localStorage.setItem(SHOW_HIDDEN_KEY, value ? "1" : "0"); } catch (e) {} }
+const state = { steps: [], columns: [], pipelines: [], loadedLevel: null, saveLevel: "local", model: null, checkTimer: null, checkCount: 0, hasError: true, commit: null, savedPath: null, original: null, confirmReplace: false, showHidden: readShowHidden() };
 const byId = (id) => document.getElementById(id);
 
 async function api(path, body) {
@@ -170,9 +174,12 @@ function renderPipeline() {
   state.model.steps.forEach((s, i) => box.append(pipelineRow(s, i)));
 }
 function pipelineRow(s, i) {
+  const info = state.steps.find((x) => x.id === s.id);
+  const mark = info && info.hidden ? el("span", { class: "tag" }, "hidden") : "";
   const head = el("div", { class: "head", draggable: "true" },
     el("span", { class: "muted" }, String(i + 1)),
     el("span", { class: "link grow", onclick: () => showDetail(s.id) }, s.id),
+    mark,
     el("button", { type: "button", onclick: () => { s.open = !s.open; renderPipeline(); } }, s.open ? "Close" : "Edit"),
     el("button", { type: "button", onclick: () => { state.model.steps.splice(i, 1); renderPipeline(); changed(); } }, "Remove"));
   head.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "move:" + i); e.dataTransfer.effectAllowed = "move"; });
@@ -221,28 +228,40 @@ function renderFilters() {
   f.append(selectInput(categories, categories.includes(current) ? current : "", (v) => { state.categoryFilter = v; renderAvailable(); }),
     textInput(state.textFilter || "", (v) => { state.textFilter = v; renderAvailable(); }, "Filter"),
     el("button", { type: "button", onclick: guard(async () => { await loadSteps(); if (state.model) await runCheck(); }) }, "Reload steps"));
+  const toggle = el("input", { type: "checkbox" });
+  toggle.checked = state.showHidden;
+  toggle.addEventListener("change", () => { state.showHidden = toggle.checked; saveShowHidden(toggle.checked); renderAvailable(); });
+  f.append(el("label", {}, toggle, " Show hidden steps"));
 }
 function renderAvailable() {
   const box = clear(byId("available"));
   const text = (state.textFilter || "").toLowerCase();
   const category = state.categoryFilter || "";
   for (const s of state.steps) {
+    if (s.hidden && !state.showHidden) continue;
     if (category && s.category !== category) continue;
     if (text && !(s.id + " " + s.category + " " + s.description).toLowerCase().includes(text)) continue;
-    const card = el("div", { class: "card clickable", draggable: "true", onclick: () => showDetail(s.id) },
+    const card = el("div", { class: "card clickable" + (s.hidden ? " dim" : ""), draggable: "true", onclick: () => showDetail(s.id) },
       el("strong", {}, s.id), " ",
       el("span", { class: "tag" }, s.category || "no category"),
       el("span", { class: "tag" }, s.level),
       el("span", { class: "tag" }, s.run_in),
+      el("button", { type: "button", onclick: (e) => { e.stopPropagation(); guard(() => setHidden(s.id, !s.hidden))(); } }, s.hidden ? "Unhide" : "Hide"),
       el("div", { class: "muted" }, s.description));
     card.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "new:" + s.id); e.dataTransfer.effectAllowed = "copy"; });
     box.append(card);
   }
 }
+async function setHidden(id, hide) {
+  await api("/api/steps/" + encodeURIComponent(id) + (hide ? "/hide" : "/unhide"), {});
+  await loadSteps();
+  if (state.model) await runCheck();
+}
 async function loadSteps() {
   state.steps = await api("/api/steps");
   renderFilters();
   renderAvailable();
+  if (state.model) renderPipeline();
 }
 
 function valueText(v) { return typeof v === "string" ? v : JSON.stringify(v); }

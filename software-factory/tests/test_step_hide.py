@@ -122,3 +122,22 @@ def test_api_hide_unhide_list_check(inited, ctx):
         assert status == 200 and out == {"message": "Step quiet is visible again."} and hidden.ids(ctx) == []
     finally:
         inited.factory("server", "stop", check=False)
+
+
+def test_editor_page_has_hide_ui():
+    from conftest import SF
+    page = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
+    for text in ("Show hidden steps", '"Unhide"', '"Hide"', "localStorage", '"/hide"', '"/unhide"', '"hidden"'):
+        assert text in page
+
+
+def test_docs_describe_hide():
+    from conftest import SF
+    readme = (SF / "README.md").read_text()
+    skill = (SF / "skills" / "software-factory" / "SKILL.md").read_text()
+    assistant = (SF / "builtin" / "steps" / "new-step.md").read_text()
+    for text in ("`factory step hide <id>`", "`factory step unhide <id>`", "`factory step list [--all]`",
+                 "Show hidden steps", "`hidden_steps`"):
+        assert text in readme
+    assert "factory step list --all --json" in skill
+    assert "factory step list --all" in assistant
