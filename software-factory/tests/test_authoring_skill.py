@@ -106,3 +106,16 @@ def test_named_builtin_steps_exist():
             named.add(sid)
     assert named
     assert [sid for sid in sorted(named) if not (SF / "builtin" / "steps" / f"{sid}.md").exists()] == []
+
+
+def test_readme_describes_authoring_skill():
+    text = (SF / "README.md").read_text()
+    section = text.split("### Authoring skill\n", 1)[1].split("\n### ", 1)[0]
+    for needle in ("/factory-authoring <file or request>", "/software-factory:factory-authoring",
+                   "prompts/crash-pipeline.md", "Implement `prompts/crash-pipeline.md`", "factory pipeline check",
+                   "library commit", ".factory/factory.yaml"):
+        assert needle in section, needle
+    install = text.split("## Install and prerequisites", 1)[1].split("## Tutorial", 1)[0]
+    assert "`/factory-authoring`" in install
+    tutorial = text.split("## Tutorial", 1)[1].split("## Reference", 1)[0]
+    assert "factory-authoring" not in tutorial

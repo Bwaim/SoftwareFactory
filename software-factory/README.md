@@ -46,6 +46,8 @@ Start the orchestrator:
 2. Start `claude`.
 3. Run `/software-factory:software-factory`.
 
+To write pipelines and steps with an agent, call `/factory-authoring` in any Claude session. See "Authoring skill" in the reference.
+
 The first run creates the link `~/.local/bin/factory`. Make sure `~/.local/bin` is in your `PATH`.
 
 ### Bash allowlist
@@ -237,6 +239,39 @@ Local server:
 - Hide: each available step has a "Hide" button. A hidden step is not in the list. Pipelines that use it still run it. The choice is saved in `.factory/factory.yaml` and is never committed.
   - "Show hidden steps" shows the hidden steps, greyed, each with an "Unhide" button. The browser remembers this choice.
   - A hidden step in the pipeline has a `hidden` mark. The checks warn: "A hidden step is used". It does not block the save.
+
+### Authoring skill
+
+The `factory-authoring` skill writes step and pipeline files for you, in any Claude session.
+You do not need the orchestrator, the local server or the browser.
+
+What it does:
+
+- It reads your request, or a prompt file that describes a pipeline.
+- It reuses the existing steps. It writes the new step files, then the pipeline files.
+- It runs `factory pipeline check` and `factory pipeline keys`. It fixes the files until the check has no error.
+- It writes local files, unless you ask for generic files. For generic files, it offers the library commit.
+- It needs the factory in the repository: `.factory/factory.yaml` must exist.
+
+How to call it:
+
+- Ask Claude in your own words, for example "Create a factory pipeline that fixes a crash". Claude loads the skill.
+- Or call it: `/factory-authoring <file or request>`. The full name is `/software-factory:factory-authoring`.
+
+Example. The file `prompts/crash-pipeline.md`:
+
+```markdown
+# Crash fix pipeline
+
+- Input: `crash_log`, the path of a crash log file.
+- Step 1, a command: copy the last 200 lines of the log into an artifact.
+- Step 2, the agent: read that artifact, find the cause of the crash and fix it.
+- Step 3: the user validates the change.
+```
+
+The request: "Implement `prompts/crash-pipeline.md`".
+
+Then review the pipeline in the browser with `factory pipeline edit <id>`.
 
 ### Dashboard
 
