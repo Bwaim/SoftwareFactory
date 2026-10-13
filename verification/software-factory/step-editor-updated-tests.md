@@ -25,7 +25,7 @@
 - tests/test_herdr_adapter.py::test_main_repo_uses_existing_workspace, test_main_repo_creates_workspace_when_missing: deleted; tasks without a worktree are removed
 - tests/test_herdr_adapter.py (all start_session calls): in_worktree argument removed
 - tests/test_adapters.py::start_session call: in_worktree argument removed
-- tests/test_minor_fixes.py::test_pipeline_id_must_be_a_plain_string: tasks without a worktree and the step assistant are removed
+- tests/test_minor_fixes.py::test_pipeline_id_must_be_a_plain_string: the step assistant is removed; the copy check now uses a real source pipeline
 - tests/test_step_hide.py::test_docs_describe_hide: tasks without a worktree and the step assistant are removed
 - tests/test_session.py (live fixture): a task now needs a worktree to start a session
 - tests/test_dashboard_api.py::test_actions_call_cli_functions: a task now needs a worktree to start a session
