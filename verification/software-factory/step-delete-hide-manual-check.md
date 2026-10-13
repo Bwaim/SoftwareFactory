@@ -30,6 +30,6 @@ Open the editor with `factory pipeline edit`.
 
 | Item | Result | Notes |
 |---|---|---|
-| 1-7 Delete | | |
-| 8-12 Hide | | |
-| 13-15 Orchestrator | | |
+| 1-7 Delete | Pass | |
+| 8-12 Hide | Pass | |
+| 13-15 Orchestrator | Pass | |
