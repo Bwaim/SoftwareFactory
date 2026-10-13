@@ -12,7 +12,13 @@ You start and manage tasks from one orchestrator session in the main repository.
 - **Task**: one run of a pipeline. It has a worktree, a Herdr tab and a Claude session.
 - **Pipeline**: a YAML file with an ordered list of steps.
 - **Step**: a markdown file. The frontmatter is the manifest. The body holds the instructions.
-- **Step types**: `prompt` (instructions for the session), `skill` (runs a Claude skill), `command` (runs a shell command with `factory run-command`), `composite` (a list of other steps).
+- **Task keys**: values a task holds. A step uses them and sets them. A key name uses lowercase letters, digits and `_`, and starts with a letter.
+- **Key types**: `text` (one line), `long-text` (several lines), `file` (an absolute path). A missing type means `text`.
+- **Key sources**: a pipeline input, an output of an earlier step, or the factory. The factory keys are `task_id`, `description` and `summary`. `summary` is set only when the task starts from a backlog entry.
+- **Step types**: `ai` (a prompt sent to the agent), `command` (a shell command), `group` (a list of other steps).
+- **Placeholders**: in an `ai` prompt, `{{<key>}}` is replaced with a task key and `{{config.<key>}}` with a config value. A key that is not set becomes `(not set)`.
+- **Outputs**: the keys a step sets, each with a type and a description. `optional: true` means the step may leave it unset.
+- **Command variables**: a `command` step gets each key as `FACTORY_KEY_<KEY>`, each config value as `FACTORY_CONFIG_<KEY>`, and the folder of the step file as `FACTORY_STEP_DIR`.
 - **Levels**: a local step or pipeline lives in `.factory/` of the repository. A generic one lives in the library folder. A built-in one ships with the plugin. Local wins over generic. Generic wins over built-in.
 - **Catalog**: ready-made pipelines and steps. You install them by copy, into the local level or into the library.
 - **Artifacts**: files a task writes for later steps or for you. `factory artifact path <name>` prints the path.
@@ -83,8 +89,10 @@ Herdr adapter:
    - Start the orchestrator again. Answer "resume all".
    - Expected: the task session opens again with the same conversation and continues.
 4. **Create a step.**
-   - Choose "Create a new step". Answer the questions of the assistant.
-   - Expected: the new step file is in `<library>/steps/` or in `.factory/steps/`.
+   - Choose "Create a new step". The pipeline editor opens on the step form.
+   - Write the id, the description and the prompt. Click a key on the right to insert it.
+   - Click "Preview". Choose local or generic. Click "Save".
+   - Expected: the new step file is in `.factory/steps/` or in `<library>/steps/`.
 5. **Create a pipeline.**
    - Choose "Create or edit a pipeline". Copy `quick-task`.
    - Add the new step. Save.
@@ -110,7 +118,7 @@ Herdr adapter:
 - **Delete a task**: close its terminal, remove its worktree and archive its folder.
 - **Clean finished tasks**: delete finished tasks whose work is merged.
 - **Create or edit a pipeline**: open the pipeline editor in the browser.
-- **Create a new step**: run the step assistant.
+- **Create a new step**: open the step form in the pipeline editor.
 - **Delete a step**: delete a local or generic step. It first shows what the delete does, then asks you to confirm.
 - **Browse the catalog**: list and install catalog pipelines and steps.
 - **Add a backlog entry**: add an entry to the backlog.
@@ -139,7 +147,7 @@ Step execution, inside a task session:
 - `factory next`: show the current step.
 - `factory done`: finish the current step.
 - `factory skip`: skip the current step, when it is not required.
-- `factory run-command`: run the current `command` step.
+- `factory run-command`: run the command of the current `command` step. It prints the output and the exit code.
 - `factory goto <step_path> --reason <text>`: go back to an earlier step.
 - `factory config get <step> <key>`: read a step config value.
 - `factory config set <step> <key> <value>`: save a step config value.
@@ -167,7 +175,7 @@ Task life:
 - `factory open-ide`: open the task worktree in the IDE.
 - `factory terminal focus <id>`: focus the task session.
 - `factory terminal send-prompt <id> <text> [--wait]`: send a prompt to a task session.
-- `factory terminal start-session <name> <cwd> <prompt> [--worktree] -- <claude args>`: start a Claude session in the terminal. Prints the session handle as JSON.
+- `factory terminal start-session <name> <cwd> <prompt> -- <claude args>`: start a Claude session in the terminal. Prints the session handle as JSON.
 - `factory terminal close <handle-json>`: close a session.
 - `factory terminal state <handle-json>`: print the session state.
 - `factory terminal wait-idle <handle-json> [--timeout <seconds>]`: wait until the session is idle.
@@ -186,6 +194,8 @@ Pipelines, steps and the library:
 - `factory pipeline list`: list the pipelines.
 - `factory pipeline check <id>`: check a pipeline.
 - `factory pipeline edit [<id>]`: open the pipeline editor.
+- `factory pipeline keys <id> [--at <position>]`: list the task keys available before the step at this position, with their type, their source and "always set" or "maybe set".
+- `factory step edit [<id>]`: open the step form in the pipeline editor.
 - `factory step list [--all]`: list the steps. Hidden steps are left out. `--all` lists them too, marked `hidden`.
 - `factory step hide <id>`: hide a step from the pipeline editor and from `factory step list`. Pipelines that use it still run it.
 - `factory step unhide <id>`: show a hidden step again.
@@ -208,6 +218,15 @@ Local server:
 - Left: the available steps. Filter them by category or by text. "Reload steps" reads the step files again.
 - Middle: the pipeline. Drag steps into it and reorder them. The checks run while you edit. You can save with warnings, never with errors.
 - Right: the step detail. Click a step to see its manifest, its level, its file and its body.
+- Keys: click a step in the pipeline to see the keys available at its position.
+- Step form: "New step" above the available steps opens it. The start screen of the editor has a "New step" button too. In the step detail, "Edit" changes a local or generic step, "Copy to local" copies a generic or built-in step to a local step with the same id, and "Duplicate" copies any step under a new id.
+  - The form shows the fields of the manifest, a table for config keys, a table for outputs, and the prompt or the command. A `group` step shows a list of child steps. Drag them to change the order.
+  - Next to the body, click a key to insert `{{<key>}}` in a prompt or `$FACTORY_KEY_<KEY>` in a command.
+  - "Preview" shows the text `factory next` prints, with each placeholder shown as `<key>`.
+  - Saving a step that exists first shows the pipelines and the unfinished tasks that use it. A task uses the change from its next step.
+  - Errors block the save. Warnings do not. For a generic step, the editor offers the library commit.
+  - Built-in steps cannot be edited. Copy them to local instead.
+  - The form never writes a script file. Put a script next to the step by hand.
 - Delete: the detail of a local or generic step has a "Delete" button.
   - It first shows what the delete does: the files it removes, the step that replaces it, and the pipelines, composite steps and tasks that still use it.
   - A step that is still used cannot be deleted. Remove it from its users first.
@@ -320,12 +339,14 @@ Only `http` and `https` URLs are used.
 
 ### Step manifest fields
 
-`id`, `description`, `category`, `type`, `reads`, `writes`, `done_when`, `done_check`, `config`, `required`, `run_in`, `model`, `effort`, `requires`, `column`, `wait_external`, `steps`.
+`id`, `description`, `category`, `type` (`ai`, `command` or `group`), `outputs`, `done_when`, `done_check`, `config`, `required`, `run_in`, `model`, `effort` (only for `ai`), `requires`, `column`, `wait_external`, `steps` (only for `group`).
+
+`factory done` checks, in this order: every output that is not optional is set, every `file` output points to a path that exists, a `command` step's last `factory run-command` exited with 0, then the `done_check`.
 
 ### Pipeline fields
 
 - `id`, `description`
-- `inputs`: values asked at launch.
+- `inputs`: values asked at launch, each with a `type` and a `description`. A relative `file` path is resolved from the main repository.
 - `steps`: a list of entries with `id`, `with`, `model`, `effort` and `column`.
 - `claude`: `model` and `effort` of the task session.
 - `start_column`: the board column of a new task.
@@ -340,6 +361,7 @@ Only `http` and `https` URLs are used.
 - **Data version mismatch.**
   - Older data: start the orchestrator. It runs the migration.
   - Newer data: update the plugin.
+  - The migration to version 2 stops if a key name breaks the rule or a task uses the old step assistant. It lists what to fix.
 - **Session gone.** Choose "Resume a task" in the menu, or run `factory resume <id>`.
 - **Folder trust dialog.**
   - Worktrees of a repository you already trust in Claude show no trust dialog.

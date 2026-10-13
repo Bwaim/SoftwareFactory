@@ -67,3 +67,12 @@ def test_checker_scans_fenced_blocks_and_inline_spans_but_not_prose():
     assert check("```\nfactory bogus\n```", names) == ["bogus"]
     assert check("run `factory nope` now", names) == ["nope"]
     assert check("```\nfactory tasks\n```\nupdate the factory plugin", names) == []
+
+
+def test_readme_describes_step_editor():
+    text = (SF / "README.md").read_text()
+    for needle in ("`text`", "`long-text`", "`file`", "`task_id`", "`summary`", "`ai`", "`command`", "`group`",
+                   "{{<key>}}", "{{config.<key>}}", "(not set)", "`outputs`", "FACTORY_KEY_", "FACTORY_STEP_DIR",
+                   "factory pipeline keys", "factory step edit", "factory run-command", "step form"):
+        assert needle in text, needle
+    assert "run-script" not in text and "new-step-assistant" not in text and "Answer the questions of the assistant" not in text
