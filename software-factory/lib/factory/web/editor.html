@@ -263,6 +263,44 @@ async function showDetail(id) {
     box.append(kids);
   }
   box.append(el("div", { class: "muted" }, "Body"), el("pre", {}, d.body));
+  if (d.level !== "builtin") {
+    box.append(el("div", { class: "row" },
+      el("button", { type: "button", onclick: guard(async () => {
+        const plan = await api("/api/steps/" + encodeURIComponent(d.id) + "/delete/dry-run", { level: d.level });
+        box.append(deletePlanBlock(d, plan));
+      }) }, "Delete")));
+  }
+}
+function userText(u) {
+  if (u.kind === "task") return "task " + u.id;
+  return (u.kind === "pipeline" ? "pipeline " : "composite step ") + u.id + " (" + u.level + ")";
+}
+function deletePlanBlock(d, plan) {
+  const block = el("div", { class: "card" }, el("div", {}, "Delete the " + plan.level + " step " + plan.id + ". Files:"));
+  for (const f of plan.files) block.append(el("div", { class: "muted" }, f));
+  if (plan.replaced_by) block.append(el("div", {}, "After the delete, the " + plan.replaced_by + " step " + plan.id + " is used."));
+  if (plan.in_use_stays) block.append(el("div", {}, "The " + plan.in_use_stays + " step " + plan.id + " stays in use."));
+  for (const w of plan.warnings) block.append(el("div", { class: "problem warning" }, "Warning: " + w));
+  if (plan.blocked) {
+    block.append(el("div", { class: "problem error" }, "The step is still used. Remove it from these first:"));
+    for (const u of plan.users) block.append(el("div", { class: "problem error" }, userText(u)));
+    return block;
+  }
+  block.append(el("div", { class: "row" },
+    el("button", { type: "button", class: "primary", onclick: guard(() => deleteStep(d)) }, "Confirm delete"),
+    el("button", { type: "button", onclick: () => block.remove() }, "Cancel")));
+  return block;
+}
+async function deleteStep(d) {
+  const result = await api("/api/steps/" + encodeURIComponent(d.id) + "/delete", { level: d.level });
+  const box = clear(byId("detail"));
+  box.append(el("div", {}, "Deleted the " + result.level + " step " + result.id + "."));
+  for (const f of result.removed) box.append(el("div", { class: "muted" }, f));
+  if (result.library_commit) {
+    box.append(commitBox(result.library_commit, () => box.append(el("div", { class: "muted" }, "Committed to the library."))));
+  }
+  await loadSteps();
+  if (state.model) await runCheck();
 }
 
 function changed(keepSaveResult = false) {
@@ -304,11 +342,22 @@ function renderSave() {
   }
   if (state.savedPath) box.append(el("div", { class: "muted" }, "Saved to " + state.savedPath));
   if (state.commit) {
-    box.append(el("div", {}, "The library is a git repository. Files:"));
-    for (const p of state.commit.paths) box.append(el("div", { class: "muted" }, p));
-    box.append(el("div", {}, state.commit.message),
-      el("button", { type: "button", onclick: guard(commitLibrary) }, "Commit to library"));
+    box.append(commitBox(state.commit, () => {
+      state.commit = null;
+      state.savedPath = state.savedPath + " (committed to the library)";
+      renderSave();
+    }));
   }
+}
+function commitBox(offer, done) {
+  const box = el("div", {}, el("div", {}, "The library is a git repository. Files:"));
+  for (const p of offer.paths) box.append(el("div", { class: "muted" }, p));
+  box.append(el("div", {}, offer.message),
+    el("button", { type: "button", onclick: guard(async () => {
+      await api("/api/library/commit", { message: offer.message, paths: offer.paths });
+      done();
+    }) }, "Commit to library"));
+  return box;
 }
 async function savePipeline(replace) {
   const body = { data: dataOf(state.model), level: state.saveLevel, replace };
@@ -329,13 +378,6 @@ async function savePipeline(replace) {
   state.loadedLevel = result.level;
   renderSave();
 }
-async function commitLibrary() {
-  await api("/api/library/commit", { message: state.commit.message, paths: state.commit.paths });
-  state.commit = null;
-  state.savedPath = state.savedPath + " (committed to the library)";
-  renderSave();
-}
-
 function openModel(model, level, original = null) {
   state.model = model;
   state.original = original;

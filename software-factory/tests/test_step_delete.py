@@ -7,6 +7,7 @@ from conftest import git, make_task, task_json, write_pipeline, write_step
 from factory import catalog, hidden, repo, step_delete
 from factory.errors import FactoryError
 from factory.registry import Registry, all_pipeline_files
+from serverutil import info, request
 
 
 @pytest.fixture
@@ -257,3 +258,34 @@ def test_cli_generic_offer_text(inited):
     text = inited.factory("step", "delete", "gstep").stdout
     assert "Warning: Other repositories that use this library are not checked." in text
     assert "Library commit offer: factory library commit 'Factory library: delete step gstep'" in text
+
+
+def test_api_dry_run_and_delete(inited, ctx):
+    write_step(inited.fdir, "apistep", {})
+    write_step(inited.fdir, "kept", {})
+    write_pipeline(inited.fdir, {"id": "pk", "steps": ["kept"]})
+    inited.factory("pipeline", "edit")
+    i = info(inited.fdir)
+    try:
+        status, plan = request(i, "POST", "/api/steps/apistep/delete/dry-run", {"level": None})
+        assert status == 200 and plan == step_delete.plan(ctx, "apistep")
+        assert (inited.fdir / "steps" / "apistep.md").exists()
+        assert request(i, "POST", "/api/steps/apistep/delete/dry-run", {}, token=False)[0] == 401
+        assert request(i, "POST", "/api/steps/apistep/delete", {}, token=False)[0] == 401
+        assert (inited.fdir / "steps" / "apistep.md").exists()
+        status, done = request(i, "POST", "/api/steps/apistep/delete", {"level": "local"})
+        assert status == 200 and [Path(p).name for p in done["removed"]] == ["apistep.md"]
+        assert not (inited.fdir / "steps" / "apistep.md").exists()
+        status, err = request(i, "POST", "/api/steps/kept/delete", {})
+        assert status == 400 and "- pipeline pk (local)" in err["error"]
+        status, err = request(i, "POST", "/api/steps/user-validation/delete/dry-run", {})
+        assert status == 400 and "Built-in steps cannot be deleted" in err["error"]
+    finally:
+        inited.factory("server", "stop", check=False)
+
+
+def test_editor_page_has_delete_flow(inited):
+    from conftest import SF
+    page = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
+    for text in ("/delete/dry-run", "Confirm delete", "function commitBox", 'd.level !== "builtin"'):
+        assert text in page

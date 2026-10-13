@@ -73,6 +73,18 @@ def step(server, sid, query, body):
     return pipeline_store.step_detail(reg, reg.step(sid))
 
 
+@route("POST", "/api/steps/([a-z][a-z0-9_-]*)/delete/dry-run")
+def step_delete_dry_run(server, sid, query, body):
+    from . import step_delete
+    return step_delete.plan(server.ctx, sid, body.get("level"))
+
+
+@route("POST", "/api/steps/([a-z][a-z0-9_-]*)/delete")
+def step_delete_run(server, sid, query, body):
+    from . import step_delete
+    return step_delete.delete(server.ctx, sid, body.get("level"))
+
+
 @route("GET", "/api/pipelines")
 def pipelines(server, query, body):
     from . import pipeline_store
