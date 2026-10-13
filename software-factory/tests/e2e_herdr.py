@@ -282,6 +282,12 @@ def run():
     waiting = wait_for(lambda: task_json(fdir, tid)["status"] == "waiting_external", 300, tid, samples)
     record("first script step runs with factory next and factory done", waiting and (fdir / "tasks" / tid / "artifacts" / "one.txt").exists())
 
+    sent = sh(["factory", "terminal", "send-prompt", tid, "Reply with the word OK only. Do not run any command.", "--wait"], cwd=repo, check=False)
+    last_event = task_events(fdir, tid)[-1]
+    record("send-prompt reads the screen, sees no question box and sends",
+           sent.returncode == 0 and last_event["type"] == "prompt_sent",
+           f"exit {sent.returncode} last event {last_event['type']} {sent.stderr.strip()}")
+
     session_file = transcript(task["session_id"])
     size_before = session_file.stat().st_size if session_file else None
     first_handle = task_json(fdir, tid)["terminal_handle"]
