@@ -342,28 +342,43 @@ const FORM_CHECK_DELAY_MS = 300;
 function formModelOf(detail, duplicate) {
   const m = detail ? detail.manifest : {};
   return {
+    original: m,
     id: duplicate ? "" : (m.id || ""), description: m.description || "", category: m.category || "", newCategory: "",
     type: m.type || "ai", run_in: m.run_in || "", model: m.model || "", effort: m.effort || "", column: m.column || "",
     required: !!m.required, wait_external: !!m.wait_external, done_when: m.done_when || "", done_check: m.done_check || "",
     requires: [...(m.requires || [])],
     config: Object.entries(m.config || {}).map(([key, v]) => ({ key, description: (v && v.description) || "",
-      default: v && "default" in v ? String(v.default) : "", hasDefault: !!(v && "default" in v) })),
+      default: v && "default" in v ? String(v.default) : "", hasDefault: !!(v && "default" in v), edited: false })),
     outputs: Object.entries(m.outputs || {}).map(([key, v]) => ({ key, type: (v && v.type) || "text",
       description: (v && v.description) || "", optional: !!(v && v.optional) })),
     steps: [...(m.steps || [])], body: detail && m.type !== "group" ? detail.body : "",
   };
 }
+const FORM_KEYS = ["id", "description", "category", "type", "done_when", "done_check", "required", "wait_external", "column",
+  "requires", "config", "run_in", "model", "effort", "steps", "outputs"];
 function manifestOf(f) {
-  const m = { id: f.id, description: f.description, category: f.newCategory || f.category, type: f.type,
+  const m = { ...f.original };
+  for (const k of FORM_KEYS) delete m[k];
+  Object.assign(m, { id: f.id, description: f.description, category: f.newCategory || f.category, type: f.type,
     done_when: f.done_when, done_check: f.done_check, required: f.required, wait_external: f.wait_external,
-    column: f.column, requires: f.requires.filter(Boolean), config: {} };
+    column: f.column, requires: f.requires.filter(Boolean), config: {} });
   if (f.type === "ai") Object.assign(m, { run_in: f.run_in, model: f.model, effort: f.effort });
   if (f.type === "group") m.steps = f.steps;
   else {
     m.outputs = {};
     for (const o of f.outputs) if (o.key) m.outputs[o.key] = { type: o.type, description: o.description, ...(o.optional ? { optional: true } : {}) };
   }
-  for (const c of f.config) if (c.key) m.config[c.key] = { description: c.description, ...(c.hasDefault || c.default !== "" ? { default: c.default } : {}) };
+  const originalConfig = (f.original && f.original.config) || {};
+  for (const c of f.config) {
+    if (!c.key) continue;
+    const spec = { ...(originalConfig[c.key] || {}), description: c.description };
+    const kept = !c.edited && c.hasDefault && spec.default !== undefined && typeof spec.default !== "string";
+    if (!kept) {
+      if (c.hasDefault || c.default !== "") spec.default = c.default;
+      else delete spec.default;
+    }
+    m.config[c.key] = spec;
+  }
   return m;
 }
 function formBody() { const f = state.form.f; return f.type === "group" ? "" : f.body; }
@@ -395,7 +410,7 @@ async function runFormCheck() {
   const s = state.form;
   if (!s) return;
   const ticket = ++s.ticket;
-  const result = await api("/api/steps/check", { manifest: manifestOf(s.f), body: formBody() });
+  const result = await api("/api/steps/check", { manifest: manifestOf(s.f), body: formBody(), level: s.mode === "copy-local" ? "local" : s.level });
   if (state.form !== s || ticket !== s.ticket) return;
   s.check = result;
   renderFormSide();
@@ -427,7 +442,7 @@ function configRows(rows) {
   return rowsEditor(rows, (r) => [
     textInput(r.key, (v) => { r.key = v; formChanged(); }, "key"),
     textInput(r.description, (v) => { r.description = v; formChanged(); }, "description"),
-    textInput(r.default, (v) => { r.default = v; formChanged(); }, "default")], () => ({ key: "", description: "", default: "", hasDefault: false }));
+    textInput(r.default, (v) => { r.default = v; r.edited = true; formChanged(); }, "default")], () => ({ key: "", description: "", default: "", hasDefault: false }));
 }
 function outputRows(rows) {
   return rowsEditor(rows, (r) => [

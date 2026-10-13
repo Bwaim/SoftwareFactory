@@ -28,7 +28,7 @@ def candidate(manifest, body):
     return Step(sid, "candidate", Path(f"{sid}.md"), dict(manifest), body)
 
 
-def check(ctx, manifest, body):
+def check(ctx, manifest, body, level="local"):
     manifest = require_input(manifest, body)
     errors, warnings = step_format.validate(manifest, body)
     uses, outputs = [], {}
@@ -44,7 +44,20 @@ def check(ctx, manifest, body):
                 uses, outputs = keys.step_uses(reg, step.id), keys.step_outputs(reg, step.id)
             except FactoryError as e:
                 errors.append(str(e))
+    if not errors and manifest.get("type") == "command":
+        warnings = warnings + missing_scripts(ctx, body, level)
     return {"errors": errors, "warnings": warnings, "uses": uses, "outputs": outputs}
+
+
+def missing_scripts(ctx, body, level):
+    from .pipeline_store import target_root
+    from .step_delete import SCRIPT_REF_RE
+    try:
+        folder = target_root(ctx, level if level == "generic" else "local") / "steps"
+    except FactoryError:
+        return []
+    names = dict.fromkeys(SCRIPT_REF_RE.findall(body))
+    return [f"The script `{n}` is not in {folder}. Copy it there by hand." for n in names if not (folder / n).exists()]
 
 
 def preview(ctx, manifest, body):
@@ -92,7 +105,7 @@ def target(ctx, reg, sid, level, mode):
 def save(ctx, manifest, body, level, mode):
     if mode not in MODES:
         raise FactoryError("The mode must be `new`, `edit` or `copy-local`.")
-    result = check(ctx, manifest, body)
+    result = check(ctx, manifest, body, "local" if mode == "copy-local" else level)
     if result["errors"]:
         raise FactoryError("The step has errors:\n" + "\n".join(result["errors"]))
     manifest = step_format.clean(manifest)

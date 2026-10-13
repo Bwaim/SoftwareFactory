@@ -148,3 +148,17 @@ def test_editor_page_has_step_form_controls(se):
     for text in ("New step", "Copy to local", "Duplicate", "Keys available here", "/api/pipelines/keys",
                  "/api/steps/save", "/api/steps/preview", "/api/steps/impact", "$FACTORY_KEY_", "new_step", "z-index: 20"):
         assert text in page, text
+
+
+def test_check_warns_about_a_missing_command_script(se):
+    inited, i = se
+    manifest = {"id": "runit", "description": "Run", "category": "test", "type": "command"}
+    body = 'bash "$FACTORY_STEP_DIR/runit.sh"\n'
+    status, out = request(i, "POST", "/api/steps/check", {"manifest": manifest, "body": body, "level": "local"})
+    assert out["errors"] == []
+    assert out["warnings"] == [f"The script `runit.sh` is not in {inited.fdir / 'steps'}. Copy it there by hand."]
+    status, out = save(i, manifest, body)
+    assert any("runit.sh" in w for w in out["warnings"])
+    (inited.fdir / "steps" / "runit.sh").write_text("echo hi\n")
+    status, out = request(i, "POST", "/api/steps/check", {"manifest": manifest, "body": body, "level": "local"})
+    assert out["warnings"] == []

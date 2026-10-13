@@ -292,7 +292,7 @@ def step_form(server, query, body):
 @route("POST", "/api/steps/check")
 def step_check(server, query, body):
     from . import step_store
-    return step_store.check(server.ctx, body["manifest"], body.get("body", ""))
+    return step_store.check(server.ctx, body["manifest"], body.get("body", ""), body.get("level") or "local")
 
 
 @route("POST", "/api/steps/preview")

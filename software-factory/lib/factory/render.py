@@ -66,7 +66,7 @@ def subagent_text(prompt, step_line, step, outputs, model, effort):
     inner = prompt_with_footer(prompt, step_line, step, outputs, SUBAGENT_END, False)
     return "\n".join([step_line, "Run this step in a subagent. Call the Agent tool with:",
                       f"- model: {model or 'inherit'}", f"- effort: {effort or 'inherit'}",
-                      "- prompt:", "<<<", inner, ">>>", SUBAGENT_AFTER])
+                      "- prompt:", "<<<", inner, ">>>", WAIT_END if step.wait_external else SUBAGENT_AFTER])
 
 
 def command_text(step_line, step, outputs):

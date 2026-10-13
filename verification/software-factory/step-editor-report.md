@@ -1,10 +1,10 @@
 # Step editor verification report
 
-Date: 2026-10-13 18:12
+Date: 2026-10-13 18:31
 
 ## Milestone 1. Step format and runtime
 
-88 of 88 tests pass.
+90 of 90 tests pass.
 
 | Test | Result |
 |---|---|
@@ -33,6 +33,7 @@ Date: 2026-10-13 18:12
 | `test_migrate::test_shared_library_migrated_once` | PASS |
 | `test_migrate::test_newer_refused` | PASS |
 | `test_migrate_v2::test_converts_every_type` | PASS |
+| `test_migrate_v2::test_absolute_script_path_is_kept` | PASS |
 | `test_migrate_v2::test_every_converted_step_passes_version_2_validation` | PASS |
 | `test_migrate_v2::test_refuses_what_version_2_refuses[empty----\nid: empty\ndescription: E\ntype: prompt\n---\n\n-the prompt is empty]` | PASS |
 | `test_migrate_v2::test_refuses_what_version_2_refuses[noscript----\nid: noscript\ndescription: N\ntype: script\n---\n\n-names no script file]` | PASS |
@@ -69,6 +70,7 @@ Date: 2026-10-13 18:12
 | `test_runtime_v2::test_file_output_must_exist` | PASS |
 | `test_runtime_v2::test_state_set_file_relative_to_caller` | PASS |
 | `test_runtime_v2::test_run_script_is_gone` | PASS |
+| `test_runtime_v2::test_subagent_wait_external_ends_with_factory_wait` | PASS |
 | `test_step_assistant::test_assistant_pipeline_and_step_do_not_exist` | PASS |
 | `test_step_assistant::test_next_never_prints_task_flag` | PASS |
 | `test_step_assistant::test_task_without_worktree_cannot_start` | PASS |
@@ -119,7 +121,7 @@ Date: 2026-10-13 18:12
 
 ## Milestone 3. Step editor
 
-19 of 19 tests pass.
+20 of 20 tests pass.
 
 | Test | Result |
 |---|---|
@@ -142,10 +144,11 @@ Date: 2026-10-13 18:12
 | `test_step_editor_api::test_step_edit_cli` | PASS |
 | `test_step_editor_api::test_skill_create_step_runs_step_edit` | PASS |
 | `test_step_editor_api::test_editor_page_has_step_form_controls` | PASS |
+| `test_step_editor_api::test_check_warns_about_a_missing_command_script` | PASS |
 
 ## Full test suite
 
-339 of 339 tests pass.
+342 of 342 tests pass.
 
 ## Updated tests
 
@@ -226,7 +229,7 @@ Date: 2026-10-13 18:12
 ### No more step assistant
 
 - `new-step-assistant` and `new-step` removed: covered by `test_builtin::test_step_assistant_is_gone`.
-- No main repository pipeline, no `--task` in printed commands, option stays: covered by `test_runtime_v2::test_first_prompt_never_adds_task_flag`, `test_terminal_cli::test_start_session_has_no_worktree_flag`, `test_runtime_v2::test_first_prompt_never_adds_task_flag` and `test_engine::test_next_done_check_fails_then_passes` (`factory next --task t1` prints no `--task`).
+- No main repository pipeline, no `--task` in printed commands, option stays: covered by `test_runtime_v2::test_next_prints_exact_prompt_then_footer`, `test_step_assistant::test_next_never_prints_task_flag`, `test_runtime_v2::test_first_prompt_never_adds_task_flag` and `test_terminal_cli::test_start_session_has_no_worktree_flag`.
 
 ### Built-in and catalog steps
 

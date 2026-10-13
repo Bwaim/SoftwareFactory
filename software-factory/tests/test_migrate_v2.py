@@ -58,6 +58,15 @@ def test_converts_every_type(inited):
     assert "Task keys" not in shout
 
 
+def test_absolute_script_path_is_kept(inited):
+    make_v1(inited)
+    (inited.library / "steps" / "shout.md").write_text(V1_SHOUT.replace("shout.sh", "/opt/x/shout.sh"))
+    commit_all(inited.library.parent, "absolute script")
+    inited.factory("migrate")
+    shout = (inited.library / "steps" / "shout.md").read_text()
+    assert shout.rstrip().endswith('bash "/opt/x/shout.sh"')
+
+
 def test_every_converted_step_passes_version_2_validation(inited):
     from factory import step_format
     from factory.registry import parse_step_text

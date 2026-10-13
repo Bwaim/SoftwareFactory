@@ -166,3 +166,14 @@ def test_state_set_file_relative_to_caller(ai):
 def test_run_script_is_gone(inited):
     r = inited.factory("run-script", "--task", "t1", check=False)
     assert r.returncode != 0
+
+
+def test_subagent_wait_external_ends_with_factory_wait(inited):
+    write_step(inited.fdir, "sw", {"run_in": "subagent", "wait_external": True}, body="Wait.\n")
+    write_pipeline(inited.fdir, {"id": "swp", "steps": ["sw"]})
+    task_from_pipeline(inited, "swp")
+    out = run(inited, "next").stdout
+    inner = out.split("<<<\n", 1)[1].split("\n>>>", 1)[0]
+    assert inner.endswith("End with a short report. If you need an answer from the user, say so in the report and stop.")
+    assert out.rstrip().endswith("The factory tells you when the external event happens.")
+    assert "Otherwise run `factory done`" not in out

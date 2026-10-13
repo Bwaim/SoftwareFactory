@@ -37,7 +37,7 @@
 ### No more step assistant
 
 - `new-step-assistant` and `new-step` removed: covered by `test_builtin::test_step_assistant_is_gone`.
-- No main repository pipeline, no `--task` in printed commands, option stays: covered by `test_runtime_v2::test_first_prompt_never_adds_task_flag`, `test_terminal_cli::test_start_session_has_no_worktree_flag`, `test_runtime_v2::test_first_prompt_never_adds_task_flag` and `test_engine::test_next_done_check_fails_then_passes` (`factory next --task t1` prints no `--task`).
+- No main repository pipeline, no `--task` in printed commands, option stays: covered by `test_runtime_v2::test_next_prints_exact_prompt_then_footer`, `test_step_assistant::test_next_never_prints_task_flag`, `test_runtime_v2::test_first_prompt_never_adds_task_flag` and `test_terminal_cli::test_start_session_has_no_worktree_flag`.
 
 ### Built-in and catalog steps
 

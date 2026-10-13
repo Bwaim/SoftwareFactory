@@ -63,7 +63,7 @@ def convert(manifest, body):
         m["outputs"] = outputs
     if old_type == "script":
         first = next((line.strip() for line in body.splitlines() if line.strip()), "")
-        body = f'bash "$FACTORY_STEP_DIR/{first}"\n'
+        body = f'bash "{first}"\n' if first.startswith("/") else f'bash "$FACTORY_STEP_DIR/{first}"\n'
     if new_type == "ai":
         blocks = []
         if reads:
