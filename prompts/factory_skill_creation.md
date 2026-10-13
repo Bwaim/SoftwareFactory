@@ -121,6 +121,7 @@ A local dashboard shows all tasks as a Kanban board and the backlog, and lets me
   - A `steps` entry can also set `model` and `effort`. They override the step manifest values for this pipeline.
   - `start_column`: the board column of a new task. Default: the first column.
   - A `steps` entry can also set `column`. It overrides the step manifest value for this pipeline.
+  - A `steps` entry can also set `loop`: `back_to` (this entry or an earlier entry id), `while` (a task key name) and `max` (1 to 20). The entry can be a group step. See Task execution.
 - Example:
 
 ```yaml
@@ -324,7 +325,7 @@ Save the plan in the artifacts folder, not in the repository.
 - The page shows the available steps on one side and the pipeline steps on the other:
   - Drag a step from the list into the pipeline, and drag pipeline steps to reorder them
   - Remove a step from the pipeline
-  - Edit the `with` values, `model` and `effort` of a pipeline step in a form
+  - Edit the `with` values, `model`, `effort` and `loop` of a pipeline step in a form. `back_to` is chosen from this entry and the earlier entries, and `while` from the keys available at the end of the entry. A row with a loop shows a mark with its target and `max`, for example "↺ write-spec ×2".
   - Edit the id, the description, the inputs with their type, and the session `model` and `effort` in a form
   - Select a pipeline step to see the task keys available at its position, with their type, their source and "always set" or "maybe set" (see Task keys)
   - Create and edit steps with the step form (see Step editor)
@@ -347,6 +348,9 @@ Save the plan in the artifacts folder, not in the repository.
   - Warning: a generic pipeline uses a local step
   - Warning: `model` or `effort` set on a step that runs in the session. It has no effect.
   - Warning: a hidden step is used
+  - Error: a `loop` with an unknown field, a `back_to` that is not this entry or an earlier entry, a `max` that is not an integer from 1 to 20, an invalid `while` key name, or two loops that overlap without one being inside the other
+  - Warning: no step inside a loop range outputs its `while` key, or every such output is optional
+  - Warning: a loop on the last entry of the pipeline. At the limit, the task finishes without asking the user.
 - It can save with warnings, never with errors.
 - On save, it asks where to save: generic in `<library>/pipelines/`, or local in `.factory/pipelines/`. When the user edits a generic pipeline, they can save a local override instead.
 - If a needed step does not exist, the user creates it with "New step" in the same page.
@@ -377,7 +381,7 @@ Save the plan in the artifacts folder, not in the repository.
 - Cards cannot be dragged between columns. The steps set the column.
 - One card per task, not archived. A card shows:
   - The Jira ticket key, when set, as a link that opens `ticket_url` in a new tab. `ticket_url` is in `.factory/factory.yaml`, with `{key}` in its place, for example `https://<company>.atlassian.net/browse/{key}`.
-  - The description, the pipeline and the current step
+  - The description, the pipeline and the current step, with "loop <n> of <max>" inside a loop that has jumped back
   - The status as text and an icon, and the time in the current status, for example "blocked for 2 h"
   - A background color from the status: `active` green, `blocked` red, `awaiting_approval` amber, `waiting_external` blue, `paused` grey. Done cards are neutral.
   - A clear marker when the session state is `gone`
@@ -543,6 +547,8 @@ Save the plan in the artifacts folder, not in the repository.
   - `task_paused`
   - `task_resumed`
   - `step_goto`, with the from step, the to step and the reason
+  - `loop_back`, with the loop entry, the target step, the jump number and `max`
+  - `loop_limit`, with the loop entry and the key
   - `task_finished`
   - `prompt_sent`, with the text
   - `column_changed`, with the from and to columns
@@ -565,6 +571,16 @@ Save the plan in the artifacts folder, not in the repository.
   - It refuses a step that is not before the current step. Moving forward is a skip.
   - State keys keep their values. Steps that run again overwrite the keys they write.
   - After 3 jumps back to the same step, the task is blocked for the user, with the reason "loop on <step>".
+- Pipeline loops (`loop` on a `steps` entry):
+  - The task snapshot keeps each loop: the last step of the entry, the first step of the `back_to` entry, `while` and `max`.
+  - When `factory done` succeeds on the last step of a loop entry, the factory reads the `while` key. It is set when its value is not empty and not `none`, ignoring case and spaces around it.
+  - Set, with fewer than `max` jumps for this loop: the task goes back to the first step of `back_to`. `factory done` prints "Loop <n> of <max>: back to `<step>`. Run `factory next`.", with `<n>` the number of this jump.
+  - Set, after `max` jumps: the task moves to the next step and is blocked with the reason "Loop limit reached on `<entry>`: `<key>` is still set". The user unblocks to continue, or approves one more round with `factory goto`. At the limit on the last entry, the task finishes, logs `loop_limit` and notifies the user. The pipeline check warns about a loop on the last entry.
+  - Not set: the task moves on. A skipped step never triggers its loop.
+  - The factory makes the jump, never the session. The jump resets `started`, `command_result` and `approval`. Task keys keep their values. Session steps run again in the same task session, with the conversation of the earlier rounds.
+  - Loop jumps are counted per loop, apart from `goto_counts`. A loop's count resets to 0 when the task jumps to a step before its range, by an outer loop or by `factory goto`. So an inner loop gets its full `max` in each round of an outer loop.
+  - A step inside a loop range that outputs the `while` key gets one footer line: "This step controls a loop. Set `<key>` to `none` when nothing is left."
+  - `factory status` shows "loop <n> of <max>" inside a loop that has jumped back, the innermost one when loops are nested.
 
 ##### Task list
 
@@ -690,7 +706,7 @@ Users ask for a dark theme. Start with the settings screen only.
 ### Authoring skill
 
 - A second skill in the plugin, `skills/factory-authoring/SKILL.md`. It loads in any Claude session, without the orchestrator, when the user asks to create or change factory pipelines or steps, or gives a file that describes them. The user can also call `/factory-authoring <file or request>`.
-- It contains the full format reference for steps and pipelines, with one example of each step type and one example pipeline.
+- It contains the full format reference for steps and pipelines, with one example of each step type and one example pipeline. It also documents `loop`, with a review loop example and a ticket loop example.
 - The agent writes the step and pipeline files directly, at the local level unless the request says generic. It reuses existing steps, plans the key flow, and never edits built-in files or task files.
 - It runs `factory pipeline check <id>` on each new or changed pipeline and on each pipeline that uses a changed step, and fixes the files until there is no error. It checks the keys with `factory pipeline keys <id>`.
 - For generic files, it offers the library commit. It reports the files and the check results.
@@ -901,6 +917,7 @@ The library, a folder in any git repository:
   - With the fake test adapter, pause saves the status and closes the terminal, and resume restores the status with the same session id.
   - Worktree creation on the test repository, with git only: new branch, existing local branch behind `origin` (fast-forwarded), branch only on `origin`, diverged branch (stops), and branch used by another worktree (stops).
   - `factory goto` moves back to an earlier step, refuses a later step, and blocks the task on the 3rd jump back to the same step.
+  - Pipeline loops: jumps while the key is set, stops on `none` or an empty value, blocks after `max` jumps with the limit reason, resets an inner loop when an outer loop jumps back, works on a group entry back to itself, ignores a skipped step, does not change `goto_counts`, and adds the footer line only to the step that outputs the `while` key. Each loop check error and warning appears on a test pipeline.
   - `factory artifact path` creates the artifacts folder and prints an absolute path in the main repository, also when called from a worktree.
   - For a subagent step, `factory next` prints the Agent call with the right model and effort: the pipeline entry value wins over the manifest value.
   - `factory pipeline check` warns about `model` or `effort` on a step that runs in the session.
