@@ -1,10 +1,10 @@
 # Authoring skill verification report
 
-Date: 2026-10-13 21:41
+Date: 2026-10-13 21:51
 
 ## Milestone 1. Authoring skill
 
-14 of 14 tests pass.
+15 of 15 tests pass.
 
 | Test | Result |
 |---|---|
@@ -16,6 +16,7 @@ Date: 2026-10-13 21:41
 | `test_authoring_skill::test_every_field_is_described` | PASS |
 | `test_authoring_skill::test_named_builtin_steps_exist` | PASS |
 | `test_authoring_skill::test_readme_describes_authoring_skill` | PASS |
+| `test_authoring_skill::test_skill_covers_review_findings` | PASS |
 | `test_docs::test_readme_commands_exist` | PASS |
 | `test_docs::test_skill_and_builtin_commands_exist` | PASS |
 | `test_docs::test_readme_sections` | PASS |
@@ -25,7 +26,7 @@ Date: 2026-10-13 21:41
 
 ## Full test suite
 
-357 of 357 tests pass.
+358 of 358 tests pass.
 
 ## Orchestrator skill
 
@@ -76,3 +77,4 @@ None. No existing test changed.
 
 - This report, the CLI tests above, and the manual check list `authoring-skill-manual-check.md`.
 - Built-in step ids named in the skill exist: covered by `test_named_builtin_steps_exist`.
+- Final review fixes (unset keys in command steps, the `branch` input, `--at` inside groups, load errors, `with` typos, required inputs): covered by `test_authoring_skill::test_skill_covers_review_findings`.

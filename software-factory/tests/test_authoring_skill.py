@@ -119,3 +119,11 @@ def test_readme_describes_authoring_skill():
     assert "`/factory-authoring`" in install
     tutorial = text.split("## Tutorial", 1)[1].split("## Reference", 1)[0]
     assert "factory-authoring" not in tutorial
+
+
+def test_skill_covers_review_findings():
+    text = skill_text()
+    for needle in ('"${FACTORY_KEY_<KEY>:-}"', "An input named `branch`", "detached HEAD", "1-based number of the entry",
+                   "A step file that does not load stops the check", "no factory command works",
+                   "does not see a `with` key", "`{{ key }}` with spaces", "Every input is required at launch"):
+        assert needle in text, needle

@@ -38,3 +38,4 @@
 
 - This report, the CLI tests above, and the manual check list `authoring-skill-manual-check.md`.
 - Built-in step ids named in the skill exist: covered by `test_named_builtin_steps_exist`.
+- Final review fixes (unset keys in command steps, the `branch` input, `--at` inside groups, load errors, `with` typos, required inputs): covered by `test_authoring_skill::test_skill_covers_review_findings`.

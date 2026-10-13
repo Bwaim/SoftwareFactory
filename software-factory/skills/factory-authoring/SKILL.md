@@ -31,14 +31,19 @@ Request: $ARGUMENTS
 4. **Plan the key flow.**
    - For each step, list the keys it uses.
    - Each key must come from a pipeline input, an output of an earlier step, or a factory key.
-   - `summary` is maybe set. A step that uses it must still work when it is `(not set)`.
+   - `summary` is maybe set. A step that uses it must still work when it is not set.
+   - In an `ai` step, a key that is not set becomes `(not set)`. In a `command` step, the variable is not set.
 5. **Write the files.** Write the step files first, then the pipeline files. Follow the format reference below.
 6. **Check.**
    - Run `factory pipeline check <id>` for each new or changed pipeline.
    - After a step change, run it for every pipeline listed by `factory pipeline list --json`. No command lists the pipelines that use a step, and checking all of them also covers group steps.
-   - An error stops the check. A step file that does not load gives `<path>: <problem>`. Fix the file and run the check again, until there is no error.
+   - A step file that does not load stops the check with `<path>: <problem>`. Other errors are listed together. Fix the errors and run the check again, until there is no error.
+   - Fix a load error right away. While a step file does not load, no factory command works, and running tasks cannot go on.
    - Read each warning. Fix it, or tell the user why it stays.
    - Run `factory pipeline keys <id> --at <position>` for the position of each step. Check that each key the step uses is in the list.
+     - The position is the 1-based number of the entry in the `steps` list of the pipeline. A listed `create-worktree` counts.
+     - For a step inside a group, also count the outputs of the earlier child steps of that group.
+     - `factory pipeline check` already warns about a key that is really missing, also inside groups.
    - The check sees the keys of a command line, not the keys used inside a script file. Check the keys of a script by hand.
 7. **Generic changes.** Tell the user that other repositories that use the library are not checked.
 8. **Library commit.** For new or changed generic files:
@@ -122,6 +127,7 @@ A step file is YAML frontmatter between two `---` lines, then the body.
 - The body is the exact prompt.
 - `{{<key>}}` becomes the value of the task key. `{{config.<key>}}` becomes the config value.
 - A key that is not set becomes `(not set)`.
+- `{{ key }}` with spaces is not a placeholder. The step does not load.
 - `{{config.<key>}}` needs the key in `config`. If not, the step does not load.
 - Single braces, like `{name}`, stay text.
 - Do not list the outputs or write "run factory done" in the prompt. The factory adds a footer with each output, the `factory state set` command for it, the `done_when` text and the end line.
@@ -134,6 +140,7 @@ A step file is YAML frontmatter between two `---` lines, then the body.
   - each config value as `"$FACTORY_CONFIG_<KEY>"`,
   - the folder of the step file as `"$FACTORY_STEP_DIR"`.
 - `<KEY>` is the key name in upper case. Always put these variables in double quotes.
+- A key that is not set is not in the environment. Use `"${FACTORY_KEY_<KEY>:-}"` for `summary` and for optional outputs.
 - No `{{...}}` in a command. The step does not load.
 - Put a long command in a script next to the step, and run it with `bash "$FACTORY_STEP_DIR/<id>.sh"`.
 - The command sets its own outputs with `factory state set <key> <value>`. For a `file` output, get a path with `factory artifact path <name>`. The session never sets them.
@@ -166,12 +173,16 @@ A step file is YAML frontmatter between two `---` lines, then the body.
   - The launch dry run asks only for the config of `create-worktree`.
   - For any other step, `factory next` asks the user for the value when the step starts.
 - `with` on a group entry applies to each child step that declares that config key.
+- The check does not see a `with` key that the step does not declare. Check each `with` key by hand against the step `config`.
 
 ### Pipeline file
 
 - `id`: the pipeline id. It is also the file name.
 - `description`: one line.
 - `inputs`: map of key name to `type` and `description`. The launch asks for each one. A relative `file` path is resolved from the main repository.
+  - Every input is required at launch. A `file` input must point to a file that exists at launch.
+  - An input named `branch` makes the launch create the worktree on that branch, new or existing. Use the name `branch` only for that.
+  - Without a `branch` input, the worktree starts in detached HEAD. A step that commits must first create a branch.
 - `steps`: the list of entries. An entry is a step id, or a map with:
   - `id`: the step id,
   - `with`: config values for this entry,

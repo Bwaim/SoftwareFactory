@@ -14,6 +14,8 @@ ORCHESTRATOR_SKILL = "software-factory/skills/software-factory/SKILL.md"
 
 def orchestrator_skill_diff():
     r = subprocess.run(["git", "diff", "master", "--", ORCHESTRATOR_SKILL], cwd=SF.parent, capture_output=True, text=True)
+    if r.returncode != 0:
+        return None
     return r.stdout.strip()
 
 
@@ -29,9 +31,13 @@ def main():
     if failed:
         lines += table(failed) + [""]
     diff = orchestrator_skill_diff()
-    lines += ["## Orchestrator skill", "",
-              "`git diff master -- " + ORCHESTRATOR_SKILL + "` is empty. The menu is unchanged." if not diff
-              else "The orchestrator skill changed. This breaks the Definition Of Done.", ""]
+    if diff is None:
+        verdict = "The diff of the orchestrator skill could not be computed (`git diff master` failed)."
+    elif diff:
+        verdict = "The orchestrator skill changed. This breaks the Definition Of Done."
+    else:
+        verdict = "`git diff master -- " + ORCHESTRATOR_SKILL + "` is empty. The menu is unchanged."
+    lines += ["## Orchestrator skill", "", verdict, ""]
     lines += ["## Updated tests", ""]
     updated = UPDATED.read_text().splitlines() if UPDATED.exists() else []
     updated = [line for line in updated if line != "# Updated tests"]
@@ -39,7 +45,7 @@ def main():
     if DOD.exists():
         lines += [""] + DOD.read_text().splitlines()
     REPORT.write_text("\n".join(lines) + "\n")
-    return 0 if rows and total == len(rows) and not diff else 1
+    return 0 if rows and total == len(rows) and diff == "" else 1
 
 
 if __name__ == "__main__":
