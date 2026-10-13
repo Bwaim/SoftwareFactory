@@ -456,6 +456,7 @@ Save the path with `factory state set plan <path>`.
 
 - The task session runs one step at a time. It never reads the pipeline or step files directly.
 - The first prompt of a task is short: "You run factory task `<id>`. Run `factory next` and follow its instructions. When the step is done, run `factory done`. Repeat until `factory next` says the pipeline is finished."
+- A task session asks the user in plain text, never with the `AskUserQuestion` tool, then ends its turn. The answer can come from the task tab, the orchestrator or the dashboard. The first prompt, the resume prompt, the `factory block` output and the `user-validation` step say this.
 - When the last step is done, `factory done` sets the task to `finished`. It sends a notification if the adapter supports `notify`. The session tells the user that the task is finished.
 - A step file changed during a task applies from the next step.
 - A step with `required: true` cannot be skipped. Other steps can be skipped with `factory skip`, only after user approval.
@@ -477,6 +478,7 @@ Save the path with `factory state set plan <path>`.
 
 - "Focus a task" lists the tasks with a live session and calls `factory terminal focus` on the selected one.
 - "Send a prompt to a task" lists the tasks with a live session, asks for the text and calls `factory terminal send-prompt`.
+  - It sends the user's text exactly as typed, and shows it in quotes before sending. After sending, it reports the real task status.
   - If the session is working, it asks the user to wait until the session is idle, or to send now.
   - If the session is gone or the task is paused, it offers to resume the task first.
 - Both actions are hidden when the adapter does not support them.
@@ -658,6 +660,7 @@ Users ask for a dark theme. Start with the settings screen only.
   - The handle is the Herdr agent name and the workspace or tab id.
 - `close`: closes the workspace or the tab. Check that this also stops the Claude process. If it does not, stop it first.
 - `send-prompt`: `herdr agent prompt`. `focus`: `herdr agent focus`. `state`: `herdr agent get`. `wait-idle`: `herdr agent wait`. `notify`: `herdr notification`. Check the exact syntax with the installed `herdr` binary.
+- Before it delivers any text (send prompt, approve, request changes), the Herdr adapter reads the screen with `herdr agent read`. If a question box is open, it does not send. It fails with a message that says to answer in the task tab. The factory logs `prompt_failed` with the reason, and logs `prompt_sent` only after a delivery that worked. The dashboard shows the failure on the card.
 
 ### Versioning and migration
 
