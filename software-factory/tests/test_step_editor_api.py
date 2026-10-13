@@ -146,5 +146,5 @@ def test_editor_page_has_step_form_controls(se):
     inited, i = se
     status, page = request(i, "GET", "/editor")
     for text in ("New step", "Copy to local", "Duplicate", "Keys available here", "/api/pipelines/keys",
-                 "/api/steps/save", "/api/steps/preview", "/api/steps/impact", "$FACTORY_KEY_", "new_step"):
+                 "/api/steps/save", "/api/steps/preview", "/api/steps/impact", "$FACTORY_KEY_", "new_step", "z-index: 20"):
         assert text in page, text

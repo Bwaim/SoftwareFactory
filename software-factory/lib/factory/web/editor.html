@@ -20,7 +20,7 @@ button.primary { background: var(--accent); color: var(--bg); border-color: var(
 .card { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 6px 0; background: var(--panel); cursor: grab; }
 .card.clickable { cursor: pointer; }
 .muted { color: var(--muted); font-size: 12px; }
-#error { display: none; background: var(--err); color: white; padding: 8px 16px; }
+#error { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: var(--err); color: white; padding: 8px 16px; }
 .problem.error { color: var(--err); }
 .problem.warning { color: var(--warn); }
 #pipeline { min-height: 200px; border: 2px dashed var(--line); border-radius: 8px; padding: 8px; margin: 8px 0; }
@@ -741,6 +741,7 @@ function renderStart() {
   const box = clear(byId("start"));
   box.hidden = false;
   box.append(el("h3", {}, "Start"));
+  box.append(el("div", { class: "row" }, el("button", { type: "button", onclick: () => openStepForm({ mode: "new" }) }, "New step")));
   box.append(el("div", { class: "row" }, el("button", { type: "button", onclick: () => openModel(emptyModel(), null) }, "Create an empty pipeline")));
   const copySelect = pipelineSelect();
   const newId = el("input", { type: "text", placeholder: "new pipeline id" });
