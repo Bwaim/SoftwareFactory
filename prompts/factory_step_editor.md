@@ -124,6 +124,7 @@ Creating a step is slow and unclear:
   - It still accepts a key that is not a declared output.
 - `factory done` checks, in this order, and stays on the step with the reason when one fails:
   1. Every output not marked `optional` is set.
+     - For a `command` step, a missing output gives: "The step command did not set the output `<key>`. Run `factory block` and tell the user." It never says `factory state set`.
   2. Every `file` output that is set points to an existing path.
   3. For a `command` step: its last `factory run-command` exited with code 0.
   4. The `done_check`, when present.
@@ -226,6 +227,7 @@ Creating a step is slow and unclear:
   - A `{{config.<key>}}` placeholder for an undeclared config key is refused when the step loads.
   - A `command` step gets its keys as `FACTORY_KEY_<KEY>`, its config as `FACTORY_CONFIG_<KEY>`, and `FACTORY_STEP_DIR`. `factory done` refuses it until `factory run-command` exits with code 0.
   - A `command` step whose command sets the wrong key: `factory run-command` names the missing output, and the `factory next` text has no `factory state set` line.
+  - `factory done` on a `command` step with a missing output names the output and says `factory block`, never `factory state set`.
   - `factory done` refuses a missing output that is not optional, and a `file` output whose path does not exist.
   - `factory state set` refuses a missing path for a `file` output and saves an absolute path.
   - A `group` step: the full path is shown, its keys and outputs are computed, and a loop is refused.

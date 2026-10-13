@@ -231,6 +231,7 @@ Save the plan in the artifacts folder, not in the repository.
 - Required steps are enforced by the factory CLI: `factory skip` refuses them, and `factory done` runs their checks.
 - `factory done` checks, in this order, and stays on the step with the reason when one fails:
   1. Every output not marked `optional` is set.
+     - For a `command` step, a missing output gives: "The step command did not set the output `<key>`. Run `factory block` and tell the user." It never says `factory state set`.
   2. Every `file` output that is set points to an existing path.
   3. For a `command` step: its last `factory run-command` exited with code 0.
   4. The `done_check`, when present.
@@ -872,6 +873,7 @@ The library, a folder in any git repository:
   - `factory next` on an `ai` step prints the prompt with each placeholder replaced, `(not set)` for a missing key, and the footer with every output. An undeclared `{{config.<key>}}` and a placeholder in a `command` step are refused when the step loads.
   - A `command` step gets `FACTORY_KEY_<KEY>`, `FACTORY_CONFIG_<KEY>` and `FACTORY_STEP_DIR`. `factory done` refuses it until `factory run-command` exits with code 0.
   - A `command` step whose command sets the wrong key: `factory run-command` names the missing output, and the `factory next` text has no `factory state set` line.
+  - `factory done` on a `command` step with a missing output names the output and says `factory block`, never `factory state set`.
   - `factory done` refuses a missing output that is not optional, and a `file` output whose path does not exist. `factory state set` refuses a missing path for a `file` output.
   - `factory pipeline keys` lists inputs, outputs of earlier steps and factory keys with their type and source, and marks `summary` and optional outputs as "maybe set".
   - A `file` input that does not exist is a launch dry run error. A relative path is saved as an absolute path.
