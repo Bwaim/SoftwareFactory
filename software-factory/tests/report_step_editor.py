@@ -12,6 +12,7 @@ MILESTONES = {
 JUNIT = VERIF / "step-editor-junit.xml"
 REPORT = VERIF / "step-editor-report.md"
 UPDATED = VERIF / "step-editor-updated-tests.md"
+DOD = VERIF / "step-editor-dod.md"
 
 
 def main():
@@ -27,7 +28,11 @@ def main():
     if failed:
         lines += table(failed) + [""]
     lines += ["## Updated tests", ""]
-    lines += UPDATED.read_text().splitlines() if UPDATED.exists() else ["None."]
+    updated = UPDATED.read_text().splitlines() if UPDATED.exists() else []
+    updated = [line for line in updated if line != "# Updated tests"]
+    lines += updated or ["None."]
+    if DOD.exists():
+        lines += [""] + DOD.read_text().splitlines()
     REPORT.write_text("\n".join(lines) + "\n")
     return 0 if rows and passed == len(rows) else 1
 

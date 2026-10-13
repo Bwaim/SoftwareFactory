@@ -1,6 +1,6 @@
 # Step editor verification report
 
-Date: 2026-10-13 18:06
+Date: 2026-10-13 18:12
 
 ## Milestone 1. Step format and runtime
 
@@ -149,7 +149,6 @@ Date: 2026-10-13 18:06
 
 ## Updated tests
 
-# Updated tests
 - tests/test_catalog.py::test_replace_needs_flag_and_shows_diff: an invalid step file now stops Registry.load, so the test appends to push.md instead of overwriting it
 - tests/conftest.py::write_step: default type is `ai` (version 2)
 - tests/test_registry.py::test_group_paths_uses_and_outputs: replaces test_composite_paths_and_io; reads and writes became computed uses and declared outputs
@@ -227,7 +226,7 @@ Date: 2026-10-13 18:06
 ### No more step assistant
 
 - `new-step-assistant` and `new-step` removed: covered by `test_builtin::test_step_assistant_is_gone`.
-- No main repository pipeline, no `--task` in printed commands, option stays: covered by `test_runtime_v2::test_first_prompt_never_adds_task_flag`, `test_terminal_cli::test_start_session_has_no_worktree_flag`, `test_engine` (the `--task` option still used by the tests).
+- No main repository pipeline, no `--task` in printed commands, option stays: covered by `test_runtime_v2::test_first_prompt_never_adds_task_flag`, `test_terminal_cli::test_start_session_has_no_worktree_flag`, `test_runtime_v2::test_first_prompt_never_adds_task_flag` and `test_engine::test_next_done_check_fails_then_passes` (`factory next --task t1` prints no `--task`).
 
 ### Built-in and catalog steps
 
@@ -239,7 +238,7 @@ Date: 2026-10-13 18:06
 - Conversion of every step type, `writes`, `reads`, `config` blocks, script body: covered by `test_migrate_v2::test_converts_every_type`, `test_every_converted_step_passes_version_2_validation`.
 - Migrated pipeline runs to the end with the fake adapter: covered by `test_migrate_v2::test_migrated_pipeline_runs_to_the_end`.
 - Refusals before any change (bad key name, unfinished `new-step-assistant` task): covered by `test_migrate_v2::test_bad_key_name_refuses_before_any_change`, `test_assistant_task_refuses_before_any_change`, `test_dry_run_lists_errors_without_change`.
-- Library commit message and the `migrate` step: covered by `test_migrate_v2` and `test_migrate::test_*` (message `Factory library: migrate to version 2`).
+- Library commit message and the `migrate` step: covered by `test_migrate_v2` and `test_migrate::test_older_refused_then_migrated`, `test_shared_library_migrated_once` (message `Factory library: migrate to version 2`).
 - Migration of the user's real data: manual check 8.
 
 ### Available keys
