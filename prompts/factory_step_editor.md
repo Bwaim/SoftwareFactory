@@ -148,6 +148,7 @@ Creating a step is slow and unclear:
   - `script` becomes `command`. The body `<file>` becomes `bash "$FACTORY_STEP_DIR/<file>"`.
   - `writes: [a, b]` becomes `outputs` with `type: text` and `optional: true` for each key, so no new done check blocks an old step.
   - For an `ai` step with `reads`, it adds this block at the end of the prompt, one line per key: `- <key>: {{<key>}}`, under the line `Task keys:`. The agent then gets the same values as before.
+  - For an `ai` step with `config` keys, it also adds this block at the end of the prompt, one line per config key: `- <key>: {{config.<key>}}`, under the line `Config:`. Version 1 printed every config value, so migrated steps keep them.
   - It removes `reads`.
 - Before it changes anything, it refuses and lists the problems when:
   - A key name does not follow the key name rule.

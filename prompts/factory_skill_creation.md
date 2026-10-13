@@ -778,6 +778,7 @@ Users ask for a dark theme. Start with the settings screen only.
   - `script` becomes `command`. The body `<file>` becomes `bash "$FACTORY_STEP_DIR/<file>"`.
   - `writes: [a, b]` becomes `outputs` with `type: text` and `optional: true` for each key, so no new done check blocks an old step.
   - For an `ai` step with `reads`, it adds the line `Task keys:` at the end of the prompt, then one line per key: `- <key>: {{<key>}}`.
+  - For an `ai` step with `config` keys, it also adds the line `Config:` at the end of the prompt, then one line per config key: `- <key>: {{config.<key>}}`. Version 1 printed every config value, so migrated steps keep them.
   - It removes `reads`.
   - It runs on the local steps and pipelines, the generic library, and the saved step lists of unfinished tasks.
   - Before it changes anything, it refuses and lists the problems: a key name that does not follow the key name rule, or an unfinished task of the removed pipeline `new-step-assistant`.
