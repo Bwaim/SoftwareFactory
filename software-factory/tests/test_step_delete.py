@@ -289,3 +289,19 @@ def test_editor_page_has_delete_flow(inited):
     page = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
     for text in ("/delete/dry-run", "Confirm delete", "function commitBox", 'd.level !== "builtin"'):
         assert text in page
+
+
+def test_menu_has_delete_step_after_new_step(inited):
+    actions = [a for g in inited.factory.json("menu")["groups"] for a in g["actions"]]
+    keys = [a["key"] for a in actions]
+    assert keys[keys.index("new-step") + 1] == "step-delete"
+    assert actions[keys.index("step-delete")]["label"] == "Delete a step"
+
+
+def test_docs_describe_delete():
+    from conftest import SF
+    readme = (SF / "README.md").read_text()
+    skill = (SF / "skills" / "software-factory" / "SKILL.md").read_text()
+    assert "**Delete a step**" in readme and "`factory step delete <id> [--level local|generic] [--dry-run]`" in readme
+    assert "### Pipeline editor" in readme
+    assert "(`step-delete`)" in skill and "factory step delete <id> --level <level> --dry-run --json" in skill

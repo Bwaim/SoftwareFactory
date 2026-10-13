@@ -52,6 +52,12 @@ Before any command that changes something, show what it will do and wait for the
 - **Clean finished tasks** (`clean`): run `factory clean --json`. Show each finished task with merged or not. Merged tasks are selected by default. Ask the user to confirm the selection. For each selected task, follow `delete-task`.
 - **Create or edit a pipeline** (`pipeline-edit`): ask for an id to edit, or nothing for a new one. Run `factory pipeline edit [<id>]`. Tell the user the editor is open in the browser.
 - **Create a new step** (`new-step`): run `factory launch new-step-assistant --description "<goal in a few words>"`. Tell the user the assistant runs in a new tab.
+- **Delete a step** (`step-delete`):
+  1. Run `factory step list --json`. List the local and generic steps with their level and category. Do not list built-in steps.
+  2. Ask which one. Run `factory step delete <id> --level <level> --dry-run --json`. Show the files, the step that replaces it, the users and the warnings.
+  3. If `blocked` is true, show the users and tell the user to remove the step from them first. Stop.
+  4. Delete only after the user confirms: `factory step delete <id> --level <level> --json`.
+  5. If `library_commit` is set, offer the library commit (Library commits below) with its message and paths.
 - **Browse the catalog** (`catalog`): run `factory catalog list --json`. Show each item with its kind, category, description, status and missing requires. To install, ask generic or local, run `factory catalog install <id> --generic|--local --dry-run --json`, show the files, missing steps and any difference, then install after approval with `--with-steps` when the user accepts the missing steps, and `--replace` when the user approved a difference. For a generic install, offer the library commit.
 - **Add a backlog entry** (`backlog-add`): follow the built-in step `backlog-add`.
 - **Remove a backlog entry** (`backlog-remove`): follow the built-in step `backlog-remove`.
@@ -64,7 +70,7 @@ Follow the built-in step `migrate`: `factory migrate --dry-run --json`, then `fa
 
 ## Library commits
 
-After a write to the library (generic step, generic pipeline, catalog install to the library, migration):
+After a write to the library (generic step, generic pipeline, catalog install to the library, migration, delete of a generic step):
 
 1. Show the changed files and the message `Factory library: <action> <kind> <id>`, for example `Factory library: add step create-merge-request`.
 2. Commit only after approval: `factory library commit "<message>" <paths...>`.

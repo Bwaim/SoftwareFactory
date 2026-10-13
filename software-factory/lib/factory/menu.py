@@ -11,6 +11,7 @@ ACTIONS = [
     ("Tasks", "clean", "Clean finished tasks", None),
     ("Pipelines and steps", "pipeline-edit", "Create or edit a pipeline", None),
     ("Pipelines and steps", "new-step", "Create a new step", None),
+    ("Pipelines and steps", "step-delete", "Delete a step", None),
     ("Pipelines and steps", "catalog", "Browse the catalog", None),
     ("Backlog", "backlog-add", "Add a backlog entry", None),
     ("Backlog", "backlog-remove", "Remove a backlog entry", None),

@@ -111,6 +111,7 @@ Herdr adapter:
 - **Clean finished tasks**: delete finished tasks whose work is merged.
 - **Create or edit a pipeline**: open the pipeline editor in the browser.
 - **Create a new step**: run the step assistant.
+- **Delete a step**: delete a local or generic step. It first shows what the delete does, then asks you to confirm.
 - **Browse the catalog**: list and install catalog pipelines and steps.
 - **Add a backlog entry**: add an entry to the backlog.
 - **Remove a backlog entry**: remove an entry from the backlog.
@@ -187,6 +188,7 @@ Pipelines, steps and the library:
 - `factory pipeline edit [<id>]`: open the pipeline editor.
 - `factory step list`: list the steps.
 - `factory step show <id>`: show a step.
+- `factory step delete <id> [--level local|generic] [--dry-run]`: delete a step. `--dry-run` only shows the files it removes, the step that replaces it and the users that block it. Built-in steps cannot be deleted.
 - `factory catalog list`: list the catalog items and their status.
 - `factory catalog install <id> --generic|--local [--with-steps] [--replace] [--dry-run]`: install a catalog item.
 - `factory library commit <message> <paths...>`: commit files of the library.
@@ -196,6 +198,19 @@ Local server:
 - `factory serve`: run the local server in the foreground.
 - `factory dashboard`: start the local server if needed and print the dashboard URL.
 - `factory server stop`: stop the local server.
+
+### Pipeline editor
+
+`factory pipeline edit [<id>]` opens the editor in the browser.
+
+- Left: the available steps. Filter them by category or by text. "Reload steps" reads the step files again.
+- Middle: the pipeline. Drag steps into it and reorder them. The checks run while you edit. You can save with warnings, never with errors.
+- Right: the step detail. Click a step to see its manifest, its level, its file and its body.
+- Delete: the detail of a local or generic step has a "Delete" button.
+  - It first shows what the delete does: the files it removes, the step that replaces it, and the pipelines, composite steps and tasks that still use it.
+  - A step that is still used cannot be deleted. Remove it from its users first.
+  - "Confirm delete" removes the files. The list of steps reloads.
+  - For a generic step, the editor offers the library commit.
 
 ### Dashboard
 
