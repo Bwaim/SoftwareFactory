@@ -51,9 +51,10 @@ def test_new_check_warnings(kp):
 
 def test_own_output_is_not_an_unset_key(kp):
     write_step(kp.fdir, "selfcheck", {"outputs": {"plan": {"type": "file", "description": "P"}},
-                                      "done_check": 'test -f "$FACTORY_KEY_PLAN"'}, body="Write the plan.\n")
+                                      "done_check": 'test -f "$FACTORY_KEY_PLAN"'}, body="Write the plan to {{plan}}. Also see {{other}}.\n")
     write_pipeline(kp.fdir, {"id": "own", "steps": ["selfcheck"]})
     out = kp.factory("pipeline", "check", "own").stdout
+    assert "Step `selfcheck` uses `other`, which no input, earlier step or factory key sets." in out
     assert "uses `plan`" not in out
 
 
