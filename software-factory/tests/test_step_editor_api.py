@@ -140,3 +140,11 @@ def test_skill_create_step_runs_step_edit():
     skill = (SF / "skills" / "software-factory" / "SKILL.md").read_text()
     assert "**Create a new step** (`new-step`): run `factory step edit`" in skill
     assert "new-step-assistant" not in skill
+
+
+def test_editor_page_has_step_form_controls(se):
+    inited, i = se
+    status, page = request(i, "GET", "/editor")
+    for text in ("New step", "Copy to local", "Duplicate", "Keys available here", "/api/pipelines/keys",
+                 "/api/steps/save", "/api/steps/preview", "/api/steps/impact", "$FACTORY_KEY_", "new_step"):
+        assert text in page, text

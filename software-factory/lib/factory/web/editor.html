@@ -39,6 +39,10 @@ dt { color: var(--muted); }
 dd { margin: 0; word-break: break-word; }
 .dim { opacity: 0.5; }
 .tag { border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; font-size: 11px; color: var(--muted); margin-right: 4px; }
+#stepform { position: fixed; inset: 0; background: var(--bg); overflow: auto; padding: 16px; z-index: 10; }
+.formgrid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+#stepform textarea { width: 100%; min-height: 280px; box-sizing: border-box; font-family: ui-monospace, monospace; }
+.formside { position: sticky; top: 0; }
 </style>
 </head>
 <body>
@@ -48,6 +52,7 @@ dd { margin: 0; word-break: break-word; }
 <main id="editor" hidden>
   <section>
     <h3>Available steps</h3>
+    <div class="row"><button type="button" id="newstep">New step</button></div>
     <div id="filters" class="row"></div>
     <div id="available"></div>
   </section>
@@ -63,6 +68,7 @@ dd { margin: 0; word-break: break-word; }
     <div id="detail" class="muted">Click a step.</div>
   </section>
 </main>
+<div id="stepform" hidden></div>
 <script>
 const params = new URLSearchParams(location.search);
 const TOKEN = params.get("token");
@@ -194,7 +200,7 @@ function pipelineRow(s, i) {
   const mark = info && info.hidden ? el("span", { class: "tag" }, "hidden") : "";
   const head = el("div", { class: "head", draggable: "true" },
     el("span", { class: "muted" }, String(i + 1)),
-    el("span", { class: "link grow", onclick: () => showDetail(s.id) }, s.id),
+    el("span", { class: "link grow", onclick: guard(() => showDetail(s.id, i + 1)) }, s.id),
     mark,
     el("button", { type: "button", onclick: () => { s.open = !s.open; renderPipeline(); } }, s.open ? "Close" : "Edit"),
     el("button", { type: "button", onclick: () => { state.model.steps.splice(i, 1); renderPipeline(); changed(); } }, "Remove"));
@@ -281,16 +287,34 @@ async function loadSteps() {
 }
 
 function valueText(v) { return typeof v === "string" ? v : JSON.stringify(v); }
-async function showDetail(id) {
+function outputsText(outputs) {
+  return Object.entries(outputs).map(([k, o]) => `${k} (${o.type}${o.optional ? ", optional" : ""})`).join(", ");
+}
+function keyRow(r, onPick) {
+  const name = el("span", onPick ? { class: "link" } : {}, r.name);
+  if (onPick) name.addEventListener("click", () => onPick(r));
+  return el("div", {}, name, " ", el("span", { class: "muted" }, `${r.type}, ${r.source}, ${r.set} set`));
+}
+async function keysAt(position) {
+  return api("/api/pipelines/keys", { data: dataOf(state.model), at: position });
+}
+async function keysBlock(position) {
+  const rows = await keysAt(position);
+  const box = el("div", {}, el("div", { class: "muted" }, "Keys available here"));
+  for (const r of rows) box.append(keyRow(r, null));
+  return box;
+}
+async function showDetail(id, position = null) {
   const d = await api("/api/steps/" + encodeURIComponent(id));
   const box = clear(byId("detail"));
   box.classList.remove("muted");
   box.append(el("h4", {}, d.id), el("div", {}, d.description));
   const list = el("dl");
-  const rows = Object.entries(d.manifest).filter(([k]) => k !== "id" && k !== "description");
+  const rows = Object.entries(d.manifest).filter(([k]) => !["id", "description", "outputs", "steps"].includes(k));
   for (const [k, v] of rows) list.append(el("dt", {}, k), el("dd", {}, valueText(v)));
+  list.append(el("dt", {}, "uses"), el("dd", {}, d.uses.join(", ") || "none"));
+  list.append(el("dt", {}, "outputs"), el("dd", {}, outputsText(d.outputs) || "none"));
   list.append(el("dt", {}, "level"), el("dd", {}, d.level), el("dt", {}, "file"), el("dd", {}, d.path));
-  if (d.reads.length || d.writes.length) list.append(el("dt", {}, "reads (all)"), el("dd", {}, d.reads.join(", ")), el("dt", {}, "writes (all)"), el("dd", {}, d.writes.join(", ")));
   box.append(list);
   if (d.children.length) {
     const kids = el("div", {}, el("div", { class: "muted" }, "Child steps"));
@@ -298,13 +322,291 @@ async function showDetail(id) {
     box.append(kids);
   }
   box.append(el("div", { class: "muted" }, "Body"), el("pre", {}, d.body));
+  const actions = el("div", { class: "row" });
+  if (d.level !== "builtin") actions.append(el("button", { type: "button", onclick: () => openStepForm({ mode: "edit", detail: d, position }) }, "Edit"));
+  if (d.level !== "local") actions.append(el("button", { type: "button", onclick: () => openStepForm({ mode: "copy-local", detail: d, position }) }, "Copy to local"));
+  actions.append(el("button", { type: "button", onclick: () => openStepForm({ mode: "new", detail: d, duplicate: true, position }) }, "Duplicate"));
   if (d.level !== "builtin") {
-    box.append(el("div", { class: "row" },
-      el("button", { type: "button", onclick: guard(async () => {
-        const plan = await api("/api/steps/" + encodeURIComponent(d.id) + "/delete/dry-run", { level: d.level });
-        box.append(deletePlanBlock(d, plan));
-      }) }, "Delete")));
+    actions.append(el("button", { type: "button", onclick: guard(async () => {
+      const plan = await api("/api/steps/" + encodeURIComponent(d.id) + "/delete/dry-run", { level: d.level });
+      box.append(deletePlanBlock(d, plan));
+    }) }, "Delete"));
   }
+  box.append(actions);
+  if (position && state.model) box.append(await keysBlock(position));
+}
+const MODELS = ["", "opus", "sonnet", "haiku"];
+const EFFORTS = ["", "low", "medium", "high", "max"];
+const FORM_CHECK_DELAY_MS = 300;
+
+function formModelOf(detail, duplicate) {
+  const m = detail ? detail.manifest : {};
+  return {
+    id: duplicate ? "" : (m.id || ""), description: m.description || "", category: m.category || "", newCategory: "",
+    type: m.type || "ai", run_in: m.run_in || "", model: m.model || "", effort: m.effort || "", column: m.column || "",
+    required: !!m.required, wait_external: !!m.wait_external, done_when: m.done_when || "", done_check: m.done_check || "",
+    requires: [...(m.requires || [])],
+    config: Object.entries(m.config || {}).map(([key, v]) => ({ key, description: (v && v.description) || "",
+      default: v && "default" in v ? String(v.default) : "", hasDefault: !!(v && "default" in v) })),
+    outputs: Object.entries(m.outputs || {}).map(([key, v]) => ({ key, type: (v && v.type) || "text",
+      description: (v && v.description) || "", optional: !!(v && v.optional) })),
+    steps: [...(m.steps || [])], body: detail && m.type !== "group" ? detail.body : "",
+  };
+}
+function manifestOf(f) {
+  const m = { id: f.id, description: f.description, category: f.newCategory || f.category, type: f.type,
+    done_when: f.done_when, done_check: f.done_check, required: f.required, wait_external: f.wait_external,
+    column: f.column, requires: f.requires.filter(Boolean), config: {} };
+  if (f.type === "ai") Object.assign(m, { run_in: f.run_in, model: f.model, effort: f.effort });
+  if (f.type === "group") m.steps = f.steps;
+  else {
+    m.outputs = {};
+    for (const o of f.outputs) if (o.key) m.outputs[o.key] = { type: o.type, description: o.description, ...(o.optional ? { optional: true } : {}) };
+  }
+  for (const c of f.config) if (c.key) m.config[c.key] = { description: c.description, ...(c.hasDefault || c.default !== "" ? { default: c.default } : {}) };
+  return m;
+}
+function formBody() { const f = state.form.f; return f.type === "group" ? "" : f.body; }
+
+function openStepForm(opts) {
+  const mode = opts.mode;
+  state.form = { mode, level: mode === "edit" ? opts.detail.level : "local", position: opts.position || null,
+    f: formModelOf(opts.detail, !!opts.duplicate), keys: [], check: null, preview: null, impact: null,
+    commit: null, saved: null, textarea: null, timer: null, ticket: 0 };
+  byId("stepform").hidden = false;
+  renderStepForm();
+  guard(refreshFormKeys)();
+  formChanged();
+}
+function closeStepForm() { byId("stepform").hidden = true; state.form = null; }
+async function refreshFormKeys() {
+  const s = state.form;
+  s.keys = s.position && state.model ? await keysAt(s.position) : state.formData.factory_keys;
+  renderFormSide();
+}
+function formChanged() {
+  const s = state.form;
+  s.preview = null; s.impact = null; s.saved = null; s.commit = null;
+  clearTimeout(s.timer);
+  s.timer = setTimeout(guard(runFormCheck), FORM_CHECK_DELAY_MS);
+  renderFormSide();
+}
+async function runFormCheck() {
+  const s = state.form;
+  if (!s) return;
+  const ticket = ++s.ticket;
+  const result = await api("/api/steps/check", { manifest: manifestOf(s.f), body: formBody() });
+  if (state.form !== s || ticket !== s.ticket) return;
+  s.check = result;
+  renderFormSide();
+}
+
+function checkbox(value, onChange) {
+  const c = el("input", { type: "checkbox" });
+  c.checked = value;
+  c.addEventListener("change", () => onChange(c.checked));
+  return c;
+}
+function rowsEditor(rows, makeRow, blank) {
+  const box = el("div");
+  const draw = () => {
+    clear(box);
+    rows.forEach((r, i) => box.append(el("div", { class: "row" }, ...makeRow(r, i),
+      el("button", { type: "button", onclick: () => { rows.splice(i, 1); draw(); formChanged(); } }, "Remove"))));
+    box.append(el("button", { type: "button", onclick: () => { rows.push(blank()); draw(); formChanged(); } }, "Add"));
+  };
+  draw();
+  return box;
+}
+function requiresRows(list) {
+  const rows = list.map((value) => ({ value }));
+  const sync = () => { list.splice(0, list.length, ...rows.map((r) => r.value)); formChanged(); };
+  return rowsEditor(rows, (r) => [textInput(r.value, (v) => { r.value = v; sync(); }, "skill or tool, for example gh")], () => ({ value: "" }));
+}
+function configRows(rows) {
+  return rowsEditor(rows, (r) => [
+    textInput(r.key, (v) => { r.key = v; formChanged(); }, "key"),
+    textInput(r.description, (v) => { r.description = v; formChanged(); }, "description"),
+    textInput(r.default, (v) => { r.default = v; formChanged(); }, "default")], () => ({ key: "", description: "", default: "", hasDefault: false }));
+}
+function outputRows(rows) {
+  return rowsEditor(rows, (r) => [
+    textInput(r.key, (v) => { r.key = v; formChanged(); }, "key"),
+    selectInput(KEY_TYPES, r.type, (v) => { r.type = v; formChanged(); }),
+    textInput(r.description, (v) => { r.description = v; formChanged(); }, "description"),
+    el("label", {}, checkbox(r.optional, (v) => { r.optional = v; formChanged(); }), " optional")],
+    () => ({ key: "", type: "text", description: "", optional: false }));
+}
+function childList(children) {
+  const box = el("div");
+  const draw = () => {
+    clear(box);
+    children.forEach((c, i) => {
+      const card = el("div", { class: "card head", draggable: "true" }, el("span", { class: "grow" }, c),
+        el("button", { type: "button", onclick: () => { children.splice(i, 1); draw(); formChanged(); } }, "Remove"));
+      card.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "child:" + i); });
+      card.addEventListener("dragover", (e) => e.preventDefault());
+      card.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const [kind, value] = e.dataTransfer.getData("text/plain").split(":");
+        if (kind !== "child") return;
+        const [item] = children.splice(Number(value), 1);
+        children.splice(i, 0, item);
+        draw(); formChanged();
+      });
+      box.append(card);
+    });
+    const pick = selectInput(["", ...state.steps.filter((s) => !s.hidden).map((s) => s.id)], "", () => {});
+    box.append(el("div", { class: "row" }, pick, el("button", { type: "button", onclick: () => {
+      if (pick.value) { children.push(pick.value); draw(); formChanged(); }
+    } }, "Add child step")));
+  };
+  draw();
+  return box;
+}
+function categoryInput(f) {
+  const options = ["", ...state.formData.categories];
+  if (f.category && !options.includes(f.category)) options.push(f.category);
+  return el("div", { class: "row" }, selectInput(options, f.category, (v) => { f.category = v; formChanged(); }),
+    textInput(f.newCategory, (v) => { f.newCategory = v.trim(); formChanged(); }, "new category"));
+}
+function levelInput() {
+  const s = state.form;
+  const box = el("div", { class: "row" });
+  for (const value of ["local", "generic"]) {
+    if (value === "generic" && !state.formData.library) continue;
+    const r = el("input", { type: "radio", name: "steplevel", value });
+    r.checked = s.level === value;
+    r.addEventListener("change", () => { s.level = value; formChanged(); });
+    box.append(el("label", {}, r, " " + value + " "));
+  }
+  return box;
+}
+function bodyArea(f) {
+  const t = el("textarea");
+  t.value = f.body;
+  t.addEventListener("input", () => { f.body = t.value; formChanged(); });
+  state.form.textarea = t;
+  return t;
+}
+function insertAtCursor(text) {
+  const t = state.form.textarea;
+  if (!t) return;
+  const start = t.selectionStart, end = t.selectionEnd;
+  t.value = t.value.slice(0, start) + text + t.value.slice(end);
+  t.selectionStart = t.selectionEnd = start + text.length;
+  t.focus();
+  state.form.f.body = t.value;
+  formChanged();
+}
+function insertKey(name, isConfig) {
+  const f = state.form.f;
+  if (f.type === "ai") insertAtCursor(isConfig ? `{{config.${name}}}` : `{{${name}}}`);
+  else if (f.type === "command") insertAtCursor(isConfig ? `$FACTORY_CONFIG_${name.toUpperCase()}` : `$FACTORY_KEY_${name.toUpperCase()}`);
+}
+
+function renderStepForm() {
+  const s = state.form, f = s.f, box = clear(byId("stepform"));
+  const titles = { new: "New step", edit: "Edit step " + f.id, "copy-local": "Copy " + f.id + " to local" };
+  const idInput = textInput(f.id, (v) => { f.id = v; formChanged(); }, "step id");
+  if (s.mode !== "new") idInput.disabled = true;
+  const left = el("div");
+  left.append(el("div", { class: "head" }, el("h3", { class: "grow" }, titles[s.mode]),
+      el("button", { type: "button", onclick: closeStepForm }, "Close")),
+    field("id", idInput),
+    field("description", textInput(f.description, (v) => { f.description = v; formChanged(); })),
+    field("category", categoryInput(f)),
+    field("type", selectInput(["ai", "command", "group"], f.type, (v) => { f.type = v; renderStepForm(); formChanged(); })));
+  if (s.mode === "new") left.append(field("level", levelInput()));
+  if (f.type === "ai") {
+    left.append(field("run_in", selectInput(["", "session", "subagent"], f.run_in, (v) => { f.run_in = v; formChanged(); })),
+      field("model", selectInput(MODELS, f.model, (v) => { f.model = v; formChanged(); })),
+      field("effort", selectInput(EFFORTS, f.effort, (v) => { f.effort = v; formChanged(); })));
+  }
+  left.append(field("column", selectInput(["", ...state.columns], f.column, (v) => { f.column = v; formChanged(); })),
+    field("required", checkbox(f.required, (v) => { f.required = v; formChanged(); })),
+    field("wait_external", checkbox(f.wait_external, (v) => { f.wait_external = v; formChanged(); })),
+    field("done_when", textInput(f.done_when, (v) => { f.done_when = v; formChanged(); })),
+    field("done_check", textInput(f.done_check, (v) => { f.done_check = v; formChanged(); }, "optional shell command")),
+    field("requires", requiresRows(f.requires)),
+    field("config", configRows(f.config)));
+  if (f.type !== "group") left.append(field("outputs", outputRows(f.outputs)));
+  state.form.textarea = null;
+  left.append(f.type === "group" ? field("child steps", childList(f.steps)) : field(f.type === "ai" ? "prompt" : "command", bodyArea(f)));
+  box.append(el("div", { class: "formgrid" }, left, el("div", { id: "formside", class: "formside" })));
+  renderFormSide();
+}
+
+function renderFormSide() {
+  const s = state.form, side = byId("formside");
+  if (!s || !side) return;
+  clear(side);
+  const f = s.f;
+  if (f.type !== "group") {
+    const keyBox = el("div", {}, el("div", { class: "muted" }, s.position && state.model ? "Keys available at this position" : "Factory keys"));
+    for (const r of s.keys) keyBox.append(keyRow(r, (k) => insertKey(k.name, false)));
+    for (const c of f.config) if (c.key) keyBox.append(keyRow({ name: "config." + c.key, type: "config", source: "this step", set: "always" }, () => insertKey(c.key, true)));
+    side.append(keyBox);
+  }
+  const check = s.check;
+  if (check) {
+    for (const e of check.errors) side.append(el("div", { class: "problem error" }, "Error: " + e));
+    for (const w of check.warnings) side.append(el("div", { class: "problem warning" }, "Warning: " + w));
+    if (!check.errors.length) side.append(el("div", { class: "muted" }, "Uses: " + (check.uses.join(", ") || "none") + ". Outputs: " + (outputsText(check.outputs) || "none") + "."));
+  }
+  if (f.type === "ai") {
+    side.append(el("button", { type: "button", onclick: guard(async () => {
+      s.preview = (await api("/api/steps/preview", { manifest: manifestOf(f), body: formBody() })).text;
+      renderFormSide();
+    }) }, "Preview"));
+    if (s.preview !== null) side.append(el("pre", {}, s.preview));
+  }
+  const save = el("button", { type: "button", class: "primary", onclick: guard(startSave) }, "Save");
+  save.disabled = !check || check.errors.length > 0;
+  side.append(el("div", { class: "row" }, save));
+  if (s.impact) side.append(impactBlock(s.impact));
+  if (s.saved) side.append(el("div", { class: "muted" }, "Saved to " + s.saved.path));
+  if (s.saved) for (const w of s.saved.warnings) side.append(el("div", { class: "problem warning" }, "Warning: " + w));
+  if (s.commit) side.append(commitBox(s.commit, () => { s.commit = null; side.append(el("div", { class: "muted" }, "Committed to the library.")); }));
+}
+function impactBlock(imp) {
+  const b = el("div", { class: "card" }, el("div", {}, "This change applies to:"));
+  for (const p of imp.pipelines) b.append(el("div", {}, `pipeline ${p.id} (${p.level})`));
+  for (const g of imp.groups) b.append(el("div", {}, `group step ${g.id} (${g.level})`));
+  for (const t of imp.tasks) b.append(el("div", {}, `task ${t.id}: the change applies from its next step`));
+  if (!imp.pipelines.length && !imp.groups.length && !imp.tasks.length) b.append(el("div", { class: "muted" }, "No pipeline or task uses this step."));
+  for (const w of imp.warnings) b.append(el("div", { class: "problem warning" }, w));
+  b.append(el("div", { class: "row" },
+    el("button", { type: "button", class: "primary", onclick: guard(doSave) }, "Confirm save"),
+    el("button", { type: "button", onclick: () => { state.form.impact = null; renderFormSide(); } }, "Cancel")));
+  return b;
+}
+async function startSave() {
+  const s = state.form;
+  if (s.mode === "edit") {
+    s.impact = await api("/api/steps/impact", { id: s.f.id });
+    renderFormSide();
+    return;
+  }
+  await doSave();
+}
+async function doSave() {
+  const s = state.form;
+  let result;
+  try {
+    result = await api("/api/steps/save", { manifest: manifestOf(s.f), body: formBody(), level: s.level, mode: s.mode });
+  } catch (e) {
+    if (e.conflict) showError(e.message);
+    return;
+  }
+  s.impact = null;
+  s.saved = result;
+  s.commit = result.library_commit;
+  s.mode = "edit";
+  s.level = result.level;
+  await loadSteps();
+  if (state.model) await runCheck();
+  renderStepForm();
 }
 function userText(u) {
   if (u.kind === "task") return "task " + u.id;
@@ -457,6 +759,16 @@ async function init() {
   state.columns = info.columns;
   setupDrop();
   await loadSteps();
+  state.formData = await api("/api/step-form");
+  byId("newstep").addEventListener("click", () => openStepForm({ mode: "new" }));
+  const stepParam = params.get("step");
+  if (params.get("new_step")) openStepForm({ mode: "new" });
+  else if (stepParam) {
+    try {
+      const d = await api("/api/steps/" + encodeURIComponent(stepParam));
+      openStepForm({ mode: d.level === "builtin" ? "copy-local" : "edit", detail: d });
+    } catch (e) {}
+  }
   const id = params.get("id");
   let failure = null;
   if (id) {
