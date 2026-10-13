@@ -1,6 +1,6 @@
 # Pipeline loop verification report
 
-Date: 2026-10-14 00:00
+Date: 2026-10-14 00:48
 
 ## Milestone 1. Loop runtime
 
@@ -42,7 +42,7 @@ Date: 2026-10-14 00:00
 
 ## Milestone 2. Loop authoring
 
-21 of 21 tests pass.
+22 of 22 tests pass.
 
 | Test | Result |
 |---|---|
@@ -56,6 +56,7 @@ Date: 2026-10-14 00:00
 | `test_authoring_skill::test_readme_describes_authoring_skill` | PASS |
 | `test_authoring_skill::test_skill_covers_review_findings` | PASS |
 | `test_authoring_skill::test_skill_documents_loops` | PASS |
+| `test_authoring_skill::test_examples_never_output_the_ticket_key` | PASS |
 | `test_docs::test_readme_commands_exist` | PASS |
 | `test_docs::test_skill_and_builtin_commands_exist` | PASS |
 | `test_docs::test_readme_sections` | PASS |
@@ -70,7 +71,7 @@ Date: 2026-10-14 00:00
 
 ## Full test suite
 
-398 of 398 tests pass.
+399 of 399 tests pass.
 
 ## Updated tests
 
@@ -123,6 +124,7 @@ Date: 2026-10-14 00:00
 ### Authoring skill and documentation
 
 - Skill loop section, footer line, the rule to set the key to `none`, the two examples with a subagent review step: `test_authoring_skill::test_skill_documents_loops`, `test_examples_load_and_check_clean`.
+- The examples never output the Jira key `ticket`, and the skill says so: `test_authoring_skill::test_examples_never_output_the_ticket_key`.
 - README: `test_loop_authoring::test_readme_documents_loops`.
 - Every `factory` command in the README and the skills exists: `test_docs::test_readme_commands_exist`, `test_authoring_skill::test_skill_commands_exist`.
 

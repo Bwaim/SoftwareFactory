@@ -140,3 +140,13 @@ def test_skill_documents_loops():
         assert needle in loops_section, needle
     review = dict(examples(text))[".factory/steps/review-spec.md"]
     assert "run_in: subagent" in review and "set `findings` to `none`" in review
+
+
+def test_examples_never_output_the_ticket_key():
+    text = skill_text()
+    assert "Never use `ticket` as an output key. It is the Jira ticket key" in text
+    for path, body in examples(text):
+        if path.endswith(".md") and body.startswith("---\n"):
+            manifest = yaml.safe_load(body.split("---\n", 2)[1])
+            assert "ticket" not in (manifest.get("outputs") or {}), path
+            assert "{{ticket}}" not in body, path

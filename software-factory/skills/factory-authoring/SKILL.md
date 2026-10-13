@@ -66,6 +66,7 @@ Request: $ARGUMENTS
 - A generic pipeline uses only generic or built-in steps. So each new step of a generic pipeline is generic too. If not, `factory pipeline check` warns "This generic pipeline uses the local step".
 - A step that calls a skill is an `ai` step. Its prompt calls the skill, and `requires` lists it. Example: `requires: [/superpowers:writing-plans]`.
 - The file name is the id: `<id>.md` for a step, `<id>.yaml` for a pipeline.
+- Never use `ticket` as an output key. It is the Jira ticket key: the dashboard shows it as the card title and builds its link from `ticket_url`.
 
 ## Format reference
 
@@ -433,7 +434,7 @@ description: Take the next ticket from the list
 category: planning
 type: ai
 outputs:
-  ticket:
+  current_ticket:
     type: text
     description: The ticket of this round, or none
   remaining:
@@ -444,8 +445,8 @@ done_when: The ticket and the tickets left are saved.
 
 The tickets left: {{remaining}}.
 
-- When this is `none`, set `ticket` to `none` and `remaining` to `none`.
-- Otherwise, set `ticket` to the first line.
+- When this is `none`, set `current_ticket` to `none` and `remaining` to `none`.
+- Otherwise, set `current_ticket` to the first line.
 - Set `remaining` to the other lines. When no line is left, set it to `none`.
 ```
 
@@ -460,7 +461,7 @@ type: ai
 done_when: The ticket is built, tested and committed.
 ---
 
-The ticket of this round: {{ticket}}.
+The ticket of this round: {{current_ticket}}.
 
 When it is `none`, do nothing and run `factory done`.
 Otherwise, build the ticket, run the tests and commit the change.
@@ -499,5 +500,5 @@ What the examples show:
 - `review-spec` runs in a subagent and sets `findings` to `none` when the review is clean.
 - `write-spec` uses `{{findings}}`, an output of a later step of its loop. It is `(not set)` in the first round.
 - `ticket-round` loops back to itself. `pick-ticket` controls the loop: it sets `remaining` to `none` after the last ticket.
-- With zero tickets, `pick-ticket` sets `ticket` to `none`, and `build-ticket` does nothing.
+- With zero tickets, `pick-ticket` sets `current_ticket` to `none`, and `build-ticket` does nothing.
 - Each loop has a step after it, so the user decides at the limit.

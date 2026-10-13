@@ -44,6 +44,7 @@
 ### Authoring skill and documentation
 
 - Skill loop section, footer line, the rule to set the key to `none`, the two examples with a subagent review step: `test_authoring_skill::test_skill_documents_loops`, `test_examples_load_and_check_clean`.
+- The examples never output the Jira key `ticket`, and the skill says so: `test_authoring_skill::test_examples_never_output_the_ticket_key`.
 - README: `test_loop_authoring::test_readme_documents_loops`.
 - Every `factory` command in the README and the skills exists: `test_docs::test_readme_commands_exist`, `test_authoring_skill::test_skill_commands_exist`.
 
