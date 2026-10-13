@@ -3,7 +3,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from . import config, events, keys, render, repo, session, state
+from . import config, events, keys, loops, render, repo, session, state
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, Registry
 
@@ -270,7 +270,57 @@ def done(ctx, tid):
         if not ok:
             events.log(ctx, tid, "done_check_failed", state.step_path_str(task), output=output)
             raise FactoryError(f"The done check failed. The step is not done.\nCheck: {step.done_check}\n{output}")
-    return advance(ctx, tid, "step_done", task["position"])
+    return settle(ctx, tid, task["position"])[1]
+
+
+def settle(ctx, tid, position, statuses=ADVANCE_STATUSES, first_event=None):
+    task = state.load(ctx, tid)
+    loop = loops.loop_ending_at(task, position)
+    if loop is None or not loops.is_set((task.get("state") or {}).get(loop["while"])):
+        return "step", advance(ctx, tid, "step_done", position, statuses, first_event)
+    if loop["jumps"] < loop["max"]:
+        return "loop", loop_back(ctx, tid, position, statuses, first_event)
+    return "limit", loop_limit(ctx, tid, position, statuses, first_event)
+
+
+def loop_back(ctx, tid, position, statuses, first_event):
+    info = {}
+
+    def change(t):
+        require_unchanged(t, position, statuses)
+        loop = loops.loop_ending_at(t, position)
+        info["from"] = state.step_path_str(t)
+        if first_event:
+            first_event()
+        events.log(ctx, tid, "step_done", info["from"])
+        loop["jumps"] += 1
+        loops.reset_counts(t, loop["first"], loop)
+        t["position"] = loop["first"]
+        t["started"] = None
+        t["command_result"] = None
+        t["approval"] = None
+        state.set_status(t, "active")
+        info.update(entry=loop["entry"], n=loop["jumps"], max=loop["max"], to=state.step_path_str(t))
+
+    task = state.update(ctx, tid, change)
+    events.log(ctx, tid, "loop_back", info["from"], entry=info["entry"], to=info["to"], round=info["n"], max=info["max"])
+    return f"Loop {info['n']} of {info['max']}: back to `{info['to']}`. Run `{cmd(task, 'next')}`."
+
+
+def loop_limit(ctx, tid, position, statuses, first_event):
+    task = state.load(ctx, tid)
+    loop = loops.loop_ending_at(task, position)
+    path = state.step_path_str(task)
+    target = state.step_path_str(task, loop["first"])
+    reason = f"Loop limit reached on `{loop['entry']}`: `{loop['while']}` is still set"
+    advance(ctx, tid, "step_done", position, statuses, first_event)
+    events.log(ctx, tid, "loop_limit", path, entry=loop["entry"], key=loop["while"])
+    if state.load(ctx, tid)["status"] == "finished":
+        session.notify(ctx, f"Task {tid} finished, but the loop limit was reached on `{loop['entry']}`: `{loop['while']}` is still set.")
+        return f"The pipeline is finished, but the loop limit was reached on `{loop['entry']}`: `{loop['while']}` is still set. Tell the user."
+    block(ctx, tid, reason)
+    return (f"{reason}. The task is blocked. Ask the user what to do. To go on, the user runs `factory unblock`. "
+            f"For one more round, after the user approves, run `factory goto \"{target}\" --reason \"<why>\"`.")
 
 
 def skip(ctx, tid):
@@ -313,6 +363,7 @@ def goto(ctx, tid, target, reason):
         t["started"] = None
         t["command_result"] = None
         t["approval"] = None
+        loops.reset_counts(t, index)
         if t["goto_counts"][key] >= MAX_JUMPS:
             state.set_status(t, "blocked", f"loop on {to_path}")
         else:
@@ -345,14 +396,15 @@ def end_wait(ctx, tid, how):
         raise FactoryError(f"Task {tid} is not waiting for an external event.")
     entry, step = load_step(ctx, task)
     path = state.step_path_str(task)
-    advance(ctx, tid, "step_done", task["position"], ("waiting_external",),
-            lambda: events.log(ctx, tid, "external_event", path, how=how))
+    kind, text = settle(ctx, tid, task["position"], ("waiting_external",),
+                        lambda: events.log(ctx, tid, "external_event", path, how=how))
     task = state.load(ctx, tid)
     happened = (step.done_when or "An external event.").removesuffix(".")
     session.notify(ctx, f"Task {tid}: {step.done_when or 'the external event happened'}")
     if task["status"] == "finished":
         return
-    session.deliver(ctx, tid, f"The external event happened: {happened}. Run `{cmd(task, 'next')}`.")
+    then = f"Run `{cmd(task, 'next')}`." if kind == "step" else text
+    session.deliver(ctx, tid, f"The external event happened: {happened}. {then}")
 
 
 def poll_task(ctx, task):
