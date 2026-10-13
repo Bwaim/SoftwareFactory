@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from . import keys
+from . import keys, loops
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, is_valid_id, normalize_entry
 
@@ -41,6 +41,7 @@ def check(reg, data, columns, save_level=None, hidden=()):
     rows = keys.start_rows(data)
     first_type = {name: (r["type"], r["source"]) for name, r in rows.items() if r["source"] == "input"}
     warned_types = set()
+    loop_keys = loops.keys_in_ranges(reg, entries)
     for i, entry in enumerate(entries):
         sid = entry.get("id")
         if sid == CREATE_WORKTREE and i != 0:
@@ -72,7 +73,7 @@ def check(reg, data, columns, save_level=None, hidden=()):
                 warning(f"Step `{leaf.id}` runs in the session. Its `model` and `effort` have no effect.")
             own_outputs = set(keys.outputs_of(leaf))
             for key in keys.leaf_uses(leaf):
-                if key not in rows and key not in own_outputs:
+                if key not in rows and key not in own_outputs and key not in loop_keys[i]:
                     warning(f"Step `{leaf.id}` uses `{key}`, which no input, earlier step or factory key sets.")
             for name, out in keys.outputs_of(leaf).items():
                 seen = first_type.setdefault(name, (out["type"], f"step {leaf.id}"))
@@ -80,4 +81,6 @@ def check(reg, data, columns, save_level=None, hidden=()):
                     warned_types.add(name)
                     warning(f"The key `{name}` is set with two types: {seen[0]} ({seen[1]}) and {out['type']} (step {leaf.id}).")
             keys.add_outputs(rows, leaf)
+    for level, message in loops.check(reg, data):
+        problems.append(Problem(level, message))
     return problems
