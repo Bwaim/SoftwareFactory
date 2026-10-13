@@ -185,6 +185,9 @@ def task_from_pipeline(inited, pid, tid="t1", worktree=None, **fields):
     from factory.registry import Registry
     ctx = repo.load_ctx(cwd=inited.repo)
     reg = Registry.load(ctx)
-    snapshot = reg.expand(reg.pipeline(pid))
+    from factory import loops
+    pipeline = reg.pipeline(pid)
+    snapshot = reg.expand(pipeline)
     position = 1 if snapshot and snapshot[0]["id"] == "create-worktree" else 0
+    fields.setdefault("loops", loops.snapshot(reg, pipeline))
     return make_task(ctx, tid=tid, worktree=worktree, steps=snapshot, position=position, pipeline=pid, **fields)

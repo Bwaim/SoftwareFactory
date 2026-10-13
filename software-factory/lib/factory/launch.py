@@ -4,7 +4,7 @@ import sys
 import unicodedata
 from pathlib import Path
 
-from . import adapters, config, events, keys, pipeline_check, repo, session, state
+from . import adapters, config, events, keys, loops, pipeline_check, repo, session, state
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, Registry
 
@@ -220,7 +220,7 @@ def new_task(ctx, reg, report, inputs):
         "column": pipeline.start_column or columns[0],
         "worktree": report["worktree"], "base_ref": report["base_ref"],
         "session_id": session.new_session_id(), "terminal_handle": None,
-        "goto_counts": {}, "approval": None, "claude": pipeline.claude,
+        "goto_counts": {}, "loops": loops.snapshot(reg, pipeline), "approval": None, "claude": pipeline.claude,
         "state": task_state, "created_at": now, "updated_at": now,
     }
 
