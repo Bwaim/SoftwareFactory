@@ -6,7 +6,9 @@ from pathlib import Path
 
 from . import adapters, config, events, pipeline_check, repo, session, state
 from .errors import FactoryError
-from .registry import CREATE_WORKTREE, NO_WORKTREE_PIPELINES, Registry
+from .registry import CREATE_WORKTREE, Registry
+
+NO_WORKTREE_PIPELINES = frozenset()
 
 TASK_ID_RE = state.TASK_ID_RE
 ID_BASE_MAX = 29

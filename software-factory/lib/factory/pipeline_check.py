@@ -62,10 +62,6 @@ def check(reg, data, columns, save_level=None, hidden=()):
                 continue
             if leaf.column and leaf.column not in columns:
                 error(f"Step `{leaf.id}` uses the column `{leaf.column}`, which is not in the board columns.")
-            for key in leaf.get("reads") or []:
-                if key not in available:
-                    warning(f"Step `{leaf.id}` reads `{key}`, which is not a pipeline input and is not written by an earlier step.")
-            available |= set(leaf.get("writes") or [])
             if (entry.get("model") or entry.get("effort")) and leaf.run_in == "session":
                 warning(f"Step `{leaf.id}` runs in the session. Its `model` and `effort` have no effect.")
     return problems

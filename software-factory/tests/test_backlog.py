@@ -39,7 +39,7 @@ def test_hand_written_file_is_kept(inited):
 
 
 def test_launch_from_backlog(inited):
-    write_step(inited.fdir, "w", {"reads": ["summary"]})
+    write_step(inited.fdir, "w", {}, body="Use {{summary}}.\n")
     write_pipeline(inited.fdir, {"id": "p", "steps": ["w"]})
     e = backlog.add(ctx_of(inited), "Dark mode", "Settings screen only.", "p")
     task = launch.launch(ctx_of(inited), "p", "", {}, from_backlog=e.id)

@@ -83,7 +83,7 @@ def test_delete_local_step_removes_file(inited, ctx):
 
 def test_script_naming_a_step_file_is_not_removed(inited, ctx):
     write_step(inited.fdir, "other", {})
-    write_step(inited.fdir, "bad", {"type": "script"}, body="other.md\n")
+    write_step(inited.fdir, "bad", {"type": "command"}, body='bash "$FACTORY_STEP_DIR/other.md"\n')
     out = step_delete.delete(ctx, "bad")
     assert [Path(p).name for p in out["removed"]] == ["bad.md"]
     assert (inited.fdir / "steps" / "other.md").exists()
@@ -139,7 +139,7 @@ def test_untracked_generic_step_has_no_commit_offer(inited, ctx):
 
 
 def test_script_step_removes_its_script(inited, ctx):
-    write_step(inited.fdir, "runner", {"type": "script"}, body="runner.sh\n")
+    write_step(inited.fdir, "runner", {"type": "command"}, body='bash "$FACTORY_STEP_DIR/runner.sh"\n')
     (inited.fdir / "steps" / "runner.sh").write_text("echo hi\n")
     out = step_delete.plan(ctx, "runner")
     assert [Path(p).name for p in out["files"]] == ["runner.md", "runner.sh"]
@@ -149,7 +149,7 @@ def test_script_step_removes_its_script(inited, ctx):
 
 def test_shared_script_stays(inited, ctx):
     for sid in ("one", "two"):
-        write_step(inited.fdir, sid, {"type": "script"}, body="shared.sh\n")
+        write_step(inited.fdir, sid, {"type": "command"}, body='bash "$FACTORY_STEP_DIR/shared.sh"\n')
     (inited.fdir / "steps" / "shared.sh").write_text("echo hi\n")
     out = step_delete.delete(ctx, "one")
     assert [Path(p).name for p in out["removed"]] == ["one.md"]
@@ -157,7 +157,7 @@ def test_shared_script_stays(inited, ctx):
 
 
 def test_script_step_with_missing_script(inited, ctx):
-    write_step(inited.fdir, "broken", {"type": "script"}, body="missing.sh\n")
+    write_step(inited.fdir, "broken", {"type": "command"}, body='bash "$FACTORY_STEP_DIR/missing.sh"\n')
     out = step_delete.delete(ctx, "broken")
     assert [Path(p).name for p in out["removed"]] == ["broken.md"]
 
@@ -173,18 +173,18 @@ def test_builtin_step_cannot_be_deleted(inited, ctx):
 def test_refused_while_used(inited, ctx):
     write_step(inited.library, "core", {})
     write_pipeline(inited.library, {"id": "gp", "steps": [{"id": "core", "with": {}}]})
-    write_step(inited.fdir, "combo", {"type": "composite", "steps": ["core"]}, body="")
+    write_step(inited.fdir, "combo", {"type": "group", "steps": ["core"]}, body="")
     make_task(ctx, tid="t1", steps=[entry("core", ["combo", "core"])])
     make_task(ctx, tid="t2", status="finished", steps=[entry("core")])
     out = step_delete.plan(ctx, "core")
     assert out["blocked"] is True
     assert {(u["kind"], u["id"], u["level"]) for u in out["users"]} == {
-        ("pipeline", "gp", "generic"), ("composite", "combo", "local"), ("task", "t1", None)}
+        ("pipeline", "gp", "generic"), ("group", "combo", "local"), ("task", "t1", None)}
     with pytest.raises(FactoryError) as e:
         step_delete.delete(ctx, "core")
     text = str(e.value)
     assert text.startswith("Step core is still used. Remove it from these first:")
-    for line in ("- pipeline gp (generic)", "- composite step combo (local)", "- task t1"):
+    for line in ("- pipeline gp (generic)", "- group step combo (local)", "- task t1"):
         assert line in text
     assert "t2" not in text
     assert (inited.library / "steps" / "core.md").exists()
@@ -200,7 +200,7 @@ def test_overridden_pipeline_is_a_user(inited, ctx):
 
 
 def test_dry_run_changes_nothing(inited, ctx):
-    write_step(inited.library, "gone", {"type": "script"}, body="gone.sh\n")
+    write_step(inited.library, "gone", {"type": "command"}, body='bash "$FACTORY_STEP_DIR/gone.sh"\n')
     (inited.library / "steps" / "gone.sh").write_text("echo\n")
     write_step(inited.fdir, "gone", {})
     set_hidden(inited, ["gone"])

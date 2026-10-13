@@ -9,9 +9,9 @@ def step_summary(step, hidden_ids=()):
 
 
 def step_detail(reg, step, hidden_ids=()):
-    reads, writes = reg.io(step.id)
+    from . import keys
     return {**step_summary(step, hidden_ids), "manifest": step.manifest, "body": step.body,
-            "reads": reads, "writes": writes, "children": step.children}
+            "uses": keys.step_uses(reg, step.id), "outputs": keys.step_outputs(reg, step.id), "children": step.children}
 
 
 def list_pipelines(reg):

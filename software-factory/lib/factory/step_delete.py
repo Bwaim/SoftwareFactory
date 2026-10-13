@@ -1,3 +1,4 @@
+import re
 import shlex
 from pathlib import Path
 
@@ -30,24 +31,26 @@ def target_step(reg, sid, level):
     return target
 
 
-def script_of(step):
-    if step.type != "script":
-        return None
-    lines = [line.strip() for line in step.body.splitlines() if line.strip()]
-    return (step.path.parent / lines[0]).resolve() if lines else None
+SCRIPT_REF_RE = re.compile(r"\$\{?FACTORY_STEP_DIR\}?/([A-Za-z0-9._-]+)")
+
+
+def scripts_of(step):
+    if step.type != "command":
+        return []
+    return [(step.path.parent / name).resolve() for name in SCRIPT_REF_RE.findall(step.body)]
 
 
 def script_files(reg, target):
-    script = script_of(target)
-    if script is None or not script.is_file() or script.parent != target.path.parent.resolve():
-        return []
-    if script in {s.path.resolve() for variants in reg.variants.values() for s in variants}:
-        return []
-    for variants in reg.variants.values():
-        for other in variants:
-            if other.path.resolve() != target.path.resolve() and script_of(other) == script:
-                return []
-    return [script]
+    step_files = {s.path.resolve() for variants in reg.variants.values() for s in variants}
+    others = [s for variants in reg.variants.values() for s in variants if s.path.resolve() != target.path.resolve()]
+    out = []
+    for script in scripts_of(target):
+        if not script.is_file() or script.parent != target.path.parent.resolve() or script in step_files:
+            continue
+        if any(script in scripts_of(other) for other in others):
+            continue
+        out.append(script)
+    return out
 
 
 def entry_ids(data):
@@ -62,8 +65,8 @@ def find_users(ctx, reg, sid, target):
             found.append({"kind": "pipeline", "id": pid, "level": level})
     for other_id in sorted(reg.variants):
         for step in reg.variants[other_id]:
-            if step.type == "composite" and step.path != target.path and sid in step.children:
-                found.append({"kind": "composite", "id": step.id, "level": step.level})
+            if step.type == "group" and step.path != target.path and sid in step.children:
+                found.append({"kind": "group", "id": step.id, "level": step.level})
     for task in state.list_tasks(ctx):
         if task.get("status") == "finished":
             continue
@@ -96,7 +99,7 @@ def plan(ctx, sid, level=None):
 def describe(user):
     if user["kind"] == "task":
         return f"- task {user['id']}"
-    kind = "pipeline" if user["kind"] == "pipeline" else "composite step"
+    kind = "pipeline" if user["kind"] == "pipeline" else "group step"
     return f"- {kind} {user['id']} ({user['level']})"
 
 

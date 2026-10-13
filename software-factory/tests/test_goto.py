@@ -3,8 +3,8 @@ from conftest import events, task_from_pipeline, task_json, write_pipeline, writ
 
 def setup(inited):
     for sid in ("a", "rebase", "commit", "b"):
-        write_step(inited.fdir, sid, {"writes": [f"{sid}_out"]})
-    write_step(inited.fdir, "rebase-and-commit", {"type": "composite", "steps": ["rebase", "commit"]}, body="")
+        write_step(inited.fdir, sid, {"outputs": {f"{sid}_out": {"type": "text", "description": "o", "optional": True}}})
+    write_step(inited.fdir, "rebase-and-commit", {"type": "group", "steps": ["rebase", "commit"]}, body="")
     write_pipeline(inited.fdir, {"id": "g", "steps": ["a", "rebase-and-commit", "b"]})
     task_from_pipeline(inited, "g")
     run = lambda *x, check=True: inited.factory(*x, "--task", "t1", check=check)

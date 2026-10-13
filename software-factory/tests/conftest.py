@@ -132,7 +132,7 @@ def inited(factory, origin_repo, library_path, work):
 def write_step(root, sid, manifest, body="Do the step.\n"):
     d = Path(root) / "steps"
     d.mkdir(parents=True, exist_ok=True)
-    data = {"id": sid, "description": f"Step {sid}", "category": "test", "type": "prompt", **manifest}
+    data = {"id": sid, "description": f"Step {sid}", "category": "test", "type": "ai", **manifest}
     (d / f"{sid}.md").write_text("---\n" + yaml.safe_dump(data, sort_keys=False) + "---\n\n" + body)
     return d / f"{sid}.md"
 

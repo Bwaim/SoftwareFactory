@@ -11,7 +11,7 @@ def msgs(problems, level):
 
 
 def test_each_problem_type(inited):
-    write_step(inited.fdir, "local-step", {"reads": ["nothing"], "column": "Nowhere"})
+    write_step(inited.fdir, "local-step", {"column": "Nowhere"}, body="Use {{nothing}}.\n")
     write_step(inited.fdir, "sess", {})
     reg = Registry.load(repo.load_ctx(cwd=inited.repo))
     data = {
@@ -29,14 +29,13 @@ def test_each_problem_type(inited):
     assert "`create-worktree` is listed, but not as the first step" in errors
     assert "`missing` does not exist" in errors
     assert "column `Nowhere`" in errors
-    assert "reads `nothing`" in warnings
     assert "uses the local step `local-step`" in warnings
     assert "runs in the session" in warnings
 
 
 def test_valid_pipeline_has_no_problem(inited):
-    write_step(inited.fdir, "a", {"writes": ["x"]})
-    write_step(inited.fdir, "b", {"reads": ["x", "ticket_in"]})
+    write_step(inited.fdir, "a", {"outputs": {"x": {"type": "text", "description": "x"}}})
+    write_step(inited.fdir, "b", {}, body="Use {{x}} and {{ticket_in}}.\n")
     reg = Registry.load(repo.load_ctx(cwd=inited.repo))
     data = {"id": "ok", "inputs": {"ticket_in": {"description": "t"}}, "steps": ["a", "b"]}
     assert check(reg, data, COLUMNS) == []

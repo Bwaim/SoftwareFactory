@@ -3,7 +3,8 @@ import uuid
 from . import adapters, events, state
 from .adapters.base import AdapterError
 from .errors import FactoryError
-from .registry import NO_WORKTREE_PIPELINES
+
+NO_WORKTREE_PIPELINES = frozenset()
 
 ASK_IN_TEXT = (
     "Ask the user in plain text, never with the AskUserQuestion tool, then end your turn. "

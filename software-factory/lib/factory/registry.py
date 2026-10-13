@@ -7,14 +7,9 @@ import yaml
 from . import fsio
 from .errors import FactoryError
 from .repo import PLUGIN_ROOT
+from .step_format import STEP_ID_RE, is_valid_id, validate
 
-STEP_ID_RE = re.compile(r"[a-z][a-z0-9_-]{0,63}")
-
-
-def is_valid_id(value):
-    return isinstance(value, str) and STEP_ID_RE.fullmatch(value) is not None
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.S)
-NO_WORKTREE_PIPELINES = {"new-step-assistant"}
 CREATE_WORKTREE = "create-worktree"
 
 
@@ -46,7 +41,7 @@ class Step:
 
     @property
     def type(self):
-        return self.get("type", "prompt")
+        return self.get("type")
 
     @property
     def run_in(self):
@@ -155,6 +150,9 @@ class Registry:
         for level, root in level_roots(ctx):
             for p in sorted((root / "steps").glob("*.md")):
                 manifest, body = parse_step_text(p.read_text(), p)
+                errors, _ = validate(manifest, body)
+                if errors:
+                    raise FactoryError(f"{p}: " + " ".join(errors))
                 sid = manifest.get("id") or p.stem
                 steps[sid] = Step(sid, level, p, manifest, body)
                 variants.setdefault(sid, []).append(steps[sid])
@@ -179,9 +177,9 @@ class Registry:
     def check_loops(self):
         def visit(sid, chain):
             if sid in chain:
-                raise FactoryError("Composite step loop: " + " > ".join(chain + [sid]))
+                raise FactoryError("Group step loop: " + " > ".join(chain + [sid]))
             step = self.steps.get(sid)
-            if step and step.type == "composite":
+            if step and step.type == "group":
                 for child in step.children:
                     visit(child, chain + [sid])
 
@@ -191,31 +189,16 @@ class Registry:
     def leaves(self, sid, prefix=None):
         prefix = prefix or []
         step = self.step(sid)
-        if step.type != "composite":
+        if step.type != "group":
             return [prefix + [sid]]
         out = []
         for child in step.children:
             out += self.leaves(child, prefix + [sid])
         return out
 
-    def io(self, sid):
-        step = self.step(sid)
-        if step.type != "composite":
-            return list(step.get("reads") or []), list(step.get("writes") or [])
-        reads, writes = [], []
-        for path in self.leaves(sid):
-            leaf = self.step(path[-1])
-            for key in leaf.get("reads") or []:
-                if key not in writes and key not in reads:
-                    reads.append(key)
-            for key in leaf.get("writes") or []:
-                if key not in writes:
-                    writes.append(key)
-        return reads, writes
-
     def expand(self, pipeline):
         entries = pipeline.entries
-        if pipeline.id not in NO_WORKTREE_PIPELINES and (not entries or entries[0].get("id") != CREATE_WORKTREE):
+        if not entries or entries[0].get("id") != CREATE_WORKTREE:
             entries = [{"id": CREATE_WORKTREE}] + entries
         snapshot = []
         for entry in entries:

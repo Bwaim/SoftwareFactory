@@ -7,7 +7,7 @@ from factory.errors import FactoryError
 
 @pytest.fixture
 def uv(inited):
-    write_step(inited.fdir, "spec", {"writes": ["spec"]})
+    write_step(inited.fdir, "spec", {"outputs": {"spec": {"type": "text", "description": "s", "optional": True}}})
     write_pipeline(inited.fdir, {"id": "uvp", "steps": ["spec", {"id": "user-validation", "with": {"target": "artifact", "artifact_key": "spec"}}]})
     task_from_pipeline(inited, "uvp", terminal_handle={"agent": "t1"}, state={"spec": "/tmp/spec.md"})
     run = lambda *a, check=True: inited.factory(*a, "--task", "t1", check=check)

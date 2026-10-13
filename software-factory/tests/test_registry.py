@@ -20,20 +20,36 @@ def test_local_overrides_generic_overrides_builtin(inited):
     assert reg.step("user-validation").description == "local"
 
 
-def test_composite_paths_and_io(inited):
-    write_step(inited.fdir, "rebase", {"reads": ["base"], "writes": ["rebased"]})
-    write_step(inited.fdir, "commit", {"reads": ["rebased", "msg"], "writes": ["sha"]})
-    write_step(inited.fdir, "rebase-and-commit", {"type": "composite", "steps": ["rebase", "commit"]}, body="")
+def test_group_paths_uses_and_outputs(inited):
+    from factory import keys
+    write_step(inited.fdir, "rebase", {"outputs": {"rebased": {"type": "text", "description": "r"}}}, body="Rebase {{base}}.\n")
+    write_step(inited.fdir, "commit", {"outputs": {"sha": {"type": "text", "description": "s"}}}, body="Commit {{rebased}} with {{msg}}.\n")
+    write_step(inited.fdir, "rebase-and-commit", {"type": "group", "steps": ["rebase", "commit"]}, body="")
     reg = Registry.load(ctx_of(inited))
     assert reg.leaves("rebase-and-commit") == [["rebase-and-commit", "rebase"], ["rebase-and-commit", "commit"]]
-    assert reg.io("rebase-and-commit") == (["base", "msg"], ["rebased", "sha"])
+    assert keys.step_uses(reg, "rebase-and-commit") == ["base", "msg"]
+    assert list(keys.step_outputs(reg, "rebase-and-commit")) == ["rebased", "sha"]
 
 
-def test_composite_loop_refused(inited):
-    write_step(inited.fdir, "a", {"type": "composite", "steps": ["b"]}, body="")
-    write_step(inited.fdir, "b", {"type": "composite", "steps": ["a"]}, body="")
+def test_group_loop_refused(inited):
+    write_step(inited.fdir, "a", {"type": "group", "steps": ["b"]}, body="")
+    write_step(inited.fdir, "b", {"type": "group", "steps": ["a"]}, body="")
     with pytest.raises(FactoryError, match="loop"):
         Registry.load(ctx_of(inited))
+
+
+def test_invalid_step_stops_the_load_with_its_file(inited):
+    path = write_step(inited.fdir, "bad", {"type": "command"}, body="echo {{x}}\n")
+    with pytest.raises(FactoryError) as e:
+        Registry.load(ctx_of(inited))
+    assert str(path) in str(e.value) and "A command cannot use" in str(e.value)
+
+
+def test_expand_always_adds_create_worktree(inited):
+    write_step(inited.fdir, "only", {})
+    write_pipeline(inited.fdir, {"id": "solo", "steps": ["only"]})
+    reg = Registry.load(ctx_of(inited))
+    assert [e["id"] for e in reg.expand(reg.pipeline("solo"))] == ["create-worktree", "only"]
 
 
 def test_expand_adds_create_worktree_and_overrides(inited):

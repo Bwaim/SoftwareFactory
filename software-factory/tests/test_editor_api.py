@@ -7,9 +7,9 @@ from serverutil import info, request
 
 @pytest.fixture
 def ed(inited):
-    write_step(inited.library, "gen", {"category": "git", "writes": ["x"]})
-    write_step(inited.fdir, "loc", {"category": "review", "run_in": "subagent", "reads": ["x"]})
-    write_step(inited.fdir, "box", {"type": "composite", "steps": ["gen", "loc"]}, body="")
+    write_step(inited.library, "gen", {"category": "git", "outputs": {"x": {"type": "text", "description": "x"}}})
+    write_step(inited.fdir, "loc", {"category": "review", "run_in": "subagent"}, body="Use {{x}}.\n")
+    write_step(inited.fdir, "box", {"type": "group", "steps": ["gen", "loc"]}, body="")
     write_pipeline(inited.fdir, {"id": "base", "steps": ["gen", "loc"]})
     inited.factory("pipeline", "edit", "base")
     yield inited, info(inited.fdir)
@@ -23,7 +23,7 @@ def test_steps_list_and_detail(ed):
     assert by_id["gen"]["level"] == "generic" and by_id["loc"]["run_in"] == "subagent"
     assert by_id["user-validation"]["level"] == "builtin"
     status, box = request(i, "GET", "/api/steps/box")
-    assert box["children"] == ["gen", "loc"] and box["reads"] == [] and box["writes"] == ["x"]
+    assert box["children"] == ["gen", "loc"] and box["uses"] == [] and list(box["outputs"]) == ["x"]
     assert request(i, "GET", "/api/steps/nope")[0] == 400
 
 

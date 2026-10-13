@@ -292,7 +292,7 @@ async function showDetail(id) {
 }
 function userText(u) {
   if (u.kind === "task") return "task " + u.id;
-  return (u.kind === "pipeline" ? "pipeline " : "composite step ") + u.id + " (" + u.level + ")";
+  return (u.kind === "pipeline" ? "pipeline " : "group step ") + u.id + " (" + u.level + ")";
 }
 function deletePlanBlock(d, plan) {
   const block = el("div", { class: "card" }, el("div", {}, "Delete the " + plan.level + " step " + plan.id + ". Files:"));
