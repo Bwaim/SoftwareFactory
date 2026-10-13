@@ -679,5 +679,9 @@ def migrate_cmd(args):
         return
     print(f"Repository data: version {result['repo']['from']} -> {result['current']}" if result["repo"]["migrate"] else "Repository data: up to date.")
     print(f"Library: version {result['library']['from']} -> {result['current']}" if result["library"]["migrate"] else "Library: up to date.")
+    for e in result.get("errors", []):
+        print(f"Error: {e}")
+    for w in result.get("warnings", []):
+        print(f"Warning: {w}")
     for b in result["backups"]:
         print(f"Backup: {b}")

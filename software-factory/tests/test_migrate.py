@@ -15,15 +15,23 @@ def migrate_library(library_dir):
 '''
 
 
+def set_version(path, v):
+    data = yaml.safe_load(path.read_text())
+    data["version"] = v
+    path.write_text(yaml.safe_dump(data))
+
+
 @pytest.fixture
 def v2(inited, work):
     mdir = work / "migrations"
     mdir.mkdir()
     (mdir / "1-to-2.py").write_text(SCRIPT)
+    set_version(inited.library / "factory.yaml", 1)
     git("add", "-A", cwd=inited.library.parent)
     git("commit", "-m", "library", cwd=inited.library.parent)
+    set_version(inited.fdir / "factory.yaml", 1)
     make_task(repo.load_ctx(cwd=inited.repo), tid="t1")
-    env = {"FACTORY_DATA_VERSION": "2", "FACTORY_MIGRATIONS_DIR": str(mdir)}
+    env = {"FACTORY_MIGRATIONS_DIR": str(mdir)}
     return inited, env
 
 

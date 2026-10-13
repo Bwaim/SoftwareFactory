@@ -30,3 +30,8 @@
 - tests/test_session.py (live fixture): a task now needs a worktree to start a session
 - tests/test_dashboard_api.py::test_actions_call_cli_functions: a task now needs a worktree to start a session
 - tests/test_waiting.py (waits fixture): a task now needs a worktree to start a session
+- tests/test_migrate.py::v2 (fixture): the data version default is now 2, so the fixture writes version 1 data
+- tests/test_repo_version.py::test_version_mismatch_refused: version 2 is now current, so the mismatching data is version 1
+- tests/test_repo_version.py::test_version_report_states: the current version is now 2
+- tests/test_init_menu.py::test_init_creates_files_and_exclude: init now writes data version 2
+- tests/test_library.py::test_commit_adds_changed_library_factory_yaml: the library was already at version 2, so the test changes it to 3 to make a real change

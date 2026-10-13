@@ -61,11 +61,29 @@ def bump(path, new_version):
     fsio.update_yaml(path, lambda d: d.__setitem__("version", new_version))
 
 
+def run_checks(ctx, p):
+    errors, warnings = [], []
+    targets = [("library", ctx.library(), "check_library"), ("repo", ctx.fdir, "check_repo")]
+    for part, root, name in targets:
+        if not p[part]["migrate"]:
+            continue
+        for v in range(p[part]["from"], p["current"]):
+            check = getattr(load_script(v), name, None)
+            if check:
+                e, w = check(root)
+                errors += e
+                warnings += w
+    return errors, warnings
+
+
 def migrate(ctx, dry_run=False):
     p = plan(ctx)
+    p["errors"], p["warnings"] = run_checks(ctx, p)
     p["backups"], p["library_commit"] = [], None
     if dry_run:
         return p
+    if p["errors"]:
+        raise FactoryError("The migration cannot start. Fix these first:\n" + "\n".join(f"- {e}" for e in p["errors"]))
     lib = ctx.library()
     if p["library"]["migrate"]:
         if p["library"]["in_git"]:
