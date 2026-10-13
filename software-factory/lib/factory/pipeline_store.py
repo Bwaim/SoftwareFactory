@@ -3,14 +3,14 @@ from .errors import ExistsError, FactoryError
 from .registry import Registry, is_valid_id, normalize_entry
 
 
-def step_summary(step):
+def step_summary(step, hidden_ids=()):
     return {"id": step.id, "description": step.description, "category": step.category, "type": step.type,
-            "level": step.level, "run_in": step.run_in, "path": str(step.path)}
+            "level": step.level, "run_in": step.run_in, "path": str(step.path), "hidden": step.id in hidden_ids}
 
 
-def step_detail(reg, step):
+def step_detail(reg, step, hidden_ids=()):
     reads, writes = reg.io(step.id)
-    return {**step_summary(step), "manifest": step.manifest, "body": step.body,
+    return {**step_summary(step, hidden_ids), "manifest": step.manifest, "body": step.body,
             "reads": reads, "writes": writes, "children": step.children}
 
 

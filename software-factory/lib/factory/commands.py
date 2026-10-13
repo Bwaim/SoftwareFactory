@@ -16,7 +16,9 @@ def register(sub, common):
     pe = ps.add_parser("edit", parents=[common]); pe.add_argument("id", nargs="?")
     p = sub.add_parser("step")
     sts = p.add_subparsers(dest="action", required=True)
-    sts.add_parser("list", parents=[common])
+    sl = sts.add_parser("list", parents=[common]); sl.add_argument("--all", action="store_true")
+    sts.add_parser("hide", parents=[common]).add_argument("id")
+    sts.add_parser("unhide", parents=[common]).add_argument("id")
     sh = sts.add_parser("show", parents=[common]); sh.add_argument("id")
     sd = sts.add_parser("delete", parents=[common]); sd.add_argument("id"); sd.add_argument("--level", choices=["local", "generic"]); sd.add_argument("--dry-run", action="store_true")
     p = sub.add_parser("config")
@@ -584,27 +586,43 @@ def pipeline_edit_cmd(args):
 
 @cli.command("step list")
 def step_list_cmd(args):
-    from . import pipeline_store
+    from . import hidden, pipeline_store
     from .registry import Registry
-    reg = Registry.load(ctx_of(args))
-    rows = [pipeline_store.step_summary(s) for s in sorted(reg.steps.values(), key=lambda s: s.id)]
+    ctx = ctx_of(args)
+    hidden_ids = set(hidden.ids(ctx))
+    steps = sorted(Registry.load(ctx).steps.values(), key=lambda s: s.id)
+    rows = [pipeline_store.step_summary(s, hidden_ids) for s in steps if args.all or s.id not in hidden_ids]
     if args.json:
         cli.emit(rows, True)
         return
     for r in rows:
-        print(f"{r['id']} [{r['category']}] ({r['level']}, {r['run_in']}): {r['description']}")
+        mark = ", hidden" if r["hidden"] else ""
+        print(f"{r['id']} [{r['category']}] ({r['level']}, {r['run_in']}{mark}): {r['description']}")
 
 
 @cli.command("step show")
 def step_show_cmd(args):
-    from . import pipeline_store
+    from . import hidden, pipeline_store
     from .registry import Registry
-    reg = Registry.load(ctx_of(args))
-    detail = pipeline_store.step_detail(reg, reg.step(args.id))
+    ctx = ctx_of(args)
+    reg = Registry.load(ctx)
+    detail = pipeline_store.step_detail(reg, reg.step(args.id), set(hidden.ids(ctx)))
     if args.json:
         cli.emit(detail, True)
     else:
-        print(f"{detail['path']}\n\n{detail['body']}")
+        print(f"{detail['path']}{' (hidden)' if detail['hidden'] else ''}\n\n{detail['body']}")
+
+
+@cli.command("step hide")
+def step_hide_cmd(args):
+    from . import hidden
+    print(hidden.hide(ctx_of(args), args.id))
+
+
+@cli.command("step unhide")
+def step_unhide_cmd(args):
+    from . import hidden
+    print(hidden.unhide(ctx_of(args), args.id))
 
 
 @cli.command("step delete")
