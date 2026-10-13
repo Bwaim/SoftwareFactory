@@ -18,6 +18,7 @@ def register(sub, common):
     sts = p.add_subparsers(dest="action", required=True)
     sts.add_parser("list", parents=[common])
     sh = sts.add_parser("show", parents=[common]); sh.add_argument("id")
+    sd = sts.add_parser("delete", parents=[common]); sd.add_argument("id"); sd.add_argument("--level", choices=["local", "generic"]); sd.add_argument("--dry-run", action="store_true")
     p = sub.add_parser("config")
     cs = p.add_subparsers(dest="action", required=True)
     g = cs.add_parser("get", parents=[common]); g.add_argument("step"); g.add_argument("key")
@@ -604,6 +605,17 @@ def step_show_cmd(args):
         cli.emit(detail, True)
     else:
         print(f"{detail['path']}\n\n{detail['body']}")
+
+
+@cli.command("step delete")
+def step_delete_cmd(args):
+    from . import step_delete
+    ctx = ctx_of(args)
+    result = step_delete.plan(ctx, args.id, args.level) if args.dry_run else step_delete.delete(ctx, args.id, args.level)
+    if args.json:
+        cli.emit(result, True)
+    else:
+        print(step_delete.render(result, args.dry_run))
 
 
 @cli.command("library commit")

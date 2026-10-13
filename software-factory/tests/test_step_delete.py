@@ -227,3 +227,33 @@ def test_deleted_catalog_step_shows_not_installed(inited, ctx):
     assert sorted(Path(p).name for p in out["removed"]) == ["push.md", "push.sh"]
     rows = {i["id"]: i for i in catalog.items(ctx)}
     assert rows["push"]["status"] == "not installed"
+
+
+def test_cli_delete_and_dry_run(inited):
+    write_step(inited.fdir, "solo", {})
+    out = inited.factory.json("step", "delete", "solo", "--dry-run")
+    assert out["blocked"] is False and (inited.fdir / "steps" / "solo.md").exists()
+    text = inited.factory("step", "delete", "solo", "--dry-run").stdout
+    assert "Dry run: delete the local step `solo`." in text and "solo.md" in text
+    text = inited.factory("step", "delete", "solo").stdout
+    assert "Deleted the local step `solo`." in text and not (inited.fdir / "steps" / "solo.md").exists()
+
+
+def test_cli_refusals(inited):
+    r = inited.factory("step", "delete", "user-validation", check=False)
+    assert r.returncode == 1
+    assert "Built-in steps cannot be deleted. Hide the step instead: `factory step hide user-validation`." in r.stderr
+    write_step(inited.fdir, "kept", {})
+    write_pipeline(inited.fdir, {"id": "pk", "steps": ["kept"]})
+    r = inited.factory("step", "delete", "kept", check=False)
+    assert r.returncode == 1 and "- pipeline pk (local)" in r.stderr
+    r = inited.factory("step", "delete", "kept", "--level", "builtin", check=False)
+    assert r.returncode == 2
+
+
+def test_cli_generic_offer_text(inited):
+    write_step(inited.library, "gstep", {})
+    commit_library(inited)
+    text = inited.factory("step", "delete", "gstep").stdout
+    assert "Warning: Other repositories that use this library are not checked." in text
+    assert "Library commit offer: factory library commit 'Factory library: delete step gstep'" in text
