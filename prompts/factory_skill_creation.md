@@ -381,6 +381,7 @@ Save the path with `factory state set plan <path>`.
 - The same id is used for the task folder, the terminal name and the Claude session name.
 - It runs the `create-worktree` step. The built-in pipeline `new-step-assistant` runs in the main repository instead.
 - It creates the task folder and the task state file, with the inputs, before the session starts.
+- It saves a copy of the expanded steps in the task state: the full step list, with composite steps expanded and the `with`, `column`, `model` and `effort` values resolved. The task runs from this copy. A change to the pipeline or to a step manifest after the launch applies only to new tasks.
 - It starts the task session with `factory terminal start-session`, in the worktree or in the main repository. Claude starts with `--name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json --add-dir <main repository>/.factory/tasks/<id>/artifacts`, plus `--model` and `--effort` when the pipeline sets them, and receives the first prompt (see Task execution).
 - It saves the terminal handle in the task state.
 - The orchestrator goes back to its menu without waiting for the task.
