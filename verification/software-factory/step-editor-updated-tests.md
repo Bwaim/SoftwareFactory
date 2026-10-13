@@ -16,3 +16,4 @@
 - tests/test_waiting.py::test_end_wait_adds_period_to_done_when: `factory next` now prints the exact prompt and footer, never `--task`
 - tests/test_question_box.py::test_prompts_ask_in_plain_text: `factory next` now prints the exact prompt and footer, never `--task`
 - tests/test_engine.py::test_run_script_gets_config_and_task: deleted; Task 6 replaces it with the run-command tests
+- tests/test_minor_fixes.py::test_run_check_reports_missing_folder: run_check now takes the step as its third argument.

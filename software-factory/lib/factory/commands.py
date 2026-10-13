@@ -38,7 +38,7 @@ def register(sub, common):
     p.add_argument("--all", action="store_true")
     p.add_argument("--wait", action="store_true")
     p = sub.add_parser("resume", parents=[common]); p.add_argument("id")
-    for name in ("next", "done", "skip", "run-script"):
+    for name in ("next", "done", "skip", "run-command"):
         sub.add_parser(name, parents=[common])
     p = sub.add_parser("goto", parents=[common]); p.add_argument("step_path"); p.add_argument("--reason", required=True)
     p = sub.add_parser("artifact")
@@ -138,11 +138,11 @@ def skip_cmd(args):
     print(engine.skip(ctx, tid))
 
 
-@cli.command("run-script")
-def run_script_cmd(args):
+@cli.command("run-command")
+def run_command_cmd(args):
     from . import engine
     ctx, tid = task_of(args)
-    return engine.run_script(ctx, tid)
+    return engine.run_command(ctx, tid)
 
 
 @cli.command("status")
@@ -413,9 +413,9 @@ def state_get(args):
 
 @cli.command("state set")
 def state_set(args):
-    from . import state
+    from . import engine
     ctx, tid = task_of(args)
-    state.set_key(ctx, tid, args.key, args.value)
+    engine.set_state(ctx, tid, args.key, args.value)
     print(f"Saved `{args.key}`.")
 
 

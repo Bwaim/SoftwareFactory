@@ -25,8 +25,8 @@ def artifacts_dir(ctx, task):
     return (state.task_dir(ctx, task["id"]) / "artifacts").resolve()
 
 
-def run_check(ctx, task, command, timeout, values=None):
-    env = script_env(ctx, task, values or {})
+def run_check(ctx, task, step, command, timeout, values=None):
+    env = step_env(ctx, task, step, values or {})
     try:
         r = subprocess.run(command, shell=True, cwd=task_cwd(ctx, task), env=env,
                            capture_output=True, text=True, timeout=timeout)
@@ -236,6 +236,7 @@ def advance(ctx, tid, event_type, position, statuses=ADVANCE_STATUSES, first_eve
         events.log(ctx, tid, event_type, before["path"])
         t["position"] += 1
         t["started"] = None
+        t["command_result"] = None
         t["approval"] = None
         if t["position"] >= len(t["steps"]):
             state.set_status(t, "finished")
@@ -259,9 +260,13 @@ def done(ctx, tid):
         return "The pipeline is finished."
     require_running(task)
     entry, step = load_step(ctx, task)
+    problem = output_problem(task, step)
+    if problem:
+        events.log(ctx, tid, "done_check_failed", state.step_path_str(task), output=problem)
+        raise FactoryError(f"The step is not done. {problem}")
     if step.done_check:
         values, _ = config.resolve(ctx, step, entry.get("with"))
-        ok, output = run_check(ctx, task, step.done_check, DONE_CHECK_TIMEOUT, values)
+        ok, output = run_check(ctx, task, step, step.done_check, DONE_CHECK_TIMEOUT, values)
         if not ok:
             events.log(ctx, tid, "done_check_failed", state.step_path_str(task), output=output)
             raise FactoryError(f"The done check failed. The step is not done.\nCheck: {step.done_check}\n{output}")
@@ -306,6 +311,7 @@ def goto(ctx, tid, target, reason):
         t["goto_counts"][key] = t["goto_counts"].get(key, 0) + 1
         t["position"] = index
         t["started"] = None
+        t["command_result"] = None
         t["approval"] = None
         if t["goto_counts"][key] >= MAX_JUMPS:
             state.set_status(t, "blocked", f"loop on {to_path}")
@@ -352,7 +358,7 @@ def end_wait(ctx, tid, how):
 def poll_task(ctx, task):
     entry, step = load_step(ctx, task)
     values, _ = config.resolve(ctx, step, entry.get("with"))
-    ok, output = run_check(ctx, task, step.done_check, POLL_CHECK_TIMEOUT, values)
+    ok, output = run_check(ctx, task, step, step.done_check, POLL_CHECK_TIMEOUT, values)
     row = {"id": task["id"], "ended": ok, "output": None if ok else output[-500:], "error": None}
     if ok:
         end_wait(ctx, task["id"], "check")
@@ -384,27 +390,68 @@ def external_done(ctx, tid):
     end_wait(ctx, tid, "manual")
 
 
-def script_env(ctx, task, values):
-    env = {**os.environ, "FACTORY_TASK": task["id"]}
+def step_env(ctx, task, step, values):
+    env = {k: v for k, v in os.environ.items() if not k.startswith(keys.ENV_PREFIX)}
+    env["FACTORY_TASK"] = task["id"]
+    for key, value in key_values(task).items():
+        if keys.is_key(key) and value is not None:
+            env[keys.env_name(key)] = str(value)
     for key, value in values.items():
         env["FACTORY_CONFIG_" + key.upper().replace("-", "_")] = str(value)
+    env["FACTORY_STEP_DIR"] = str(step.path.parent.resolve())
     return env
 
 
-def run_script(ctx, tid):
+def run_command(ctx, tid):
     task = state.load(ctx, tid)
     require_running(task)
     entry, step = load_step(ctx, task)
-    if step.type != "script":
-        raise FactoryError(f"The step `{step.id}` is not a script step.")
-    first_line = step.body.strip().splitlines()[0].strip() if step.body.strip() else ""
-    script = (step.path.parent / first_line).resolve()
-    if not first_line or not script.is_file():
-        raise FactoryError(f"The script of step `{step.id}` does not exist: {script}")
-    values, _ = config.resolve(ctx, step, entry.get("with"))
-    r = subprocess.run(["bash", str(script)], cwd=task_cwd(ctx, task), env=script_env(ctx, task, values))
-    print(f"Script exit code: {r.returncode}")
+    if step.type != "command":
+        raise FactoryError(f"The step `{step.id}` is not a `command` step.")
+    values, missing = config.resolve(ctx, step, entry.get("with"))
+    if missing:
+        raise FactoryError("Some config values are missing. Run `factory next` first.")
+    print("", end="", flush=True)
+    r = subprocess.run(["bash", "-c", step.body], cwd=task_cwd(ctx, task), env=step_env(ctx, task, step, values))
+    position = task["position"]
+    state.update(ctx, tid, lambda t: t.__setitem__("command_result", {"position": position, "exit_code": r.returncode}))
+    print(f"Exit code: {r.returncode}", flush=True)
     return r.returncode
+
+
+def output_problem(task, step):
+    values = task.get("state") or {}
+    outputs = keys.outputs_of(step)
+    for key, out in outputs.items():
+        value = values.get(key)
+        if not out["optional"] and (value is None or str(value).strip() == ""):
+            return f"The output `{key}` is not set. Set it with `factory state set {key} <value>`."
+    for key, out in outputs.items():
+        value = values.get(key)
+        if out["type"] == "file" and value not in (None, "") and not Path(str(value)).exists():
+            return f"The output `{key}` points to a path that does not exist: {value}."
+    if step.type == "command":
+        result = task.get("command_result")
+        if not result or result.get("position") != task["position"]:
+            return "Run `factory run-command` first."
+        if result.get("exit_code") != 0:
+            return f"The last `factory run-command` exited with code {result.get('exit_code')}. Fix it and run it again."
+    return None
+
+
+def set_state(ctx, tid, key, value):
+    task = state.load(ctx, tid)
+    entry = state.current_entry(task)
+    if entry is not None and task["status"] != "finished":
+        step = Registry.load(ctx).steps.get(entry["id"])
+        out = keys.outputs_of(step).get(key) if step else None
+        if out and out["type"] == "file":
+            path = (ctx.cwd / Path(value).expanduser()).resolve()
+            if not path.exists():
+                raise FactoryError(f"The path does not exist: {path}. The output `{key}` is a file.")
+            value = str(path)
+    state.set_key(ctx, tid, key, value)
+    return value
 
 
 def status_text(ctx, tid):

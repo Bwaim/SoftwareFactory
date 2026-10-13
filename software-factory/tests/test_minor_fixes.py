@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -42,7 +43,7 @@ def test_poll_reports_a_broken_task_and_goes_on(inited, ctx):
 
 def test_run_check_reports_missing_folder(inited, ctx):
     task = make_task(ctx, worktree=str(inited.work / "nowhere"))
-    ok, message = engine.run_check(ctx, task, "true", 5)
+    ok, message = engine.run_check(ctx, task, SimpleNamespace(path=inited.work / "step.md"), "true", 5)
     assert ok is False and message
 
 

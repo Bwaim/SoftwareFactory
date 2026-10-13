@@ -12,7 +12,7 @@ You start and manage tasks from one orchestrator session in the main repository.
 - **Task**: one run of a pipeline. It has a worktree, a Herdr tab and a Claude session.
 - **Pipeline**: a YAML file with an ordered list of steps.
 - **Step**: a markdown file. The frontmatter is the manifest. The body holds the instructions.
-- **Step types**: `prompt` (instructions for the session), `skill` (runs a Claude skill), `script` (runs a script with `factory run-script`), `composite` (a list of other steps).
+- **Step types**: `prompt` (instructions for the session), `skill` (runs a Claude skill), `command` (runs a shell command with `factory run-command`), `composite` (a list of other steps).
 - **Levels**: a local step or pipeline lives in `.factory/` of the repository. A generic one lives in the library folder. A built-in one ships with the plugin. Local wins over generic. Generic wins over built-in.
 - **Catalog**: ready-made pipelines and steps. You install them by copy, into the local level or into the library.
 - **Artifacts**: files a task writes for later steps or for you. `factory artifact path <name>` prints the path.
@@ -139,7 +139,7 @@ Step execution, inside a task session:
 - `factory next`: show the current step.
 - `factory done`: finish the current step.
 - `factory skip`: skip the current step, when it is not required.
-- `factory run-script`: run the current `script` step.
+- `factory run-command`: run the current `command` step.
 - `factory goto <step_path> --reason <text>`: go back to an earlier step.
 - `factory config get <step> <key>`: read a step config value.
 - `factory config set <step> <key> <value>`: save a step config value.

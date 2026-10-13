@@ -1,6 +1,8 @@
+import json
+
 import pytest
 
-from conftest import task_from_pipeline, write_pipeline, write_step
+from conftest import task_from_pipeline, task_json, write_pipeline, write_step
 
 
 def run(inited, *args, check=True):
@@ -68,3 +70,99 @@ def test_first_prompt_never_adds_task_flag():
     from factory import session
     text = session.first_prompt({"id": "t1", "worktree": "/w"})
     assert "`factory next`" in text and "`factory done`" in text and "--task" not in text
+
+
+@pytest.fixture
+def cmd(inited):
+    step = write_step(inited.fdir, "echo", {
+        "type": "command", "config": {"word": {"description": "w", "default": "hello"}},
+        "outputs": {"echoed": {"type": "file", "description": "Echo file"}},
+    }, body='bash "$FACTORY_STEP_DIR/echo.sh"\n')
+    (step.parent / "echo.sh").write_text(
+        'p="$(factory artifact path echo.txt)"\n'
+        'printf "%s|%s|%s|%s" "$FACTORY_KEY_TICKET" "$FACTORY_CONFIG_WORD" "$FACTORY_KEY_TASK_ID" "$FACTORY_STEP_DIR" > "$p"\n'
+        'factory state set echoed "$p"\n'
+        'exit "${FACTORY_KEY_CODE:-0}"\n')
+    write_pipeline(inited.fdir, {"id": "c", "steps": ["echo"]})
+    task_from_pipeline(inited, "c", state={"ticket": "T-1"})
+    return inited, step
+
+
+def test_command_next_and_env(cmd):
+    inited, step = cmd
+    out = run(inited, "next").stdout
+    assert "Run `factory run-command`." in out and "The command sets these outputs:" in out
+    r = run(inited, "run-command")
+    assert r.stdout.rstrip().endswith("Exit code: 0")
+    text = (inited.fdir / "tasks" / "t1" / "artifacts" / "echo.txt").read_text()
+    assert text == f"T-1|hello|t1|{step.parent.resolve()}"
+    assert "The pipeline is finished" in run(inited, "done").stdout
+
+
+def test_done_refused_until_command_exits_0(cmd):
+    inited, _ = cmd
+    run(inited, "next")
+    r = run(inited, "done", check=False)
+    assert r.returncode == 1 and "The output `echoed` is not set" in r.stderr
+    run(inited, "state", "set", "echoed", str(inited.repo / "README.md"))
+    r = run(inited, "done", check=False)
+    assert r.returncode == 1 and "Run `factory run-command` first." in r.stderr
+    run(inited, "state", "set", "code", "3")
+    assert run(inited, "run-command", check=False).returncode == 3
+    r = run(inited, "done", check=False)
+    assert r.returncode == 1 and "exited with code 3" in r.stderr
+    assert json.loads((inited.fdir / "tasks" / "t1" / "events.jsonl").read_text().splitlines()[-1])["type"] == "done_check_failed"
+    run(inited, "state", "set", "code", "0")
+    run(inited, "run-command")
+    run(inited, "done")
+
+
+def test_goto_clears_command_result(cmd):
+    inited, _ = cmd
+    write_step(inited.fdir, "after", {})
+    write_pipeline(inited.fdir, {"id": "c2", "steps": ["echo", "after"]})
+    task_from_pipeline(inited, "c2", tid="t2", state={"ticket": "T-1"})
+    r2 = lambda *a, check=True: inited.factory(*a, "--task", "t2", check=check)
+    r2("next"); r2("run-command"); r2("done"); r2("next")
+    r2("goto", "echo", "--reason", "again")
+    assert task_json(inited.fdir, "t2")["command_result"] is None
+    r = r2("done", check=False)
+    assert r.returncode == 1 and "Run `factory run-command` first." in r.stderr
+
+
+def test_command_key_value_is_never_run(inited):
+    write_step(inited.fdir, "safe", {"type": "command"}, body='printf "%s" "$FACTORY_KEY_EVIL" > "$(factory artifact path out.txt)"\n')
+    write_pipeline(inited.fdir, {"id": "s", "steps": ["safe"]})
+    evil = '$(touch pwned) `touch pwned2` "quote\nline'
+    task_from_pipeline(inited, "s", state={"evil": evil})
+    run(inited, "next"); run(inited, "run-command")
+    assert (inited.fdir / "tasks" / "t1" / "artifacts" / "out.txt").read_text() == evil
+    assert not (inited.repo / "pwned").exists() and not (inited.repo / "pwned2").exists()
+
+
+def test_file_output_must_exist(ai):
+    run(ai, "next")
+    run(ai, "state", "set", "note", "free text, not checked")
+    r = run(ai, "state", "set", "plan", "missing.md", check=False)
+    assert r.returncode == 1 and "The path does not exist" in r.stderr
+    task = task_json(ai.fdir, "t1")
+    task["state"]["plan"] = "/nowhere/plan.md"
+    (ai.fdir / "tasks" / "t1" / "task.json").write_text(json.dumps(task))
+    r = run(ai, "done", check=False)
+    assert r.returncode == 1 and "The output `plan` points to a path that does not exist: /nowhere/plan.md" in r.stderr
+
+
+def test_state_set_file_relative_to_caller(ai):
+    run(ai, "next")
+    sub = ai.repo / "docs"
+    sub.mkdir()
+    (sub / "plan.md").write_text("x")
+    ai.factory("state", "set", "plan", "plan.md", "--task", "t1", cwd=sub)
+    assert task_json(ai.fdir, "t1")["state"]["plan"] == str((sub / "plan.md").resolve())
+    run(ai, "state", "set", "free_key", "anything")
+    run(ai, "done")
+
+
+def test_run_script_is_gone(inited):
+    r = inited.factory("run-script", "--task", "t1", check=False)
+    assert r.returncode != 0
