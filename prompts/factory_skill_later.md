@@ -14,4 +14,6 @@ Ideas and requirements not in the current build. Move them to `factory_skill_cre
 - Update the live session state with Claude Code hooks (`Stop`, `Notification`), for terminals whose adapter has no `state` operation.
 - In the dashboard automatically hides the empty columns.
 - When finished to create a new step, we need a way to exit the session and close the herdr tab.
-- In the dashboard, add the possibility to edit a backlog entry. 
+- In the dashboard, add the possibility to edit a backlog entry.
+- we need a better management of the inputs and outputs in the pipeline editor and having a kind of mapping between inputs available to map to the input of a step. 
+- in the pipeline editor, we should be able to save and go back to the list of pipelines to have the option to create a new one or edit an existing one. We should also be able to delete a pipeline from here.
