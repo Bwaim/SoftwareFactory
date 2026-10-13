@@ -76,6 +76,7 @@ A local dashboard shows all tasks as a Kanban board and the backlog, and lets me
   - Pipelines and steps
     - Create or edit a pipeline: opens the pipeline editor in the browser
     - Create a new step: runs the built-in pipeline `new-step-assistant`
+    - Delete a step: deletes a local or generic step (see Step delete)
     - Browse the catalog: lists the catalog pipelines and steps, and installs them
   - Backlog
     - Add a backlog entry: runs the built-in step `backlog-add`
@@ -221,6 +222,32 @@ Save the path with `factory state set plan <path>`.
 - `factory next` prints the resolved config values with the step instructions.
 - No secrets in config files. Tokens stay in the tools' own configuration.
 
+#### Step delete
+
+- A step is deleted with `factory step delete <id> [--level local|generic] [--dry-run]`. It does not use Claude.
+- Without `--level`, it deletes the step at the level that is used now: local first, then generic.
+- Built-in steps cannot be deleted. The error says: "Built-in steps cannot be deleted. Hide the step instead: `factory step hide <id>`."
+- `factory step delete --dry-run` prints what would happen, and changes nothing:
+  - The files it removes: the step `.md` file and, for a `script` step, the script file named in its body, when that file is in the same `steps/` folder and no other step names it.
+  - The step that replaces it, when another level has a step with the same id. Example: deleting a local override makes the generic step used again.
+  - The users of the step, when no other level has the same id: pipelines at every level that list it, composite steps that include it, and tasks that are not finished whose saved step list contains it.
+  - For a generic step, a warning: "Other repositories that use this library are not checked."
+- The delete is refused while the step has users and no other level replaces it. The error lists the users.
+- When the delete runs, it removes the files listed by the dry run, and removes the id from `hidden_steps` unless another level still has it. It keeps the step section in `.factory/config.yaml`. A deleted catalog step shows as not installed.
+- For a generic step, it offers the library commit `Factory library: delete step <id>`.
+- The menu action "Delete a step" lists the local and generic steps with their level and category, shows the dry run of the selected one, and deletes only after the user confirms.
+- The pipeline editor has a "Delete" button in the detail panel of local and generic steps (see Pipeline editor).
+
+#### Step hide
+
+- The hidden steps are a list of step ids in `.factory/factory.yaml`, key `hidden_steps`. The choice is per repository and is never committed.
+- `hidden_steps` is optional. A missing key means no hidden step, so the data format version does not change.
+- `factory step hide <id>` adds the id. `factory step unhide <id>` removes it. Hiding an id that no level has is refused.
+- Hiding works on any level, built-in included. It applies to the id, so it covers every level that has this id.
+- A hidden step is not shown in the available steps of the pipeline editor (by default), in `factory step list` (unless `--all`, which marks it `hidden`), and in the step lists the step assistant shows to build a composite step.
+- A hidden step still works everywhere else. Pipelines that use it launch and run as before. `factory step show <id>` shows it, marked `hidden`. The step assistant still sees it when it checks for a similar step or a duplicate id.
+- Hide is the only way to deactivate a step. A hidden step is never blocked from running.
+
 #### Pipeline editor
 
 - Pipelines are created and changed in a web page served by the local server (see Local server): `factory pipeline edit [<id>]` starts the server and opens the page with `open <url>`. It does not use Claude.
@@ -236,18 +263,21 @@ Save the path with `factory state set plan <path>`.
   - Edit the id, the description, the inputs, and the session `model` and `effort` in a form
   - Filter the available steps by category or by text
   - Reload the available steps, to see a step created in another task
+  - Hide an available step with its "Hide" button. A "Show hidden steps" toggle shows the hidden steps, greyed, each with an "Unhide" button. The toggle is saved in the browser. A hidden step already in the pipeline has a `hidden` mark. See Step hide.
 - Each available step shows its id, category, description, level (local, generic or built-in) and where it runs (session or subagent).
 - Clicking a step, in the list or in the pipeline, opens a read-only detail panel:
   - The full manifest: type, `reads`, `writes`, `done_when`, `done_check`, config keys with their defaults, `required`, `run_in`, `model`, `effort`, `requires`
   - The body, as plain text
   - The level and the file path, so the user can open the file in their own editor
   - For a composite step, its child steps, each one clickable
+  - For a local or generic step, a "Delete" button. It shows the delete dry run in the page, deletes only after the user confirms, then reloads the list. For a generic step, it offers the library commit. See Step delete.
 - It runs the pipeline checks live, through the server, and shows the problems:
   - Error: `create-worktree` is listed, but not as the first step
   - Error: a step id does not exist
   - Warning: a `reads` key is not a pipeline input and is not written by an earlier step
   - Warning: a generic pipeline uses a local step
   - Warning: `model` or `effort` set on a step that runs in the session. It has no effect.
+  - Warning: a hidden step is used
 - It can save with warnings, never with errors.
 - On save, it asks where to save: generic in `<library>/pipelines/`, or local in `.factory/pipelines/`. When the user edits a generic pipeline, they can save a local override instead.
 - If a needed step does not exist, the user creates it with "Create a new step" from the orchestrator, then reloads the list in the editor.
@@ -256,7 +286,7 @@ Save the path with `factory state set plan <path>`.
 
 - One small local HTTP server, written with the Python standard `http.server` module, serves the pipeline editor, the dashboard and their API.
 - `factory pipeline edit` and `factory dashboard` start it if it is not running, then open their page with `open <url>`. The running server writes its port, token and process id to `.factory/server.json`, so the factory reuses it.
-- API: list steps, get one step (manifest and body), list pipelines, load, check and save a pipeline, list tasks, list the backlog, and one route per dashboard action. The pages use only this API. They never read or write files directly.
+- API: list steps, get one step (manifest and body), delete a step with its dry run, hide and unhide a step, list pipelines, load, check and save a pipeline, list tasks, list the backlog, and one route per dashboard action. The pages use only this API. They never read or write files directly.
 - Every action route calls the same function as the matching CLI command. The server holds no task logic.
 - While it runs, the server runs `factory poll` every `poll_minutes` (see External waiting).
 - Security:
@@ -338,6 +368,7 @@ Save the path with `factory state set plan <path>`.
 - After each write to `<library>/`, the factory offers to commit it in the git repository that contains the library:
   - The step assistant saves a generic step
   - The pipeline editor saves a generic pipeline
+  - A generic step is deleted
   - A catalog item is installed to the generic library
   - `migrate` changes the library
 - It shows the changed files and the commit message, and commits only after approval.
@@ -628,6 +659,9 @@ Users ask for a dark theme. Start with the settings screen only.
   - `factory backlog list`, `factory backlog add <title> [--summary <text>] [--pipeline <id>]`, `factory backlog remove <id>` and `factory backlog move <id> --to <position>`: read and change the backlog.
   - `factory pipeline edit [<id>]`: opens the pipeline editor.
   - `factory pipeline check <id>`: runs the pipeline checks and prints the errors and warnings.
+  - `factory step list [--all]` and `factory step show <id>`: list the steps, and show one step.
+  - `factory step delete <id> [--level local|generic] [--dry-run]`: delete a step, or show what the delete would do.
+  - `factory step hide <id>` and `factory step unhide <id>`: hide a step from the pipeline editor, or show it again.
   - `factory block <reason>` and `factory unblock`: change the blocked status of the task.
   - `factory tasks`: prints the task list.
   - `factory pause <id>`, `factory pause --all` and `factory resume <id>`: pause and resume tasks.
@@ -692,7 +726,7 @@ In the main repository, never committed:
 
 ```
 .factory/
-  factory.yaml       # Data format version, library path and terminal
+  factory.yaml       # Data format version, library path, terminal and hidden steps
   config.yaml        # Step config values for this repository
   claude-settings.json  # Permission rules for task sessions
   backlog.md         # Tasks not started yet
@@ -792,6 +826,8 @@ The library, a folder in any git repository:
   - With the fake test adapter, focus and send prompt call the adapter, and are hidden when the adapter does not support them.
   - `factory clean` detects a branch merged into `origin/<base_ref>`, a pushed branch whose remote branch was deleted, and a branch not merged.
   - `factory library commit` commits only the given library files. Another staged file in the test library repository stays staged and is not committed.
+  - `factory step delete`: a local step file is removed, a local override makes the generic step used again, a `script` step also loses its script file unless another step names it, a built-in step is refused, a step with users and no replacement is refused with the list of users, `--dry-run` changes nothing, and a generic delete commits only the removed files.
+  - `factory step hide` and `unhide` change `hidden_steps`. A hidden step is missing from `factory step list` and from the editor step API, shown with `--all`, and a pipeline that uses it still runs to the end with the fake adapter. `factory pipeline check` warns about it. Data without `hidden_steps` works.
 - End-to-end test with the Herdr adapter and Claude, on the test repository:
   - Launching a test pipeline fetches `origin`, creates the worktree from `origin/main`, opens it in Herdr and starts Claude with the task id as its name. Claude receives the first prompt.
   - The test pipeline has two `script` steps. The task session runs them to the end with `factory next` and `factory done`.
