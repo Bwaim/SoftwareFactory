@@ -263,7 +263,7 @@ Save the plan in the artifacts folder, not in the repository.
   - When the step is selected in the current pipeline: the keys available at its position (see Task keys).
   - Otherwise: the factory keys.
   - Its own config keys, as `{{config.<key>}}`.
-  - Clicking a key inserts `{{<key>}}` in an `ai` prompt, or `$FACTORY_KEY_<KEY>` in a command.
+  - Clicking a key inserts `{{<key>}}` in an `ai` prompt, or `"$FACTORY_KEY_<KEY>"`, with the double quotes, in a command.
 - For an `ai` step, a "Preview" shows the exact text `factory next` would print, with each placeholder shown as `<key>` and the footer included.
 - Saving an existing step first shows:
   - The pipelines that use the step
