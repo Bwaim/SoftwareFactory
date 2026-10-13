@@ -218,6 +218,9 @@ Save the plan in the artifacts folder, not in the repository.
   - The `done_when` text
   - "When the step is done, run `factory done`."
 - `factory next` for a `command` step tells the session to run `factory run-command`. It runs the command and prints its output and its exit code.
+  - After the command, `factory run-command` names each output that is not `optional` and still not set.
+  - The footer lists the outputs that the command sets, with their type and description. It has no `factory state set` command and no `factory artifact path` line.
+  - The footer says: "The command sets these outputs. Never set them yourself and never write their files. If one is missing, run `factory block` and tell the user that the step command did not set it."
 - For a `subagent` step, `factory next` prints the Agent tool call to make: the model, the effort and the same text as for a session. The subagent sees nothing of the session conversation.
 - The subagent writes its outputs with `factory state set` and ends with a short report. If it needs the user, it says so in its report, and the session asks the user and runs the step again.
 - The session runs `factory done` after the subagent ends.
@@ -868,6 +871,7 @@ The library, a folder in any git repository:
   - Group steps: the full path is shown, the keys and outputs are computed, and a loop is refused.
   - `factory next` on an `ai` step prints the prompt with each placeholder replaced, `(not set)` for a missing key, and the footer with every output. An undeclared `{{config.<key>}}` and a placeholder in a `command` step are refused when the step loads.
   - A `command` step gets `FACTORY_KEY_<KEY>`, `FACTORY_CONFIG_<KEY>` and `FACTORY_STEP_DIR`. `factory done` refuses it until `factory run-command` exits with code 0.
+  - A `command` step whose command sets the wrong key: `factory run-command` names the missing output, and the `factory next` text has no `factory state set` line.
   - `factory done` refuses a missing output that is not optional, and a `file` output whose path does not exist. `factory state set` refuses a missing path for a `file` output.
   - `factory pipeline keys` lists inputs, outputs of earlier steps and factory keys with their type and source, and marks `summary` and optional outputs as "maybe set".
   - A `file` input that does not exist is a launch dry run error. A relative path is saved as an absolute path.

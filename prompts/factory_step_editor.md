@@ -116,6 +116,9 @@ Creating a step is slow and unclear:
   - "When the step is done, run `factory done`."
 - For a subagent step, the Agent prompt is this same text.
 - `factory next` for a `command` step tells the session to run `factory run-command`. It runs the command and prints its output and its exit code.
+  - After the command, `factory run-command` names each output that is not `optional` and still not set.
+  - The footer lists the outputs that the command sets, with their type and description. It has no `factory state set` command and no `factory artifact path` line.
+  - The footer says: "The command sets these outputs. Never set them yourself and never write their files. If one is missing, run `factory block` and tell the user that the step command did not set it."
 - `factory state set <key> <value>`:
   - For a `file` output of the current step, it refuses a path that does not exist, and saves the absolute path.
   - It still accepts a key that is not a declared output.
@@ -222,6 +225,7 @@ Creating a step is slow and unclear:
   - `factory next` on an `ai` step prints the prompt with each placeholder replaced, `(not set)` for a missing key, and the footer with every output.
   - A `{{config.<key>}}` placeholder for an undeclared config key is refused when the step loads.
   - A `command` step gets its keys as `FACTORY_KEY_<KEY>`, its config as `FACTORY_CONFIG_<KEY>`, and `FACTORY_STEP_DIR`. `factory done` refuses it until `factory run-command` exits with code 0.
+  - A `command` step whose command sets the wrong key: `factory run-command` names the missing output, and the `factory next` text has no `factory state set` line.
   - `factory done` refuses a missing output that is not optional, and a `file` output whose path does not exist.
   - `factory state set` refuses a missing path for a `file` output and saves an absolute path.
   - A `group` step: the full path is shown, its keys and outputs are computed, and a loop is refused.
