@@ -3,6 +3,7 @@ import yaml
 
 from conftest import task_json, write_pipeline, write_step
 from factory import hidden, repo
+from serverutil import info, request
 
 
 @pytest.fixture
@@ -74,3 +75,50 @@ def test_data_without_hidden_steps(inited, ctx):
     assert "hidden_steps" not in factory_yaml(inited)
     assert factory_yaml(inited)["version"] == version
     assert inited.factory.json("version", "check") == report
+
+
+def hidden_pipeline(inited):
+    write_step(inited.fdir, "quiet", {})
+    write_pipeline(inited.fdir, {"id": "hp", "steps": ["quiet", "quiet"]})
+    inited.factory("step", "hide", "quiet")
+
+
+def test_pipeline_check_warns_hidden_once(inited):
+    hidden_pipeline(inited)
+    r = inited.factory("pipeline", "check", "hp")
+    assert r.returncode == 0
+    assert r.stdout.count("WARNING: A hidden step is used: `quiet`.") == 1
+
+
+def test_pipeline_with_hidden_step_runs_to_end(inited):
+    hidden_pipeline(inited)
+    task = inited.factory.json("launch", "hp", "--description", "Hidden run")
+    tid = task["id"]
+    for _ in range(2):
+        inited.factory("next", "--task", tid)
+        inited.factory("done", "--task", tid)
+    assert task_json(inited.fdir, tid)["status"] == "finished"
+
+
+def test_api_hide_unhide_list_check(inited, ctx):
+    write_step(inited.fdir, "quiet", {})
+    inited.factory("pipeline", "edit")
+    i = info(inited.fdir)
+    try:
+        assert request(i, "POST", "/api/steps/quiet/hide", {}, token=False)[0] == 401
+        assert hidden.ids(ctx) == []
+        status, out = request(i, "POST", "/api/steps/quiet/hide", {})
+        assert status == 200 and out == {"message": "Step quiet is hidden."} and hidden.ids(ctx) == ["quiet"]
+        status, steps = request(i, "GET", "/api/steps")
+        by_id = {s["id"]: s for s in steps}
+        assert by_id["quiet"]["hidden"] is True and by_id["user-validation"]["hidden"] is False
+        assert request(i, "GET", "/api/steps/quiet")[1]["hidden"] is True
+        status, problems = request(i, "POST", "/api/pipelines/check", {"data": {"id": "x", "steps": ["quiet"]}, "level": "local"})
+        assert {"level": "warning", "message": "A hidden step is used: `quiet`."} in problems
+        status, err = request(i, "POST", "/api/steps/ghost/hide", {})
+        assert status == 400 and "does not exist" in err["error"]
+        assert request(i, "POST", "/api/steps/quiet/unhide", {}, token=False)[0] == 401
+        status, out = request(i, "POST", "/api/steps/quiet/unhide", {})
+        assert status == 200 and out == {"message": "Step quiet is visible again."} and hidden.ids(ctx) == []
+    finally:
+        inited.factory("server", "stop", check=False)

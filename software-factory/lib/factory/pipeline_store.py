@@ -35,8 +35,9 @@ def copy(reg, source_id, new_id):
 
 
 def check(ctx, data, level):
+    from . import hidden
     reg = Registry.load(ctx)
-    return [p.to_dict() for p in pipeline_check.check(reg, data, ctx.columns(), level)]
+    return [p.to_dict() for p in pipeline_check.check(reg, data, ctx.columns(), level, hidden.ids(ctx))]
 
 
 def is_empty(value):

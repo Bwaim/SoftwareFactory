@@ -62,15 +62,28 @@ def registry(server):
 
 @route("GET", "/api/steps")
 def steps(server, query, body):
-    from . import pipeline_store
-    return [pipeline_store.step_summary(s) for s in sorted(registry(server).steps.values(), key=lambda s: s.id)]
+    from . import hidden, pipeline_store
+    hidden_ids = set(hidden.ids(server.ctx))
+    return [pipeline_store.step_summary(s, hidden_ids) for s in sorted(registry(server).steps.values(), key=lambda s: s.id)]
 
 
 @route("GET", "/api/steps/([a-z][a-z0-9_-]*)")
 def step(server, sid, query, body):
-    from . import pipeline_store
+    from . import hidden, pipeline_store
     reg = registry(server)
-    return pipeline_store.step_detail(reg, reg.step(sid))
+    return pipeline_store.step_detail(reg, reg.step(sid), set(hidden.ids(server.ctx)))
+
+
+@route("POST", "/api/steps/([a-z][a-z0-9_-]*)/hide")
+def step_hide(server, sid, query, body):
+    from . import hidden
+    return {"message": hidden.hide(server.ctx, sid)}
+
+
+@route("POST", "/api/steps/([a-z][a-z0-9_-]*)/unhide")
+def step_unhide(server, sid, query, body):
+    from . import hidden
+    return {"message": hidden.unhide(server.ctx, sid)}
 
 
 @route("POST", "/api/steps/([a-z][a-z0-9_-]*)/delete/dry-run")

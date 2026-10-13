@@ -360,12 +360,12 @@ def version_check(args):
 
 @cli.command("pipeline check")
 def pipeline_check_cmd(args):
-    from . import pipeline_check, repo
+    from . import hidden, pipeline_check, repo
     from .registry import Registry
     ctx = repo.load_ctx(task_opt=args.task)
     reg = Registry.load(ctx)
     pipeline = reg.pipeline(args.id)
-    problems = pipeline_check.check(reg, pipeline.data, ctx.columns(), pipeline.level)
+    problems = pipeline_check.check(reg, pipeline.data, ctx.columns(), pipeline.level, hidden.ids(ctx))
     if args.json:
         cli.emit([p.to_dict() for p in problems], True)
     elif not problems:

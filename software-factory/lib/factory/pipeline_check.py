@@ -19,8 +19,10 @@ def errors(problems):
     return [p for p in problems if p.level == "error"]
 
 
-def check(reg, data, columns, save_level=None):
+def check(reg, data, columns, save_level=None, hidden=()):
     problems = []
+    hidden = set(hidden)
+    warned_hidden = set()
     error = lambda m: problems.append(Problem("error", m))
     warning = lambda m: problems.append(Problem("warning", m))
     pid = data.get("id") or ""
@@ -41,6 +43,9 @@ def check(reg, data, columns, save_level=None):
             error(f"The step `{sid}` does not exist.")
             continue
         step = reg.steps[sid]
+        if sid in hidden and sid not in warned_hidden:
+            warned_hidden.add(sid)
+            warning(f"A hidden step is used: `{sid}`.")
         if entry.get("column") and entry["column"] not in columns:
             error(f"Step `{sid}` uses the column `{entry['column']}`, which is not in the board columns.")
         if (save_level or data.get("_level")) == "generic" and step.level == "local":
