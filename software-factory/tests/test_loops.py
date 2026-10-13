@@ -3,7 +3,7 @@ import json
 import pytest
 
 from conftest import events, fake_calls, task_from_pipeline, task_json, write_pipeline, write_step
-from factory import loops, repo
+from factory import engine, loops, repo, state
 from factory.registry import Registry
 
 LIMIT = "Loop limit reached on `review`: `findings` is still set"
@@ -374,3 +374,121 @@ def test_status_shows_the_innermost_loop(inited):
     step_with(run)
     step_with(run, "inner", "x")
     assert "Step: b (3 of 5), loop 1 of 1" in run("status").stdout
+
+
+def notifications(inited):
+    return [c["text"] for c in fake_calls(inited.fdir) if c["op"] == "notify"]
+
+
+def ready_for_last_review(inited, value):
+    run = review_pipeline(inited)
+    review_round(run, "a")
+    review_round(run, "b")
+    run("next")
+    run("done")
+    run("next")
+    run("state", "set", "findings", value)
+    return repo.load_ctx(cwd=inited.repo)
+
+
+def test_limit_message_text(inited):
+    run = review_pipeline(inited)
+    review_round(run, "a")
+    review_round(run, "b")
+    assert review_round(run, "c").stdout.strip() == (
+        f"{LIMIT}. The task is blocked. Ask the user what to do. When the user says to go on, run `factory unblock`. "
+        'For one more round, after the user approves, run `factory goto "write" --reason "<why>"`.')
+
+
+def test_limit_is_one_atomic_update(inited, monkeypatch):
+    ctx = ready_for_last_review(inited, "c")
+    original, seen = state.update, []
+
+    def update(ctx, tid, fn):
+        task = original(ctx, tid, fn)
+        seen.append((task["status"], task["steps"][task["position"]]["id"]))
+        return task
+
+    monkeypatch.setattr(state, "update", update)
+    engine.done(ctx, "t1")
+    assert seen == [("blocked", "after")]
+    types = [e["type"] for e in events(inited.fdir, "t1")]
+    assert types[-3:] == ["step_done", "loop_limit", "task_blocked"]
+
+
+def test_loop_decision_reads_the_key_inside_the_update(inited, monkeypatch):
+    ctx = ready_for_last_review(inited, "c")
+    original, fired = state.update, []
+
+    def update(ctx, tid, fn):
+        if not fired:
+            fired.append(True)
+            original(ctx, tid, lambda t: t["state"].__setitem__("findings", "none"))
+        return original(ctx, tid, fn)
+
+    monkeypatch.setattr(state, "update", update)
+    assert engine.done(ctx, "t1") == "Step done. Run `factory next`."
+    t = task_json(inited.fdir, "t1")
+    assert current_id(inited) == "after" and t["status"] == "active" and of_type(inited, "loop_limit") == []
+
+
+def test_limit_on_last_entry_sends_one_notification(inited):
+    run = review_pipeline(inited, limit=1, after=False)
+    review_round(run, "a")
+    before = len(notifications(inited))
+    review_round(run, "b")
+    assert notifications(inited)[before:] == [
+        "Task t1 finished, but the loop limit was reached on `review`: `findings` is still set."]
+    types = [e["type"] for e in events(inited.fdir, "t1")]
+    assert types.index("loop_limit") < types.index("task_finished")
+
+
+def test_limit_through_end_wait(inited):
+    write_step(inited.fdir, "w", {"wait_external": True, "done_when": "QA is done.",
+                                  "outputs": {"bugs": {"type": "text", "description": "Bugs"}}})
+    write_step(inited.fdir, "end", {})
+    write_pipeline(inited.fdir, {"id": "wl", "steps": [{"id": "w", "loop": loop("w", "bugs", 1)}, "end"]})
+    task_from_pipeline(inited, "wl", terminal_handle={"agent": "t1"})
+    run = runner(inited)
+    for _ in range(2):
+        run("next")
+        run("state", "set", "bugs", "two")
+        run("wait")
+        inited.factory("external-done", "t1")
+    limit = "Loop limit reached on `w`: `bugs` is still set"
+    t = task_json(inited.fdir, "t1")
+    assert current_id(inited) == "end" and t["status"] == "blocked" and t["status_reason"] == limit
+    texts = [c.get("text", "") for c in fake_calls(inited.fdir)]
+    assert any(text.startswith(f"The external event happened: QA is done. {limit}. The task is blocked.") for text in texts)
+
+
+def test_inner_loop_on_the_same_first_step_gets_its_full_max_again(inited):
+    write_step(inited.fdir, "a", {})
+    write_step(inited.fdir, "b", {"outputs": {"inner": {"type": "text", "description": "Inner"}}})
+    write_step(inited.fdir, "c", {"outputs": {"outer": {"type": "text", "description": "Outer"}}})
+    write_step(inited.fdir, "end", {})
+    write_pipeline(inited.fdir, {"id": "same", "steps": [
+        "a", {"id": "b", "loop": loop("b", "inner", 1)}, {"id": "c", "loop": loop("b", "outer", 2)}, "end"]})
+    task_from_pipeline(inited, "same")
+    run = runner(inited)
+    step_with(run)
+    assert step_with(run, "inner", "x") == "Loop 1 of 1: back to `b`. Run `factory next`."
+    assert "Loop limit reached on `b`" in step_with(run, "inner", "x")
+    run("unblock")
+    assert step_with(run, "outer", "y") == "Loop 1 of 2: back to `b`. Run `factory next`."
+    assert step_with(run, "inner", "x") == "Loop 1 of 1: back to `b`. Run `factory next`."
+
+
+def test_running_task_keeps_its_loop_snapshot(inited):
+    run = review_pipeline(inited)
+    steps = ["write", {"id": "review", "loop": loop("write", "findings", 1)}, "after"]
+    write_pipeline(inited.fdir, {"id": "rl", "steps": steps})
+    assert review_round(run, "a").stdout.strip() == "Loop 1 of 2: back to `write`. Run `factory next`."
+    assert review_round(run, "b").stdout.strip() == "Loop 2 of 2: back to `write`. Run `factory next`."
+    assert [l["max"] for l in task_json(inited.fdir, "t1")["loops"]] == [2]
+
+
+def test_check_skips_the_loop_of_an_unknown_step(inited):
+    write_step(inited.fdir, "a", {})
+    messages = check_messages(inited, "ghost", ["a", {"id": "ghost", "loop": loop("nowhere", "Bad-Key", 0)}, "a"])
+    assert messages and not any("loop" in m for _, m in messages)

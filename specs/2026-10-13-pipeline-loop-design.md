@@ -83,19 +83,19 @@ After the existing checks pass (outputs, file paths, command result, `done_check
    - Reset the counts of the loops inside, by section 5.6.
    - Events: `step_done` on the current step, then `loop_back` with `entry`, `to` (the path of the target step), `round` (the jump number `n`, after the increment) and `max`.
    - Output: "Loop <n> of <max>: back to `<step>`. Run `factory next`." `<n>` is the number of this jump, from 1 to `max`. `<step>` is the path of the target step.
-3. **Set, and `jumps == max`:** the task moves to the next step as today, then it is blocked:
+3. **Set, and `jumps == max`:** in the same `state.update`, the task moves to the next step and is blocked:
    - Reason: "Loop limit reached on `<entry>`: `<key>` is still set".
    - Events: `step_done`, `loop_limit` with `entry` and `key`, then `task_blocked` with the reason.
    - A notification, as `factory block` sends.
-   - Output: "Loop limit reached on `<entry>`: `<key>` is still set. The task is blocked. Ask the user what to do. To go on, the user runs `factory unblock`. For one more round, after the user approves, run `factory goto <back_to> --reason "<why>"`."
+   - Output: "Loop limit reached on `<entry>`: `<key>` is still set. The task is blocked. Ask the user what to do. When the user says to go on, run `factory unblock`. For one more round, after the user approves, run `factory goto "<path of the first step of back_to>" --reason "<why>"`."
 4. **Not set:** the task moves to the next step, as today.
 - A loop on the last entry of the pipeline that ends (key not set) finishes the task, as today.
-- At the limit on the last entry, no next step exists. The task finishes as today. The factory also logs `loop_limit` and sends the notification "Task <id> finished, but the loop limit was reached on `<entry>`: `<key>` is still set." The `factory done` output says the same. The pipeline check warns about this case (section 8).
+- At the limit on the last entry, no next step exists. The task finishes as today. The factory also logs `loop_limit` and sends the notification "Task <id> finished, but the loop limit was reached on `<entry>`: `<key>` is still set." It is the only notification. `loop_limit` is logged before `task_finished`. The `factory done` output says the same. The pipeline check warns about this case (section 8).
 - `factory skip` never runs the loop decision.
 
 ### 5.3 Wait steps
 
-A `wait_external` step ends with `factory poll` or `factory external-done`, through `engine.end_wait`, not `factory done`. The same loop decision runs there. The message sent to the session is the loop message or the limit message, instead of "The external event happened".
+A `wait_external` step ends with `factory poll` or `factory external-done`, through `engine.end_wait`, not `factory done`. The same loop decision runs there. The message sent to the session is "The external event happened: <done_when>. <loop or limit message>".
 
 ### 5.4 Session
 

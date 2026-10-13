@@ -61,6 +61,21 @@ def test_editor_model_keeps_loop_on_load_and_save(work):
     assert json.loads(out) == [None, LOOP, {"back_to": "write", "until": 1}, "write"]
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_editor_back_to_lists_nearest_ids_and_missing_target(work):
+    source = EDITOR.read_text()
+    functions = "\n".join(extract(source, n) for n in ("nearestIndex", "loopMarkText", "backToChoices"))
+    model = {"steps": [{"id": "a"}, {"id": "b"}, {"id": "a"}, {"id": "c"}]}
+    script = (f"const state = {{ model: {json.dumps(model)} }};\n" + functions +
+              "\nconsole.log(JSON.stringify([backToChoices(3, 'a'), backToChoices(3, 'gone'), backToChoices(3, null),"
+              " loopMarkText({ loop: { back_to: '', max: 2 } }), loopMarkText({ loop: { back_to: 'a', max: 2 } })]));\n")
+    path = work / "choices.js"
+    path.write_text(script)
+    out = json.loads(subprocess.run(["node", str(path)], capture_output=True, text=True, check=True).stdout)
+    nearest = [["1", "2. b"], ["2", "3. a"], ["3", "4. c"]]
+    assert out == [nearest, nearest + [["missing", "gone (not found)"]], nearest, "↺ ? ×2", "↺ a ×2"]
+
+
 def test_task_row_shows_loop_count(inited):
     write_step(inited.fdir, "write", {})
     write_step(inited.fdir, "review", {"outputs": {"findings": {"type": "long-text", "description": "Findings"}}})

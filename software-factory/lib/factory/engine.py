@@ -225,33 +225,59 @@ def open_ide(ctx, tid):
 ADVANCE_STATUSES = ("active", "blocked", "awaiting_approval", "waiting_external")
 
 
-def advance(ctx, tid, event_type, position, statuses=ADVANCE_STATUSES, first_event=None):
-    before = {}
+def clear_step(t):
+    t["started"] = None
+    t["command_result"] = None
+    t["approval"] = None
+
+
+def forward(t, reason=None):
+    t["position"] += 1
+    clear_step(t)
+    if t["position"] >= len(t["steps"]):
+        state.set_status(t, "finished")
+        t["column"] = repo.DONE_COLUMN
+    elif reason:
+        state.set_status(t, "blocked", reason)
+    elif t["status"] != "active":
+        state.set_status(t, "active")
+
+
+def move(ctx, tid, event_type, position, statuses, first_event, decide=None):
+    info = {}
 
     def change(t):
         require_unchanged(t, position, statuses)
-        before.update(column=t["column"], path=state.step_path_str(t))
+        info.clear()
+        info.update(kind="step", column=t["column"], path=state.step_path_str(t))
         if first_event:
             first_event()
-        events.log(ctx, tid, event_type, before["path"])
-        t["position"] += 1
-        t["started"] = None
-        t["command_result"] = None
-        t["approval"] = None
-        if t["position"] >= len(t["steps"]):
-            state.set_status(t, "finished")
-            t["column"] = repo.DONE_COLUMN
-        elif t["status"] != "active":
-            state.set_status(t, "active")
+        events.log(ctx, tid, event_type, info["path"])
+        if decide:
+            decide(t, info)
+        if info["kind"] != "loop":
+            forward(t, info.get("reason"))
 
-    task = state.update(ctx, tid, change)
+    return state.update(ctx, tid, change), info
+
+
+def log_finished(ctx, tid, info):
+    if info["column"] != repo.DONE_COLUMN:
+        events.log(ctx, tid, "column_changed", None, **{"from": info["column"], "to": repo.DONE_COLUMN})
+    events.log(ctx, tid, "task_finished")
+
+
+def stepped(ctx, tid, task, info):
     if task["status"] != "finished":
         return f"Step done. Run `{cmd(task, 'next')}`."
-    if before["column"] != repo.DONE_COLUMN:
-        events.log(ctx, tid, "column_changed", None, **{"from": before["column"], "to": repo.DONE_COLUMN})
-    events.log(ctx, tid, "task_finished")
+    log_finished(ctx, tid, info)
     session.notify(ctx, f"Task {tid} is finished.")
     return "The pipeline is finished. Tell the user that the task is finished."
+
+
+def advance(ctx, tid, event_type, position, statuses=ADVANCE_STATUSES, first_event=None):
+    task, info = move(ctx, tid, event_type, position, statuses, first_event)
+    return stepped(ctx, tid, task, info)
 
 
 def done(ctx, tid):
@@ -274,53 +300,45 @@ def done(ctx, tid):
 
 
 def settle(ctx, tid, position, statuses=ADVANCE_STATUSES, first_event=None):
-    task = state.load(ctx, tid)
-    loop = loops.loop_ending_at(task, position)
-    if loop is None or not loops.is_set((task.get("state") or {}).get(loop["while"])):
-        return "step", advance(ctx, tid, "step_done", position, statuses, first_event)
-    if loop["jumps"] < loop["max"]:
-        return "loop", loop_back(ctx, tid, position, statuses, first_event)
-    return "limit", loop_limit(ctx, tid, position, statuses, first_event)
+    task, info = move(ctx, tid, "step_done", position, statuses, first_event, decide_loop)
+    if info["kind"] == "loop":
+        return "loop", looped(ctx, tid, task, info)
+    if info["kind"] == "limit":
+        return "limit", limit_reached(ctx, tid, task, info)
+    return "step", stepped(ctx, tid, task, info)
 
 
-def loop_back(ctx, tid, position, statuses, first_event):
-    info = {}
-
-    def change(t):
-        require_unchanged(t, position, statuses)
-        loop = loops.loop_ending_at(t, position)
-        info["from"] = state.step_path_str(t)
-        if first_event:
-            first_event()
-        events.log(ctx, tid, "step_done", info["from"])
-        loop["jumps"] += 1
-        loops.reset_counts(t, loop["first"], loop)
-        t["position"] = loop["first"]
-        t["started"] = None
-        t["command_result"] = None
-        t["approval"] = None
-        state.set_status(t, "active")
-        info.update(entry=loop["entry"], n=loop["jumps"], max=loop["max"], to=state.step_path_str(t))
-
-    task = state.update(ctx, tid, change)
-    events.log(ctx, tid, "loop_back", info["from"], entry=info["entry"], to=info["to"], round=info["n"], max=info["max"])
-    return f"Loop {info['n']} of {info['max']}: back to `{info['to']}`. Run `{cmd(task, 'next')}`."
+def decide_loop(t, info):
+    loop = loops.loop_ending_at(t, t["position"])
+    if loop is None or not loops.is_set((t.get("state") or {}).get(loop["while"])):
+        return
+    info.update(entry=loop["entry"], key=loop["while"], max=loop["max"], target=state.step_path_str(t, loop["first"]))
+    if loop["jumps"] >= loop["max"]:
+        info.update(kind="limit", reason=f"Loop limit reached on `{loop['entry']}`: `{loop['while']}` is still set")
+        return
+    loop["jumps"] += 1
+    loops.reset_counts(t, loop["first"], loop)
+    t["position"] = loop["first"]
+    clear_step(t)
+    state.set_status(t, "active")
+    info.update(kind="loop", n=loop["jumps"])
 
 
-def loop_limit(ctx, tid, position, statuses, first_event):
-    task = state.load(ctx, tid)
-    loop = loops.loop_ending_at(task, position)
-    path = state.step_path_str(task)
-    target = state.step_path_str(task, loop["first"])
-    reason = f"Loop limit reached on `{loop['entry']}`: `{loop['while']}` is still set"
-    advance(ctx, tid, "step_done", position, statuses, first_event)
-    events.log(ctx, tid, "loop_limit", path, entry=loop["entry"], key=loop["while"])
-    if state.load(ctx, tid)["status"] == "finished":
-        session.notify(ctx, f"Task {tid} finished, but the loop limit was reached on `{loop['entry']}`: `{loop['while']}` is still set.")
-        return f"The pipeline is finished, but the loop limit was reached on `{loop['entry']}`: `{loop['while']}` is still set. Tell the user."
-    block(ctx, tid, reason)
-    return (f"{reason}. The task is blocked. Ask the user what to do. To go on, the user runs `factory unblock`. "
-            f"For one more round, after the user approves, run `factory goto \"{target}\" --reason \"<why>\"`.")
+def looped(ctx, tid, task, info):
+    events.log(ctx, tid, "loop_back", info["path"], entry=info["entry"], to=info["target"], round=info["n"], max=info["max"])
+    return f"Loop {info['n']} of {info['max']}: back to `{info['target']}`. Run `{cmd(task, 'next')}`."
+
+
+def limit_reached(ctx, tid, task, info):
+    events.log(ctx, tid, "loop_limit", info["path"], entry=info["entry"], key=info["key"])
+    if task["status"] == "finished":
+        log_finished(ctx, tid, info)
+        session.notify(ctx, f"Task {tid} finished, but the loop limit was reached on `{info['entry']}`: `{info['key']}` is still set.")
+        return f"The pipeline is finished, but the loop limit was reached on `{info['entry']}`: `{info['key']}` is still set. Tell the user."
+    events.log(ctx, tid, "task_blocked", state.step_path_str(task), reason=info["reason"])
+    session.notify(ctx, f"Task {tid} is blocked: {info['reason']}")
+    return (f"{info['reason']}. The task is blocked. Ask the user what to do. When the user says to go on, run `{cmd(task, 'unblock')}`. "
+            f"For one more round, after the user approves, run `factory goto \"{info['target']}\" --reason \"<why>\"`.")
 
 
 def skip(ctx, tid):
@@ -360,9 +378,7 @@ def goto(ctx, tid, target, reason):
         key = str(index)
         t["goto_counts"][key] = t["goto_counts"].get(key, 0) + 1
         t["position"] = index
-        t["started"] = None
-        t["command_result"] = None
-        t["approval"] = None
+        clear_step(t)
         loops.reset_counts(t, index)
         if t["goto_counts"][key] >= MAX_JUMPS:
             state.set_status(t, "blocked", f"loop on {to_path}")

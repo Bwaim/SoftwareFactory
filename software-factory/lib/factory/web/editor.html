@@ -209,7 +209,19 @@ function nearestIndex(i, id) {
   for (let j = i; j >= 0; j--) if (state.model.steps[j].id === id) return j;
   return -1;
 }
-function loopMarkText(s) { return s.loop ? `↺ ${s.loop.back_to} ×${s.loop.max}` : ""; }
+function loopMarkText(s) {
+  if (!s.loop) return "";
+  if (!s.loop.back_to) return `↺ ? ×${s.loop.max}`;
+  return `↺ ${s.loop.back_to} ×${s.loop.max}`;
+}
+function backToChoices(i, backTo) {
+  const choices = [];
+  state.model.steps.slice(0, i + 1).forEach((e, j) => {
+    if (nearestIndex(i, e.id) === j) choices.push([String(j), `${j + 1}. ${e.id}`]);
+  });
+  if (backTo !== null && nearestIndex(i, backTo) < 0) choices.push(["missing", `${backTo || "?"} (not found)`]);
+  return choices;
+}
 function loopMark(s) {
   const tag = el("span", { class: "tag" }, loopMarkText(s));
   if (!s.loop) tag.style.display = "none";
@@ -219,9 +231,12 @@ function loopBlock(s, i, tag) {
   const editLoop = (fn) => { fn(s.loop); s.loop.edited = true; tag.textContent = loopMarkText(s); changed(); };
   const target = el("select");
   target.append(el("option", { value: "" }, "(no loop)"));
-  state.model.steps.slice(0, i + 1).forEach((e, j) => target.append(el("option", { value: String(j) }, `${j + 1}. ${e.id}`)));
-  target.value = s.loop ? String(nearestIndex(i, s.loop.back_to)) : "";
+  const backTo = s.loop ? s.loop.back_to : null;
+  backToChoices(i, backTo).forEach(([value, label]) => target.append(el("option", { value }, label)));
+  const found = s.loop ? nearestIndex(i, backTo) : -1;
+  target.value = !s.loop ? "" : found < 0 ? "missing" : String(found);
   target.addEventListener("change", () => {
+    if (target.value === "missing") return;
     if (target.value === "") s.loop = null;
     else {
       s.loop = s.loop || loopOf({ back_to: "", while: "", max: DEFAULT_LOOP_MAX });

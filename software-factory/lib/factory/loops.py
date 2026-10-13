@@ -2,7 +2,7 @@ from . import keys
 from .registry import CREATE_WORKTREE, normalize_entry
 
 LOOP_FIELDS = ("back_to", "while", "max")
-MAX_JUMPS = 20
+LOOP_MAX = 20
 EMPTY_VALUES = ("", "none")
 
 
@@ -116,6 +116,8 @@ def range_outputs(reg, entries, j, i, key):
 def check_one(reg, entries, i, problems, ranges):
     entry = entries[i]
     sid = entry.get("id")
+    if sid not in reg.steps:
+        return
     error = lambda m: problems.append(("error", m))
     warning = lambda m: problems.append(("warning", m))
     loop = entry["loop"]
@@ -133,8 +135,8 @@ def check_one(reg, entries, i, problems, ranges):
     elif j is None:
         error(f"Step `{sid}`: `loop.back_to` must be this step or an earlier step of the pipeline.")
     limit = loop.get("max")
-    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_JUMPS:
-        error(f"Step `{sid}`: `loop.max` must be an integer from 1 to {MAX_JUMPS}.")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= LOOP_MAX:
+        error(f"Step `{sid}`: `loop.max` must be an integer from 1 to {LOOP_MAX}.")
     key = loop.get("while")
     if not keys.is_key(key):
         error(f"Step `{sid}`: `loop.while` must be a key name: lowercase letters, digits and `_`, starting with a letter.")

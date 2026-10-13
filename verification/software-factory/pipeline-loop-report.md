@@ -1,10 +1,10 @@
 # Pipeline loop verification report
 
-Date: 2026-10-13 23:36
+Date: 2026-10-14 00:00
 
 ## Milestone 1. Loop runtime
 
-23 of 23 tests pass.
+31 of 31 tests pass.
 
 | Test | Result |
 |---|---|
@@ -31,10 +31,18 @@ Date: 2026-10-13 23:36
 | `test_loops::test_footer_line_for_subagent_and_command` | PASS |
 | `test_loops::test_status_shows_loop_count` | PASS |
 | `test_loops::test_status_shows_the_innermost_loop` | PASS |
+| `test_loops::test_limit_message_text` | PASS |
+| `test_loops::test_limit_is_one_atomic_update` | PASS |
+| `test_loops::test_loop_decision_reads_the_key_inside_the_update` | PASS |
+| `test_loops::test_limit_on_last_entry_sends_one_notification` | PASS |
+| `test_loops::test_limit_through_end_wait` | PASS |
+| `test_loops::test_inner_loop_on_the_same_first_step_gets_its_full_max_again` | PASS |
+| `test_loops::test_running_task_keeps_its_loop_snapshot` | PASS |
+| `test_loops::test_check_skips_the_loop_of_an_unknown_step` | PASS |
 
 ## Milestone 2. Loop authoring
 
-20 of 20 tests pass.
+21 of 21 tests pass.
 
 | Test | Result |
 |---|---|
@@ -56,12 +64,13 @@ Date: 2026-10-13 23:36
 | `test_loop_authoring::test_editor_api_saves_and_loads_loop_unchanged` | PASS |
 | `test_loop_authoring::test_editor_page_has_loop_controls` | PASS |
 | `test_loop_authoring::test_editor_model_keeps_loop_on_load_and_save` | PASS |
+| `test_loop_authoring::test_editor_back_to_lists_nearest_ids_and_missing_target` | PASS |
 | `test_loop_authoring::test_task_row_shows_loop_count` | PASS |
 | `test_loop_authoring::test_readme_documents_loops` | PASS |
 
 ## Full test suite
 
-389 of 389 tests pass.
+398 of 398 tests pass.
 
 ## Updated tests
 
@@ -82,16 +91,16 @@ Date: 2026-10-13 23:36
 
 ### Runtime
 
-- Snapshot of each loop: `test_snapshot_positions`. A changed file does not change a running loop: the loop is read from `task.json` only, see `test_old_task_without_loops` for a task without loops.
+- Snapshot of each loop: `test_snapshot_positions`. A changed file does not change a running loop: `test_running_task_keeps_its_loop_snapshot`. A task without loops: `test_old_task_without_loops`.
 - Jump, "Loop <n> of <max>" and `loop_back`: `test_review_loop_jumps_twice_then_moves_on`.
-- Limit, block, reason and `loop_limit`: `test_limit_moves_on_and_blocks`. One more round with `factory goto`: `test_goto_after_limit_gives_one_more_round`.
-- Limit on the last entry: `test_limit_on_last_entry_finishes`.
+- Limit, block, reason and `loop_limit`: `test_limit_moves_on_and_blocks`. The limit message: `test_limit_message_text`. Move and block in one update: `test_limit_is_one_atomic_update`. The loop decision reads the key inside the update: `test_loop_decision_reads_the_key_inside_the_update`. One more round with `factory goto`: `test_goto_after_limit_gives_one_more_round`.
+- Limit on the last entry: `test_limit_on_last_entry_finishes`. One notification only: `test_limit_on_last_entry_sends_one_notification`.
 - Not set values: `test_is_set`, `test_not_set_values_move_on`.
 - Skip: `test_skipped_loop_step_does_not_jump`.
 - Reset of `started`, `command_result`, `approval`, task keys kept: `test_jump_resets_fields_and_keeps_keys`.
 - Counts apart from `goto_counts`, no `goto` block: `test_three_loop_rounds_do_not_block_like_goto`, `test_group_loop_back_to_itself`.
-- Count reset by an outer loop and by `factory goto`: `test_nested_inner_loop_resets_after_outer_jump`, `test_goto_resets_only_before_the_range`.
-- Wait steps: `test_wait_step_loop_jumps_on_external_done`.
+- Count reset by an outer loop and by `factory goto`: `test_nested_inner_loop_resets_after_outer_jump`, `test_goto_resets_only_before_the_range`. An inner loop that starts on the same step as its outer loop: `test_inner_loop_on_the_same_first_step_gets_its_full_max_again`.
+- Wait steps: `test_wait_step_loop_jumps_on_external_done`. The limit through a wait step: `test_limit_through_end_wait`.
 - Same session for session steps, new agent for subagent steps: the jump only moves the position. Real sessions: manual check 1.
 - `factory status`: `test_status_shows_loop_count`, `test_status_shows_the_innermost_loop`.
 
@@ -101,13 +110,13 @@ Date: 2026-10-13 23:36
 
 ### Pipeline check
 
-- Every error and warning: `test_check_errors_and_warnings`, `test_overlap_names_both_loops_and_nested_is_fine`.
+- Every error and warning: `test_check_errors_and_warnings`, `test_overlap_names_both_loops_and_nested_is_fine`. An entry with an unknown step gets no loop check: `test_check_skips_the_loop_of_an_unknown_step`.
 - A key output later in the loop is available inside the range: `test_key_set_later_in_the_loop_is_available_inside_the_range`.
 
 ### Pipeline editor and dashboard
 
 - Save and load with `loop` unchanged: `test_loop_authoring::test_editor_api_saves_and_loads_loop_unchanged` (server) and `test_editor_model_keeps_loop_on_load_and_save` (editor model, run with node).
-- Entry form controls and row mark: `test_editor_page_has_loop_controls`. Browser look: manual check 3.
+- Entry form controls and row mark: `test_editor_page_has_loop_controls`. The `back_to` list shows the nearest entry of each id and a missing target: `test_editor_back_to_lists_nearest_ids_and_missing_target` (run with node). Browser look: manual check 3.
 - Live checks: the editor calls `/api/pipelines/check`, see `test_editor_api_saves_and_loads_loop_unchanged`.
 - Dashboard card: `test_task_row_shows_loop_count`. Browser look: manual check 4.
 

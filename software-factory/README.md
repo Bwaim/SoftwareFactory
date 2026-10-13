@@ -409,7 +409,7 @@ Only `http` and `https` URLs are used.
 - When `factory done` succeeds on the last step of a loop entry, the factory reads the `while` key.
 - The key is not set when it is missing, empty or `none`, ignoring case and spaces around it.
 - Set, with fewer than `max` jumps: the task goes back to the first step of `back_to`. `factory done` prints "Loop <n> of <max>: back to `<step>`. Run `factory next`."
-- Set, after `max` jumps: the task moves to the next step and is blocked. The user unblocks to go on, or approves one more round with `factory goto`.
+- Set, after `max` jumps: the task moves to the next step and is blocked. The session asks the user what to do. When the user says to go on, the session runs `factory unblock`. For one more round, after the user approves, the session runs `factory goto`.
 - Not set: the task moves on. A skipped step never makes its loop jump.
 - At the limit on the last entry, the task finishes. The check warns about a loop on the last entry.
 - The jump keeps the task keys. Session steps run again in the same session, with the conversation of the earlier rounds.

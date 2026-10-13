@@ -217,10 +217,11 @@ steps:
 - When `factory done` succeeds on the last step of the loop entry, the factory reads the `while` key:
   - The key is not set when it is missing, empty or `none`, ignoring case and spaces around it.
   - Set, with fewer than `max` jumps: the task goes back to the first step of `back_to`. `factory done` prints "Loop <n> of <max>: back to `<step>`. Run `factory next`."
-  - Set, after `max` jumps: the task moves to the next step and is blocked: "Loop limit reached on `<entry>`: `<key>` is still set". The user unblocks to go on, or approves one more round with `factory goto`.
+  - Set, after `max` jumps: the task moves to the next step and is blocked: "Loop limit reached on `<entry>`: `<key>` is still set". The session asks the user what to do. When the user says to go on, the session runs `factory unblock`. For one more round, after the user approves, the session runs `factory goto`.
   - Not set: the task moves on.
 - At the limit on the last entry of the pipeline, the task finishes without asking the user. So put a step after a loop, for example `user-validation`.
 - A skipped step never makes its loop jump.
+- An approval on a `user-validation` step does not stop a loop. If that step is the last step of the loop entry, the task still jumps back while the key is set.
 - The factory makes the jump. The session never runs `factory goto` for a loop.
 - The jump keeps the task keys. It runs in the same task session, so a `session` step keeps the conversation of the earlier rounds. A `subagent` step starts a new agent each time.
 - A loop's count goes back to 0 when the task jumps to a step before its range. So an inner loop gets its full `max` in each round of an outer loop.
