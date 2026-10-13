@@ -12,3 +12,4 @@ Ideas and requirements not in the current build. Move them to `factory_skill_cre
 - Analyze a finished task: split the Claude transcript by step with the event log, find failed commands, retries and user corrections, and propose step improvements in the right location (generic or local).
 - Custom card actions: a dashboard button that runs a chosen step on a task.
 - Update the live session state with Claude Code hooks (`Stop`, `Notification`), for terminals whose adapter has no `state` operation.
+- In the dashboard automatically hides the empty columns. 
