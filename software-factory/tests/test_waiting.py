@@ -89,4 +89,4 @@ def test_end_wait_adds_period_to_done_when(inited):
     run = lambda *a: inited.factory(*a, "--task", "t1")
     run("next"); run("wait"); run("external-done", "t1")
     texts = [c.get("text", "") for c in fake_calls(inited.fdir)]
-    assert texts[-1] == "The external event happened: QA is done. Run `factory next --task t1`."
+    assert texts[-1] == "The external event happened: QA is done. Run `factory next`."

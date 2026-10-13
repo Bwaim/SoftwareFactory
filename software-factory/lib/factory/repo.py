@@ -71,7 +71,3 @@ def current_task_id(ctx):
         if wt and Path(wt).resolve() == top:
             return data["id"]
     raise FactoryError("Cannot find the task for this folder. Add --task <id> to the command.")
-
-
-def task_flag(task):
-    return "" if task.get("worktree") else f" --task {task['id']}"

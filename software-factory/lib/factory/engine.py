@@ -1,29 +1,20 @@
 import os
-import re
 import shlex
 import subprocess
 from pathlib import Path
 
-from . import config, events, repo, session, state
+from . import config, events, keys, render, repo, session, state
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, Registry
 
 DONE_CHECK_TIMEOUT = 300
 POLL_CHECK_TIMEOUT = 60
 APPROVAL_STEP = "user-validation"
-FACTORY_SPAN_RE = re.compile(r"`(factory [^`]*)`")
 MAX_JUMPS = 3
 
 
 def cmd(task, text):
-    return f"factory {text}{repo.task_flag(task)}"
-
-
-def with_task_flag(text, tid):
-    def add(m):
-        inner = m.group(1)
-        return m.group(0) if "--task" in inner else f"`{inner} --task {tid}`"
-    return FACTORY_SPAN_RE.sub(add, text)
+    return f"factory {text}"
 
 
 def task_cwd(ctx, task):
@@ -93,92 +84,27 @@ def start(ctx, tid, entry, step):
     return task
 
 
-def header(task, step):
-    lines = [
-        f"Task `{task['id']}`, step {task['position'] + 1} of {len(task['steps'])}: {state.step_path_str(task)}",
-        f"Type: {step.type}. Runs in: {step.run_in}.",
-    ]
-    if step.done_when:
-        lines.append(f"Done when: {step.done_when}")
-    return lines
+def key_values(task):
+    return {**(task.get("state") or {}), "task_id": task["id"], "description": task.get("description") or ""}
 
 
-def context_lines(ctx, task, step, values):
-    lines = []
-    if values:
-        lines += ["", "Config:"] + [f"- {k}: {v}" for k, v in values.items()]
-    reads = step.get("reads") or []
-    if reads:
-        lines += ["", "Task state:"] + [f"- {k}: {task['state'].get(k, '(not set)')}" for k in reads]
-    writes = step.get("writes") or []
-    if writes:
-        lines += ["", f"Save these task state keys with `factory state set <key> <value>`: {', '.join(writes)}."]
-    lines += ["", f"Artifacts folder: {artifacts_dir(ctx, task)}"]
-    return lines
+def step_line(task):
+    return f"Step {task['position'] + 1} of {len(task['steps'])}: {state.step_path_str(task)}"
 
 
-def subagent_block(ctx, task, entry, step, values):
+def render_step(task, entry, step, values):
+    prompt = render.fill(step.body, key_values(task), values) if step.type == "ai" else ""
     model, effort = settings(entry, step)
-    prompt = [
-        f"You run one step of the factory task `{task['id']}`: {state.step_path_str(task)}.",
-        f"Working folder: {task_cwd(ctx, task)}",
-        *context_lines(ctx, task, step, values),
-        "",
-        "Instructions:",
-        step.body.strip(),
-        "",
-        "Write your outputs with `factory state set <key> <value>`.",
-        "End with a short report. If you need an answer from the user, say so in the report and stop.",
-    ]
-    return [
-        "Run this step in a subagent. Call the Agent tool with:",
-        f"- model: {model or 'inherit'}",
-        f"- effort: {effort or 'inherit'}",
-        "- prompt:",
-        "<<<",
-        with_task_flag("\n".join(prompt), task["id"]),
-        ">>>",
-    ]
-
-
-def end_line(step):
-    if step.wait_external:
-        return "When the actions of this step are done, run `factory wait`. The factory tells you when the external event happens."
-    if step.run_in == "subagent":
-        return "When the subagent ends, read its report. If it needs the user, ask the user, then run `factory next` again. Otherwise run `factory done`."
-    return "When the step is done, run `factory done`."
-
-
-IF_NEEDED = [
-    "If needed:",
-    '- If you cannot continue without the user, run `factory block "<question>"`, ask the user, then run `factory unblock` when the user answers.',
-    "- Only after the user approves: skip this step with `factory skip`, or go back to an earlier step with `factory goto <step path> --reason \"<why>\"`.",
-]
-
-
-def render(ctx, task, entry, step, values):
-    lines = header(task, step)
-    if step.run_in == "subagent" and step.type in ("prompt", "skill"):
-        lines += [""] + subagent_block(ctx, task, entry, step, values)
-    else:
-        lines += context_lines(ctx, task, step, values)
-        if step.type == "script":
-            lines += ["", "Run the step script with `factory run-script`. It prints the script output and its exit code."]
-        else:
-            lines += ["", "Instructions:", step.body.strip()]
-    lines += ["", end_line(step), "", *IF_NEEDED]
-    text = "\n".join(lines)
-    return with_task_flag(text, task["id"]) if not task.get("worktree") else text
+    return render.step_text(step, prompt, step_line(task), keys.outputs_of(step), model, effort)
 
 
 def render_missing(task, step, missing):
-    lines = header(task, step) + ["", "Some config values are missing. Ask the user for each one, then save it:"]
+    lines = [step_line(task), "", "Some config values are missing. Ask the user for each one, then save it:"]
     for key in missing:
         desc = step.config_spec[key].get("description", "")
         lines.append(f"- `{key}`: {desc} Save it with `factory config set {step.id} {key} <value>`.")
     lines.append("Then run `factory next` again.")
-    text = "\n".join(lines)
-    return with_task_flag(text, task["id"]) if not task.get("worktree") else text
+    return "\n".join(lines)
 
 
 def next_step(ctx, tid):
@@ -194,7 +120,7 @@ def next_step(ctx, tid):
         return render_missing(task, step, missing)
     if task.get("started") != task["position"]:
         task = start(ctx, tid, entry, step)
-    return render(ctx, task, entry, step, values)
+    return render_step(task, entry, step, values)
 
 
 def require_open(task):

@@ -20,16 +20,12 @@ RESUME_PROMPT = "The factory resumed this task. Run `{status}`, then continue wi
 QUESTION_BOX = "The session shows a question box. Answer it in the task tab: factory terminal focus {id}."
 
 
-def factory_cmd(task, sub):
-    return f"factory {sub}" + ("" if task.get("worktree") else f" --task {task['id']}")
-
-
 def first_prompt(task):
-    return FIRST_PROMPT.format(id=task["id"], next=factory_cmd(task, "next"), done=factory_cmd(task, "done"))
+    return FIRST_PROMPT.format(id=task["id"], next="factory next", done="factory done")
 
 
 def resume_prompt(task, extra=None):
-    text = RESUME_PROMPT.format(status=factory_cmd(task, "status"), next=factory_cmd(task, "next"))
+    text = RESUME_PROMPT.format(status="factory status", next="factory next")
     return f"{text}\n\n{extra}" if extra else text
 
 

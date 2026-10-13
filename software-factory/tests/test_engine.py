@@ -23,8 +23,8 @@ def run(flow, *args, check=True):
 
 def test_next_done_check_fails_then_passes(flow):
     out = run(flow, "next").stdout
-    assert "step 2 of 5: make" in out
-    assert "`factory state set out made.txt --task t1`" in out
+    assert "Step 2 of 5: make" in out
+    assert "Create `made.txt`. Then run `factory state set out made.txt`." in out
     r = run(flow, "done", check=False)
     assert r.returncode == 1 and "done check failed" in r.stderr
     (flow.repo / "made.txt").write_text("x")
@@ -61,7 +61,7 @@ def test_missing_config_asks(inited):
     assert "factory config set cfg target_branch <value>" in out
     assert events(inited.fdir, "t1")[-1] == {**events(inited.fdir, "t1")[-1], "type": "config_asked", "key": "target_branch"}
     inited.factory("config", "set", "cfg", "target_branch", "release")
-    assert "- target_branch: release" in inited.factory("next", "--task", "t1").stdout
+    assert "Do the step." in inited.factory("next", "--task", "t1").stdout
 
 
 def test_subagent_call_model_effort_precedence(inited):
@@ -72,8 +72,7 @@ def test_subagent_call_model_effort_precedence(inited):
     assert "Call the Agent tool" in out
     assert "- model: opus" in out
     assert "- effort: low" in out
-    assert "- ticket: ABC-1" in out
-    assert "Analyze it." in out
+    assert "Analyze ABC-1." in out
     started = events(inited.fdir, "t1")[0]
     assert (started["run_in"], started["model"], started["effort"]) == ("subagent", "opus", "low")
 
@@ -89,17 +88,7 @@ def test_done_check_timeout(inited, monkeypatch):
     assert events(inited.fdir, "t1")[-1]["type"] == "done_check_failed"
 
 
-def test_run_script_gets_config_and_task(inited):
-    step = write_step(inited.fdir, "scr", {"type": "script", "config": {"word": {"description": "w", "default": "hello"}}}, body="scr.sh\n")
-    (step.parent / "scr.sh").write_text('echo "$FACTORY_CONFIG_WORD" > "$(factory artifact path out.txt)"\n')
-    write_pipeline(inited.fdir, {"id": "scr", "steps": ["scr"]})
-    task_from_pipeline(inited, "scr")
-    assert "`factory run-script --task t1`" in inited.factory("next", "--task", "t1").stdout
-    inited.factory("run-script", "--task", "t1")
-    assert (inited.fdir / "tasks" / "t1" / "artifacts" / "out.txt").read_text().strip() == "hello"
-
-
 def test_next_tells_session_about_block_skip_and_goto(flow):
     out = run(flow, "next").stdout
     assert "Only after the user approves" in out
-    assert "`factory skip --task t1`" in out
+    assert "`factory skip`" in out

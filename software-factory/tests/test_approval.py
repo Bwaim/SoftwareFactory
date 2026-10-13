@@ -24,7 +24,7 @@ def test_awaiting_approval_then_approve(uv):
     assert rows["t1"]["approval"]["artifact"] == "/tmp/spec.md"
     assert run("done", check=False).returncode == 1
     run("approve", "--send")
-    assert fake_calls(inited.fdir)[-1]["text"].startswith("The user approved. Run `factory done --task t1`")
+    assert fake_calls(inited.fdir)[-1]["text"].startswith("The user approved. Run `factory done`")
     run("done")
     assert task_json(inited.fdir, "t1")["status"] == "finished"
     kinds = [e["type"] for e in events(inited.fdir, "t1")]

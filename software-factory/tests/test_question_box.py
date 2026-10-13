@@ -81,7 +81,7 @@ def test_dashboard_approve_shows_question_box_error(awaiting):
 
 
 def test_prompts_ask_in_plain_text(ctx, awaiting):
-    assert session.ASK_IN_TEXT in session.first_prompt({"id": "t1", "worktree": None})
+    assert session.ASK_IN_TEXT in session.first_prompt({"id": "t1", "worktree": "/w"})
     assert "never with the AskUserQuestion tool" in session.ASK_IN_TEXT
     out = awaiting.factory("block", "--task", "t1", "Which database?", check=False)
     assert session.ASK_IN_TEXT in out.stdout

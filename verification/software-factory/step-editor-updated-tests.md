@@ -8,3 +8,11 @@
 - tests/test_pipeline_check.py::test_valid_pipeline_has_no_problem and the problems test: reads and writes are gone; the reads warning returns in Task 10
 - tests/test_engine.py (flow fixture, test_subagent_call_model_effort_precedence): writes became outputs, composite became group, reads removed
 - tests/test_goto.py, tests/test_approval.py, tests/test_backlog.py: writes and reads became outputs and body keys
+- tests/test_engine.py::test_next_done_check_fails_then_passes: `factory next` now prints the exact prompt and footer, never `--task`
+- tests/test_engine.py::test_missing_config_asks: `factory next` now prints the exact prompt and footer, never `--task`
+- tests/test_engine.py::test_subagent_call_model_effort_precedence: `factory next` now prints the exact prompt and footer, never `--task`
+- tests/test_engine.py::test_next_tells_session_about_block_skip_and_goto: `factory next` now prints the exact prompt and footer, never `--task`
+- tests/test_approval.py::test_awaiting_approval_then_approve: `factory next` now prints the exact prompt and footer, never `--task`
+- tests/test_waiting.py::test_end_wait_adds_period_to_done_when: `factory next` now prints the exact prompt and footer, never `--task`
+- tests/test_question_box.py::test_prompts_ask_in_plain_text: `factory next` now prints the exact prompt and footer, never `--task`
+- tests/test_engine.py::test_run_script_gets_config_and_task: deleted; Task 6 replaces it with the run-command tests
