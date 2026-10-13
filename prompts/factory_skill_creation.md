@@ -343,6 +343,7 @@ Save the path with `factory state set plan <path>`.
 - It shows the changed files and the commit message, and commits only after approval.
 - The message is `Factory library: <action> <kind> <id>`, for example `Factory library: add step create-merge-request`. A migration uses `Factory library: migrate to version <n>`.
 - It commits only the changed files in the library, with a pathspec. Other changes in that repository are never included, even if they are staged.
+- It also includes `<library>/factory.yaml` when that file is new or changed, so the library version is always committed with the library content.
 - If the library is not in a git repository, library commits are disabled.
 - It never pushes.
 
