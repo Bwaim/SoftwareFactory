@@ -27,6 +27,20 @@ def read_step(path):
     return yaml.safe_load(m.group(1)) or {}, m.group(2).lstrip("\n")
 
 
+def load_step(path):
+    try:
+        parsed = read_step(path)
+    except yaml.YAMLError as exc:
+        return None, f"{path}: invalid YAML frontmatter: {str(exc).splitlines()[0]}"
+    if parsed is None:
+        return None, f"{path}: the step file has no YAML frontmatter."
+    if not isinstance(parsed[0], dict):
+        return None, f"{path}: the frontmatter must be a YAML mapping."
+    if not isinstance(parsed[0].get("type"), (str, type(None))):
+        return None, f"{path}: unknown step type `{parsed[0].get('type')}`."
+    return parsed, None
+
+
 def key_block(title, lines):
     return title + "\n" + "\n".join(lines)
 
@@ -36,12 +50,16 @@ def convert(manifest, body):
     old_type = m.get("type")
     new_type = TYPE_MAP.get(old_type, old_type)
     m["type"] = new_type
-    reads = list(m.pop("reads", None) or [])
-    writes = list(m.pop("writes", None) or [])
-    if writes and new_type != "group":
-        outputs = dict(m.get("outputs") or {})
+    reads = m.pop("reads", None) or []
+    writes = m.pop("writes", None) or []
+    reads = reads if isinstance(reads, list) else []
+    used_extra = [] if isinstance(writes, list) else [writes]
+    existing = m.get("outputs") or {}
+    if writes and new_type != "group" and isinstance(existing, dict) and isinstance(writes, list):
+        outputs = dict(existing)
         for key in writes:
-            outputs.setdefault(key, {"type": "text", "description": "", "optional": True})
+            if isinstance(key, str):
+                outputs.setdefault(key, {"type": "text", "description": "", "optional": True})
         m["outputs"] = outputs
     if old_type == "script":
         first = next((line.strip() for line in body.splitlines() if line.strip()), "")
@@ -57,7 +75,7 @@ def convert(manifest, body):
             body = body.rstrip("\n") + "\n\n" + "\n\n".join(blocks) + "\n"
     if new_type == "group":
         body = ""
-    return m, body, reads + writes
+    return m, body, reads + (writes if isinstance(writes, list) else []) + used_extra
 
 
 def dump(manifest, body):
@@ -107,6 +125,30 @@ def type_errors(path, manifest, new_m, new_body, config):
     return []
 
 
+KEY_TYPES = ("text", "long-text", "file")
+
+
+def output_errors(path, new_m):
+    outputs = new_m.get("outputs")
+    if outputs is None:
+        return []
+    if not isinstance(outputs, dict):
+        return [f"{path}: `outputs` must be a mapping of key names."]
+    errors = []
+    if new_m.get("type") == "group":
+        errors.append(f"{path}: a group step cannot have `outputs`.")
+    for name, spec in outputs.items():
+        if not is_key(name):
+            errors.append(f"{path}: the output `{name}` {KEY_RULE}.")
+        if spec is None:
+            continue
+        if not isinstance(spec, dict):
+            errors.append(f"{path}: the output `{name}` must be a mapping or empty.")
+        elif spec.get("type", "text") not in KEY_TYPES:
+            errors.append(f"{path}: the output `{name}` has the unknown type `{spec.get('type')}`.")
+    return errors
+
+
 def step_errors(path, manifest, new_m, new_body, used):
     errors = []
     if not (isinstance(new_m.get("id"), str) and STEP_ID_RE.fullmatch(new_m["id"])):
@@ -121,6 +163,7 @@ def step_errors(path, manifest, new_m, new_body, used):
     for key in config:
         if not is_key(key):
             errors.append(f"{path}: the config key `{key}` {KEY_RULE}.")
+    errors += output_errors(path, new_m)
     errors += type_errors(path, manifest, new_m, new_body, config)
     if PLACEHOLDER_RE.search(str(new_m.get("done_check") or "")):
         errors.append(f"{path}: the done check contains `{{{{`. Remove it, then migrate again.")
@@ -134,17 +177,28 @@ def folder_errors(root):
     root = Path(root)
     errors = []
     for path in sorted((root / "steps").glob("*.md")):
-        parsed = read_step(path)
-        if parsed is None:
-            errors.append(f"{path}: the step file has no YAML frontmatter.")
+        parsed, problem = load_step(path)
+        if problem:
+            errors.append(problem)
             continue
         manifest, body = parsed
         manifest.setdefault("id", path.stem)
         new_m, new_body, used = convert(manifest, body)
         errors += step_errors(path, manifest, new_m, new_body, used)
     for path in sorted((root / "pipelines").glob("*.yaml")):
-        data = yaml.safe_load(path.read_text()) or {}
-        for key in (data.get("inputs") or {}):
+        try:
+            data = yaml.safe_load(path.read_text()) or {}
+        except yaml.YAMLError as exc:
+            errors.append(f"{path}: invalid YAML: {str(exc).splitlines()[0]}")
+            continue
+        if not isinstance(data, dict):
+            errors.append(f"{path}: the pipeline file must be a YAML mapping.")
+            continue
+        inputs = data.get("inputs") or {}
+        if not isinstance(inputs, dict):
+            errors.append(f"{path}: `inputs` must be a mapping.")
+            continue
+        for key in inputs:
             if not is_key(key):
                 errors.append(f"{path}: the input `{key}` {KEY_RULE}.")
     return errors
@@ -183,8 +237,8 @@ def write_atomic(path, text):
 
 def convert_folder(root):
     for path in sorted((Path(root) / "steps").glob("*.md")):
-        parsed = read_step(path)
-        if parsed is None:
+        parsed, problem = load_step(path)
+        if problem:
             continue
         manifest, body = parsed
         manifest.setdefault("id", path.stem)

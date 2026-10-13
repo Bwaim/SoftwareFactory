@@ -75,6 +75,10 @@ def test_every_converted_step_passes_version_2_validation(inited):
     ("noscript", "---\nid: noscript\ndescription: N\ntype: script\n---\n\n", "names no script file"),
     ("nokids", "---\nid: nokids\ndescription: K\ntype: composite\n---\n", "has no `steps` list"),
     ("badrun", "---\nid: badrun\ndescription: R\ntype: prompt\nrun_in: elsewhere\n---\n\nDo it.\n", "`run_in` must be"),
+    ("badouts", "---\nid: badouts\ndescription: O\ntype: prompt\noutputs: nope\nwrites: [x]\n---\n\nDo it.\n", "`outputs` must be a mapping"),
+    ("badname", "---\nid: badname\ndescription: O\ntype: prompt\noutputs:\n  Bad-Name: {}\n---\n\nDo it.\n", "the output `Bad-Name`"),
+    ("badtype", "---\nid: badtype\ndescription: O\ntype: prompt\noutputs:\n  x:\n    type: blob\n---\n\nDo it.\n", "unknown type `blob`"),
+    ("grpouts", "---\nid: grpouts\ndescription: G\ntype: composite\nsteps: [ask]\noutputs:\n  x: {}\n---\n", "a group step cannot have `outputs`"),
     ("Bad_Id", "---\nid: Bad_Id\ndescription: I\ntype: prompt\n---\n\nDo it.\n", "the step id `Bad_Id`"),
 ])
 def test_refuses_what_version_2_refuses(inited, name, text, needle):
@@ -136,3 +140,25 @@ def test_dry_run_lists_errors_without_change(inited):
     (inited.fdir / "steps" / "ask.md").write_text(V1_ASK.replace("Answer the ticket.", "Answer {{Bad}}."))
     out = json.loads(inited.factory("migrate", "--dry-run", "--json").stdout)
     assert any("{{Bad}}" in e for e in out["errors"])
+
+
+@pytest.mark.parametrize("text,needle", [
+    ("---\nid: [oops\n---\n\nDo it.\n", "invalid YAML frontmatter"),
+    ("---\n- a\n- b\n---\n\nDo it.\n", "the frontmatter must be a YAML mapping"),
+])
+def test_bad_frontmatter_refuses_before_any_change(inited, text, needle):
+    make_v1(inited)
+    (inited.fdir / "steps" / "broken.md").write_text(text)
+    before = snapshot(inited.fdir, inited.library)
+    r = inited.factory("migrate", check=False)
+    assert r.returncode == 1 and needle in r.stderr and "Traceback" not in r.stderr
+    assert snapshot(inited.fdir, inited.library) == before
+
+
+def test_bad_pipeline_yaml_refuses_before_any_change(inited):
+    make_v1(inited)
+    (inited.fdir / "pipelines" / "broken.yaml").write_text("- just\n- a list\n")
+    before = snapshot(inited.fdir, inited.library)
+    r = inited.factory("migrate", check=False)
+    assert r.returncode == 1 and "the pipeline file must be a YAML mapping" in r.stderr
+    assert snapshot(inited.fdir, inited.library) == before
