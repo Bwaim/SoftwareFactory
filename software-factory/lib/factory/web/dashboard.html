@@ -227,13 +227,14 @@ function approvalArtifact(t) {
   const base = a.artifact ? String(a.artifact).split("/").pop() : "";
   return [base, a.artifact_key, a.artifact_key + ".md"].find((n) => n && t.artifacts.includes(n)) || null;
 }
+function loopText(t) { return t.loop ? ` · loop ${t.loop.n} of ${t.loop.max}` : ""; }
 function taskCard(t) {
   const card = el("div", { class: "card s-" + t.status });
   const top = el("div", { class: "row" });
   const ticket = ticketNode(t);
   if (ticket) top.append(ticket);
   top.append(el("span", { class: "muted" }, t.id));
-  card.append(top, el("div", { class: "title" }, t.description), el("div", { class: "muted" }, `${t.pipeline} › ${t.step}`));
+  card.append(top, el("div", { class: "title" }, t.description), el("div", { class: "muted" }, `${t.pipeline} › ${t.step}${loopText(t)}`));
   const since = ago(t.status_since);
   const label = t.status.replace("_", " ");
   card.append(el("div", { class: "status" }, `${ICONS[t.status] || ""} ${label}${since && t.status !== "finished" ? " for " + since : ""}`));

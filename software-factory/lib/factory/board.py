@@ -1,4 +1,4 @@
-from . import session, state
+from . import loops, session, state
 from .errors import FactoryError
 from .registry import Registry
 
@@ -51,6 +51,7 @@ def task_row(ctx, task, reg=None):
         "artifacts": artifact_names(ctx, task["id"]),
         "approval": approval_info(task),
         "wait_has_check": bool(step and step.done_check) if waiting else None,
+        "loop": loops.current_loop(task),
     }
 
 

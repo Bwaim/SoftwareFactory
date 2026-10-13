@@ -75,6 +75,8 @@ const TOKEN = params.get("token");
 const CHECK_DELAY_MS = 300;
 const SHOW_HIDDEN_KEY = "factory-editor-show-hidden";
 const KEY_TYPES = ["text", "long-text", "file"];
+const DEFAULT_LOOP_MAX = 2;
+const LOOP_MAX_LIMIT = 20;
 function readShowHidden() { try { return localStorage.getItem(SHOW_HIDDEN_KEY) === "1"; } catch (e) { return false; } }
 function saveShowHidden(value) { try { localStorage.setItem(SHOW_HIDDEN_KEY, value ? "1" : "0"); } catch (e) {} }
 const state = { steps: [], columns: [], pipelines: [], loadedLevel: null, saveLevel: "local", model: null, checkTimer: null, checkCount: 0, hasError: true, commit: null, savedPath: null, original: null, confirmReplace: false, showHidden: readShowHidden() };
@@ -104,10 +106,21 @@ function guard(fn) { return (...a) => fn(...a).catch(() => {}); }
 function emptyModel() {
   return { id: "", description: "", model: "", effort: "", start_column: "", inputs: [], steps: [], extra: {} };
 }
+function isMap(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
+function loopOf(raw) {
+  if (raw === undefined) return null;
+  const m = isMap(raw) ? raw : {};
+  return { raw, edited: false, back_to: m.back_to ?? "", while: m.while ?? "", max: m.max ?? DEFAULT_LOOP_MAX };
+}
+function loopData(l) {
+  if (!l.edited) return l.raw;
+  return { ...(isMap(l.raw) ? l.raw : {}), back_to: l.back_to, while: l.while, max: l.max };
+}
 function entryOf(raw) {
   const e = typeof raw === "string" ? { id: raw } : raw || {};
   return { id: e.id || "", model: e.model || "", effort: e.effort || "", column: e.column || "",
-    with: Object.entries(e.with || {}).map(([key, value]) => ({ key, value: typeof value === "string" ? value : JSON.stringify(value) })), open: false };
+    with: Object.entries(e.with || {}).map(([key, value]) => ({ key, value: typeof value === "string" ? value : JSON.stringify(value) })),
+    loop: loopOf(e.loop), open: false };
 }
 function modelOf(data) {
   const claude = data.claude || {};
@@ -129,7 +142,9 @@ function dataOf(m) {
   for (const s of m.steps) {
     const w = {};
     for (const r of s.with) if (r.key) w[r.key] = parseValue(r.value);
-    data.steps.push({ id: s.id, with: w, model: s.model, effort: s.effort, column: s.column });
+    const entry = { id: s.id, with: w, model: s.model, effort: s.effort, column: s.column };
+    if (s.loop) entry.loop = loopData(s.loop);
+    data.steps.push(entry);
   }
   return data;
 }
@@ -190,6 +205,49 @@ function renderForm() {
     field("inputs", inputRows(m.inputs)));
 }
 
+function nearestIndex(i, id) {
+  for (let j = i; j >= 0; j--) if (state.model.steps[j].id === id) return j;
+  return -1;
+}
+function loopMarkText(s) { return s.loop ? `↺ ${s.loop.back_to} ×${s.loop.max}` : ""; }
+function loopMark(s) {
+  const tag = el("span", { class: "tag" }, loopMarkText(s));
+  if (!s.loop) tag.style.display = "none";
+  return tag;
+}
+function loopBlock(s, i, tag) {
+  const editLoop = (fn) => { fn(s.loop); s.loop.edited = true; tag.textContent = loopMarkText(s); changed(); };
+  const target = el("select");
+  target.append(el("option", { value: "" }, "(no loop)"));
+  state.model.steps.slice(0, i + 1).forEach((e, j) => target.append(el("option", { value: String(j) }, `${j + 1}. ${e.id}`)));
+  target.value = s.loop ? String(nearestIndex(i, s.loop.back_to)) : "";
+  target.addEventListener("change", () => {
+    if (target.value === "") s.loop = null;
+    else {
+      s.loop = s.loop || loopOf({ back_to: "", while: "", max: DEFAULT_LOOP_MAX });
+      s.loop.back_to = state.model.steps[Number(target.value)].id;
+      s.loop.edited = true;
+    }
+    renderPipeline();
+    changed();
+  });
+  const box = el("div", { class: "loop" }, el("div", { class: "muted" }, "loop"), field("back_to", target));
+  if (!s.loop) return box;
+  const listId = `loop-keys-${i}`;
+  const keyList = el("datalist", { id: listId });
+  const whileInput = el("input", { type: "text", list: listId });
+  whileInput.value = s.loop.while;
+  whileInput.addEventListener("input", () => editLoop((l) => { l.while = whileInput.value; }));
+  guard(async () => { for (const r of await keysAt(i + 2)) keyList.append(el("option", { value: r.name })); })();
+  const maxInput = el("input", { type: "number", min: "1", max: String(LOOP_MAX_LIMIT) });
+  maxInput.value = String(s.loop.max);
+  maxInput.addEventListener("input", () => editLoop((l) => {
+    const n = Number(maxInput.value);
+    l.max = maxInput.value.trim() !== "" && Number.isInteger(n) ? n : maxInput.value;
+  }));
+  box.append(field("while", whileInput), keyList, field("max", maxInput));
+  return box;
+}
 function renderPipeline() {
   const box = clear(byId("pipeline"));
   if (!state.model.steps.length) box.append(el("div", { class: "muted" }, "Drag steps here."));
@@ -197,10 +255,12 @@ function renderPipeline() {
 }
 function pipelineRow(s, i) {
   const info = state.steps.find((x) => x.id === s.id);
+  const loopTag = loopMark(s);
   const mark = info && info.hidden ? el("span", { class: "tag" }, "hidden") : "";
   const head = el("div", { class: "head", draggable: "true" },
     el("span", { class: "muted" }, String(i + 1)),
     el("span", { class: "link grow", onclick: guard(() => showDetail(s.id, i + 1)) }, s.id),
+    loopTag,
     mark,
     el("button", { type: "button", onclick: () => { s.open = !s.open; renderPipeline(); } }, s.open ? "Close" : "Edit"),
     el("button", { type: "button", onclick: () => { state.model.steps.splice(i, 1); renderPipeline(); changed(); } }, "Remove"));
@@ -212,7 +272,8 @@ function pipelineRow(s, i) {
       pairRows(s.with, "key", "value", "key", "value"),
       field("model", textInput(s.model, (v) => { s.model = v; changed(); })),
       field("effort", textInput(s.effort, (v) => { s.effort = v; changed(); })),
-      field("column", selectInput(["", ...state.columns], s.column, (v) => { s.column = v; changed(); })));
+      field("column", selectInput(["", ...state.columns], s.column, (v) => { s.column = v; changed(); })),
+      loopBlock(s, i, loopTag));
   }
   return card;
 }
