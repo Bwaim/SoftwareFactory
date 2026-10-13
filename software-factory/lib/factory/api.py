@@ -122,6 +122,12 @@ def pipeline_check_route(server, query, body):
     return pipeline_store.check(server.ctx, body["data"], body.get("level"))
 
 
+@route("POST", "/api/pipelines/keys")
+def pipeline_keys(server, query, body):
+    from . import keys
+    return keys.available(registry(server), body["data"], body.get("at"))
+
+
 @route("POST", "/api/library/commit")
 def library_commit(server, query, body):
     from . import library

@@ -12,6 +12,7 @@ def register(sub, common):
     ps = p.add_subparsers(dest="action", required=True)
     pc = ps.add_parser("check", parents=[common])
     pc.add_argument("id")
+    pk = ps.add_parser("keys", parents=[common]); pk.add_argument("id"); pk.add_argument("--at", type=int, default=None)
     ps.add_parser("list", parents=[common])
     pe = ps.add_parser("edit", parents=[common]); pe.add_argument("id", nargs="?")
     p = sub.add_parser("step")
@@ -561,6 +562,19 @@ def dashboard_cmd(args):
 def server_stop_cmd(args):
     from . import server
     print("Server stopped." if server.stop_server(ctx_of(args)) else "The server was not running.")
+
+
+@cli.command("pipeline keys")
+def pipeline_keys_cmd(args):
+    from . import keys
+    from .registry import Registry
+    reg = Registry.load(ctx_of(args))
+    rows = keys.available(reg, reg.pipeline(args.id).data, args.at)
+    if args.json:
+        cli.emit(rows, True)
+        return
+    for r in rows:
+        print(f"{r['name']} ({r['type']}) from {r['source']}, {r['set']} set")
 
 
 @cli.command("pipeline list")

@@ -35,3 +35,4 @@
 - tests/test_repo_version.py::test_version_report_states: the current version is now 2
 - tests/test_init_menu.py::test_init_creates_files_and_exclude: init now writes data version 2
 - tests/test_library.py::test_commit_adds_changed_library_factory_yaml: the library was already at version 2, so the test changes it to 3 to make a real change
+- tests/test_pipeline_check.py::test_each_problem_type: the `reads` warning was replaced by the computed-keys warning

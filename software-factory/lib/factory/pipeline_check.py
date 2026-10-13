@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 
+from . import keys
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, is_valid_id, normalize_entry
-
-ALWAYS_AVAILABLE = {"summary", "branch", "ticket"}
 
 
 @dataclass
@@ -34,7 +33,14 @@ def check(reg, data, columns, save_level=None, hidden=()):
     start = data.get("start_column")
     if start and start not in columns:
         error(f"The start column `{start}` is not in the board columns.")
-    available = set((data.get("inputs") or {}).keys()) | ALWAYS_AVAILABLE
+    for name, spec in (data.get("inputs") or {}).items():
+        if not keys.is_key(name):
+            error(f"The input `{name}` must use lowercase letters, digits and `_`, and start with a letter.")
+        elif keys.key_type(spec) not in keys.KEY_TYPES:
+            error(f"The input `{name}` has an unknown type `{keys.key_type(spec)}`. Use text, long-text or file.")
+    rows = keys.start_rows(data)
+    first_type = {name: (r["type"], r["source"]) for name, r in rows.items() if r["source"] == "input"}
+    warned_types = set()
     for i, entry in enumerate(entries):
         sid = entry.get("id")
         if sid == CREATE_WORKTREE and i != 0:
@@ -64,4 +70,14 @@ def check(reg, data, columns, save_level=None, hidden=()):
                 error(f"Step `{leaf.id}` uses the column `{leaf.column}`, which is not in the board columns.")
             if (entry.get("model") or entry.get("effort")) and leaf.run_in == "session":
                 warning(f"Step `{leaf.id}` runs in the session. Its `model` and `effort` have no effect.")
+            own_outputs = set(keys.outputs_of(leaf))
+            for key in keys.leaf_uses(leaf):
+                if key not in rows and key not in own_outputs:
+                    warning(f"Step `{leaf.id}` uses `{key}`, which no input, earlier step or factory key sets.")
+            for name, out in keys.outputs_of(leaf).items():
+                seen = first_type.setdefault(name, (out["type"], f"step {leaf.id}"))
+                if seen[0] != out["type"] and name not in warned_types:
+                    warned_types.add(name)
+                    warning(f"The key `{name}` is set with two types: {seen[0]} ({seen[1]}) and {out['type']} (step {leaf.id}).")
+            keys.add_outputs(rows, leaf)
     return problems

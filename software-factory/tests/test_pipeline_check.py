@@ -30,6 +30,7 @@ def test_each_problem_type(inited):
     assert "`missing` does not exist" in errors
     assert "column `Nowhere`" in errors
     assert "uses the local step `local-step`" in warnings
+    assert "uses `nothing`, which no input" in warnings
     assert "runs in the session" in warnings
 
 

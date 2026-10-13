@@ -93,3 +93,52 @@ def step_outputs(reg, sid):
     for path in reg.leaves(sid):
         out.update(outputs_of(reg.step(path[-1])))
     return out
+
+
+def put(rows, name, ktype, source, set_state):
+    rows.pop(name, None)
+    rows[name] = {"name": name, "type": ktype, "source": source, "set": set_state}
+
+
+def pipeline_entries(data):
+    from .registry import normalize_entry
+    return [normalize_entry(e) for e in data.get("steps") or []]
+
+
+def start_rows(data):
+    rows = {}
+    for name, spec in FACTORY_KEYS.items():
+        put(rows, name, spec["type"], "factory", spec["set"])
+    for name, spec in (data.get("inputs") or {}).items():
+        put(rows, name, key_type(spec), "input", "always")
+    return rows
+
+
+def entry_leaves(reg, entry):
+    from .errors import FactoryError
+    sid = entry.get("id")
+    if sid not in reg.steps:
+        return []
+    try:
+        return [reg.steps[path[-1]] for path in reg.leaves(sid) if path[-1] in reg.steps]
+    except FactoryError:
+        return []
+
+
+def add_outputs(rows, leaf):
+    for name, out in outputs_of(leaf).items():
+        put(rows, name, out["type"], f"step {leaf.id}", "maybe" if out["optional"] else "always")
+
+
+def available(reg, data, at=None):
+    from .errors import FactoryError
+    entries = pipeline_entries(data)
+    last = len(entries) + 1
+    at = last if at is None else at
+    if not isinstance(at, int) or not 1 <= at <= last:
+        raise FactoryError(f"The position must be between 1 and {last}.")
+    rows = start_rows(data)
+    for entry in entries[:at - 1]:
+        for leaf in entry_leaves(reg, entry):
+            add_outputs(rows, leaf)
+    return list(rows.values())
