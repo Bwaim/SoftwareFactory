@@ -1,8 +1,8 @@
 # Software factory verification report
 
-Date: 2026-10-12 21:47
+Date: 2026-10-13 04:05
 
-Total: 215 of 215 checks pass.
+Total: 226 of 226 checks pass.
 
 ## Milestone 1. Core
 
@@ -157,6 +157,8 @@ Total: 215 of 215 checks pass.
 | `test_library::test_commit_only_given_files` | PASS |
 | `test_library::test_refuses_paths_outside_library` | PASS |
 | `test_library::test_disabled_without_git` | PASS |
+| `test_library::test_commit_adds_new_library_factory_yaml` | PASS |
+| `test_library::test_commit_adds_changed_library_factory_yaml` | PASS |
 | `test_server::test_server_survives_the_command_and_is_reused` | PASS |
 | `test_server::test_security_checks` | PASS |
 | `test_server::test_stop` | PASS |
@@ -227,6 +229,14 @@ Total: 215 of 215 checks pass.
 | `test_minor_fixes::test_approve_send_with_delivery_failure_keeps_approval` | PASS |
 | `test_minor_fixes::test_cli_approve_send_warns_and_exits_zero` | PASS |
 | `test_minor_fixes::test_api_approve_returns_delivery_error` | PASS |
+| `test_question_box::test_send_prompt_refused_when_question_box_shows` | PASS |
+| `test_question_box::test_send_prompt_failure_logs_prompt_failed` | PASS |
+| `test_question_box::test_approve_send_refused_when_question_box_shows` | PASS |
+| `test_question_box::test_request_changes_send_refused_when_question_box_shows` | PASS |
+| `test_question_box::test_approve_send_logs_prompt_sent` | PASS |
+| `test_question_box::test_dashboard_approve_shows_question_box_error` | PASS |
+| `test_question_box::test_prompts_ask_in_plain_text` | PASS |
+| `test_question_box::test_herdr_detects_question_box_on_screen` | PASS |
 | `test_races::test_second_advance_with_same_position_refused` | PASS |
 | `test_races::test_done_racing_with_skip_advances_once` | PASS |
 | `test_races::test_approve_after_request_changes_race_is_factory_error` | PASS |
@@ -241,14 +251,15 @@ Total: 215 of 215 checks pass.
 
 | Check | Result |
 |---|---|
-| launch fetches origin and creates the worktree from origin/main | PASS (worktree 220e299d new origin 220e299d clone head f51513b8) |
+| launch fetches origin and creates the worktree from origin/main | PASS (worktree cc42261f new origin cc42261f clone head c582708b) |
 | Claude runs in Herdr named with the task id, with the factory settings | PASS (status idle kind claude processes 1) |
 | Claude receives the first prompt and runs factory next | PASS |
 | first script step runs with factory next and factory done | PASS |
+| send-prompt reads the screen, sees no question box and sends | PASS (exit 0 last event prompt_sent ) |
 | pause closes the task terminal | PASS |
 | resume reopens the Claude process with --resume and the same session id | PASS (resume processes 1) |
 | the resumed session continues the pipeline to the end | PASS |
-| the same Claude transcript file exists and grew after resume | PASS (/Users/fabienboismoreau/.claude/projects/-Users-fabienboismoreau-Documents-Projects-SoftwareFactory-SoftwareFactory-verification-software-factory-work-e2e-worktrees-e2e-task/9cf105dd-7b32-458a-9b23-531247b4ddcf.jsonl 343932 -> 364666) |
+| the same Claude transcript file exists and grew after resume | PASS (/Users/fabienboismoreau/.claude/projects/-Users-fabienboismoreau-Documents-Projects-SoftwareFactory-SoftwareFactory-verification-software-factory-work-e2e-worktrees-e2e-task/884569b1-e2fd-41f7-816c-882b5daff3c0.jsonl 356319 -> 390486) |
 | the session never waits on a permission prompt | PASS (13 samples, blocked 0, error 0) |
 | delete asks for approval when there are uncommitted changes | PASS |
 | delete closes the terminal, removes the worktree and archives the task | PASS |
