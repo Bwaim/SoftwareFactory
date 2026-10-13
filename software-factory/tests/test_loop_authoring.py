@@ -76,3 +76,12 @@ def test_task_row_shows_loop_count(inited):
     assert board.task_row(ctx, state.load(ctx, "t1"))["loop"] == {"n": 1, "max": 2, "entry": "review"}
     page = (SF / "lib" / "factory" / "web" / "dashboard.html").read_text()
     assert "` · loop ${t.loop.n} of ${t.loop.max}`" in page
+
+
+def test_readme_documents_loops():
+    text = (SF / "README.md").read_text()
+    fields = text.split("### Pipeline fields\n", 1)[1].split("\n### ", 1)[0]
+    for needle in ("`loop`", "`back_to`", "`while`", "`max`", "back_to: write-spec", "while: findings"):
+        assert needle in fields, needle
+    for needle in ("### Loops", "Loop <n> of <max>: back to `<step>`", "`loop_back`", "`loop_limit`", "↺ write-spec ×2"):
+        assert needle in text, needle

@@ -221,6 +221,7 @@ Local server:
 - Middle: the pipeline. Drag steps into it and reorder them. The checks run while you edit. You can save with warnings, never with errors.
 - Right: the step detail. Click a step to see its manifest, its level, its file and its body.
 - Keys: click a step in the pipeline to see the keys available at its position.
+- Loop: "Edit" on a pipeline step shows the loop fields. Pick `back_to` from this step and the earlier steps, `while` from the keys available after the step, and `max`. A step with a loop shows a mark, for example "↺ write-spec ×2".
 - Step form: "New step" above the available steps opens it. The start screen of the editor has a "New step" button too. In the step detail, "Edit" changes a local or generic step, "Copy to local" copies a generic or built-in step to a local step with the same id, and "Duplicate" copies any step under a new id.
   - The form shows the fields of the manifest, a table for config keys, a table for outputs, and the prompt or the command. A `group` step shows a list of child steps. Drag them to change the order.
   - Next to the body, click a key to insert `{{<key>}}` in a prompt or `$FACTORY_KEY_<KEY>` in a command.
@@ -382,9 +383,46 @@ Only `http` and `https` URLs are used.
 
 - `id`, `description`
 - `inputs`: values asked at launch, each with a `type` and a `description`. A relative `file` path is resolved from the main repository.
-- `steps`: a list of entries with `id`, `with`, `model`, `effort` and `column`.
+- `steps`: a list of entries with `id`, `with`, `model`, `effort`, `column` and `loop`.
+- `loop`: repeat a range of steps while a task key is set.
+  - `back_to`: this entry or an earlier entry. The loop range goes from there to this entry.
+  - `while`: a task key name.
+  - `max`: the most jumps back, from 1 to 20.
+
+  A review loop:
+
+  ```yaml
+  steps:
+    - write-spec
+    - id: review-spec
+      loop:
+        back_to: write-spec
+        while: findings
+        max: 2
+    - next-step
+  ```
 - `claude`: `model` and `effort` of the task session.
 - `start_column`: the board column of a new task.
+
+### Loops
+
+- When `factory done` succeeds on the last step of a loop entry, the factory reads the `while` key.
+- The key is not set when it is missing, empty or `none`, ignoring case and spaces around it.
+- Set, with fewer than `max` jumps: the task goes back to the first step of `back_to`. `factory done` prints "Loop <n> of <max>: back to `<step>`. Run `factory next`."
+- Set, after `max` jumps: the task moves to the next step and is blocked. The user unblocks to go on, or approves one more round with `factory goto`.
+- Not set: the task moves on. A skipped step never makes its loop jump.
+- At the limit on the last entry, the task finishes. The check warns about a loop on the last entry.
+- The jump keeps the task keys. Session steps run again in the same session, with the conversation of the earlier rounds.
+- A loop's count goes back to 0 when the task jumps to a step before its range. An inner loop gets its full `max` in each round of an outer loop.
+- A step inside the range that outputs the `while` key gets a footer line: "This step controls a loop. Set `<key>` to `none` when nothing is left." A clean round must reset the key, because task keys keep their values.
+- `factory status` and the dashboard card show "loop <n> of <max>".
+
+### Events
+
+Each task logs its events in `.factory/tasks/<id>/events.jsonl`, one JSON object per line. Loops add two events:
+
+- `loop_back`: the loop jumped back. It has `entry`, `to` (the target step), `round` (the jump number) and `max`.
+- `loop_limit`: the loop reached `max` with the key still set. It has `entry` and `key`.
 
 ### `.factory/factory.yaml` fields
 

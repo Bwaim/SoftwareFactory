@@ -188,9 +188,48 @@ A step file is YAML frontmatter between two `---` lines, then the body.
   - `with`: config values for this entry,
   - `model` and `effort`: for a step that runs in a subagent,
   - `column`: the board column when this entry starts.
+  - `loop`: repeat a range of steps while a key is set. See Loops.
 - `claude`: `model` and `effort` of the task session.
 - `start_column`: the board column of a new task.
 - `create-worktree`: the factory adds the built-in step `create-worktree` as the first step. List it only to set its `with` values, and then only as the first step.
+
+### Loops
+
+A pipeline entry can repeat a range of steps while a task key is set.
+
+```yaml
+steps:
+  - write-spec
+  - id: review-spec
+    loop:
+      back_to: write-spec
+      while: findings
+      max: 2
+  - user-validation
+```
+
+- `loop` has three fields:
+  - `back_to`: the id of this entry or of an earlier entry. When the id appears more than once, the nearest one at or before this entry is used. It cannot be `create-worktree`.
+  - `while`: a task key name.
+  - `max`: an integer from 1 to 20. It is the most jumps back for this loop.
+- The entry can be a normal step or a group step. `back_to` can be the entry itself, to repeat one round.
+- The loop range is the steps from the `back_to` entry to the loop entry.
+- When `factory done` succeeds on the last step of the loop entry, the factory reads the `while` key:
+  - The key is not set when it is missing, empty or `none`, ignoring case and spaces around it.
+  - Set, with fewer than `max` jumps: the task goes back to the first step of `back_to`. `factory done` prints "Loop <n> of <max>: back to `<step>`. Run `factory next`."
+  - Set, after `max` jumps: the task moves to the next step and is blocked: "Loop limit reached on `<entry>`: `<key>` is still set". The user unblocks to go on, or approves one more round with `factory goto`.
+  - Not set: the task moves on.
+- At the limit on the last entry of the pipeline, the task finishes without asking the user. So put a step after a loop, for example `user-validation`.
+- A skipped step never makes its loop jump.
+- The factory makes the jump. The session never runs `factory goto` for a loop.
+- The jump keeps the task keys. It runs in the same task session, so a `session` step keeps the conversation of the earlier rounds. A `subagent` step starts a new agent each time.
+- A loop's count goes back to 0 when the task jumps to a step before its range. So an inner loop gets its full `max` in each round of an outer loop.
+- `factory status` and the dashboard card show "loop <n> of <max>".
+- A step inside the range that outputs the `while` key gets this footer line: "This step controls a loop. Set `<key>` to `none` when nothing is left."
+- Each step that outputs the `while` key must set it to `none` when nothing is left. Task keys keep their values, so a clean round must reset the key. Say this in the step prompt.
+- In a `command` step, the command sets the key itself, also to `none`.
+- Inside the range, a step can use a key that a later step of the range outputs. It is `(not set)` in the first round.
+- `factory pipeline check` refuses a bad `loop` and two loops that overlap without one being inside the other. It warns when no step in the range outputs the key, when the key is optional in every step that outputs it, and when the loop is on the last entry.
 
 ## Examples
 
@@ -288,3 +327,176 @@ What the example shows:
 - The input `crash_log` is used by the script as `"$FACTORY_KEY_CRASH_LOG"`.
 - The output `crash_report` of `collect-crash` is used by `fix-crash` as `{{crash_report}}`.
 - The config value `lines` is set with `with` on the group entry. `test_hint` uses its default.
+
+## Loop examples
+
+### Review loop
+
+Write a spec in the session, review it in a subagent, and fix it until the review is clean, at most 2 times.
+
+#### .factory/steps/write-spec.md
+
+```markdown
+---
+id: write-spec
+description: Write the spec, or fix it from the review findings
+category: planning
+type: ai
+outputs:
+  spec:
+    type: file
+    description: The spec file
+done_when: The spec file is written and its path is saved.
+---
+
+Write a spec for: {{description}}.
+Save it at the path printed by `factory artifact path spec.md`.
+
+Findings of the last review: {{findings}}.
+In the first round, there is no review yet. In a later round, fix each finding in the spec.
+```
+
+#### .factory/steps/review-spec.md
+
+```markdown
+---
+id: review-spec
+description: Review the spec and list the real problems
+category: planning
+type: ai
+outputs:
+  findings:
+    type: long-text
+    description: The real problems of the spec, one per line, or none
+done_when: The findings are saved.
+run_in: subagent
+model: opus
+effort: high
+---
+
+Review the spec at {{spec}} for: {{description}}.
+List only real problems: a missing case, a contradiction, a vague rule. Skip style comments.
+Set `findings` to the list, one problem per line.
+When you find no real problem, set `findings` to `none`.
+```
+
+#### .factory/pipelines/spec-review.yaml
+
+```yaml
+id: spec-review
+description: Write a spec, review it, and fix it until the review is clean
+steps:
+  - write-spec
+  - id: review-spec
+    loop:
+      back_to: write-spec
+      while: findings
+      max: 2
+  - id: user-validation
+    with:
+      target: artifact
+      artifact_key: spec
+```
+
+### Ticket loop
+
+Split the work into tickets, then run one round of steps per ticket, for any number of tickets.
+
+#### .factory/steps/split-tickets.md
+
+```markdown
+---
+id: split-tickets
+description: Split the work into small tickets
+category: planning
+type: ai
+outputs:
+  remaining:
+    type: long-text
+    description: The tickets left, one per line, or none
+done_when: The tickets are saved.
+---
+
+Split this work into small tickets: {{description}}.
+Each ticket is one line. Each ticket can be built and tested alone.
+Set `remaining` to the tickets, one per line.
+When there is no ticket, set `remaining` to `none`.
+```
+
+#### .factory/steps/pick-ticket.md
+
+```markdown
+---
+id: pick-ticket
+description: Take the next ticket from the list
+category: planning
+type: ai
+outputs:
+  ticket:
+    type: text
+    description: The ticket of this round, or none
+  remaining:
+    type: long-text
+    description: The tickets left after this one, one per line, or none
+done_when: The ticket and the tickets left are saved.
+---
+
+The tickets left: {{remaining}}.
+
+- When this is `none`, set `ticket` to `none` and `remaining` to `none`.
+- Otherwise, set `ticket` to the first line.
+- Set `remaining` to the other lines. When no line is left, set it to `none`.
+```
+
+#### .factory/steps/build-ticket.md
+
+```markdown
+---
+id: build-ticket
+description: Build one ticket and commit it
+category: build
+type: ai
+done_when: The ticket is built, tested and committed.
+---
+
+The ticket of this round: {{ticket}}.
+
+When it is `none`, do nothing and run `factory done`.
+Otherwise, build the ticket, run the tests and commit the change.
+```
+
+#### .factory/steps/ticket-round.md
+
+```markdown
+---
+id: ticket-round
+description: Take the next ticket and build it
+category: build
+type: group
+steps:
+  - pick-ticket
+  - build-ticket
+---
+```
+
+#### .factory/pipelines/ticket-loop.yaml
+
+```yaml
+id: ticket-loop
+description: Split the work into tickets and build them one by one
+steps:
+  - split-tickets
+  - id: ticket-round
+    loop:
+      back_to: ticket-round
+      while: remaining
+      max: 20
+  - user-validation
+```
+
+What the examples show:
+- `review-spec` runs in a subagent and sets `findings` to `none` when the review is clean.
+- `write-spec` uses `{{findings}}`, an output of a later step of its loop. It is `(not set)` in the first round.
+- `ticket-round` loops back to itself. `pick-ticket` controls the loop: it sets `remaining` to `none` after the last ticket.
+- With zero tickets, `pick-ticket` sets `ticket` to `none`, and `build-ticket` does nothing.
+- Each loop has a step after it, so the user decides at the limit.

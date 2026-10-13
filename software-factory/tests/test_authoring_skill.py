@@ -65,7 +65,8 @@ def test_examples_load_and_check_clean(inited):
     from factory import repo
     reg = registry.Registry.load(repo.load_ctx(cwd=inited.repo))
     assert {reg.steps[sid].type for sid in example_step_ids(text)} == {"ai", "command", "group"}
-    assert inited.factory.json("pipeline", "check", "crash-fix") == []
+    for pid in ("crash-fix", "spec-review", "ticket-loop"):
+        assert inited.factory.json("pipeline", "check", pid) == [], pid
     rows = {r["name"]: r for r in inited.factory.json("pipeline", "keys", "crash-fix", "--at", "2")}
     assert rows["crash_log"]["source"] == "input"
     assert rows["crash_report"]["source"] == "step collect-crash"
@@ -127,3 +128,15 @@ def test_skill_covers_review_findings():
                    "A step file that does not load stops the check", "no factory command works",
                    "does not see a `with` key", "`{{ key }}` with spaces", "Every input is required at launch"):
         assert needle in text, needle
+
+
+def test_skill_documents_loops():
+    text = skill_text()
+    loops_section = text.split("### Loops\n", 1)[1].split("\n## ", 1)[0]
+    for needle in ("`back_to`", "`while`", "`max`", "from 1 to 20", "Loop <n> of <max>: back to `<step>`",
+                   "Loop limit reached on `<entry>`: `<key>` is still set",
+                   "This step controls a loop. Set `<key>` to `none` when nothing is left.",
+                   "Each step that outputs the `while` key must set it to `none` when nothing is left."):
+        assert needle in loops_section, needle
+    review = dict(examples(text))[".factory/steps/review-spec.md"]
+    assert "run_in: subagent" in review and "set `findings` to `none`" in review
