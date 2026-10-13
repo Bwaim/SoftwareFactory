@@ -1,10 +1,10 @@
 # Step delete and hide verification report
 
-Date: 2026-10-13 11:27
+Date: 2026-10-13 11:39
 
 ## Milestone 1. Delete a step
 
-27 of 27 tests pass.
+28 of 28 tests pass.
 
 | Test | Result |
 |---|---|
@@ -13,6 +13,7 @@ Date: 2026-10-13 11:27
 | `test_step_delete::test_hidden_ids_and_discard` | PASS |
 | `test_step_delete::test_plan_local_step` | PASS |
 | `test_step_delete::test_delete_local_step_removes_file` | PASS |
+| `test_step_delete::test_script_naming_a_step_file_is_not_removed` | PASS |
 | `test_step_delete::test_local_override_is_replaced_by_generic` | PASS |
 | `test_step_delete::test_generic_under_local_override` | PASS |
 | `test_step_delete::test_unknown_step` | PASS |
@@ -38,7 +39,7 @@ Date: 2026-10-13 11:27
 
 ## Milestone 2. Hide a step
 
-10 of 10 tests pass.
+11 of 11 tests pass.
 
 | Test | Result |
 |---|---|
@@ -47,6 +48,7 @@ Date: 2026-10-13 11:27
 | `test_step_hide::test_hide_any_level` | PASS |
 | `test_step_hide::test_step_list_and_show` | PASS |
 | `test_step_hide::test_data_without_hidden_steps` | PASS |
+| `test_step_hide::test_hidden_steps_not_a_list` | PASS |
 | `test_step_hide::test_pipeline_check_warns_hidden_once` | PASS |
 | `test_step_hide::test_pipeline_with_hidden_step_runs_to_end` | PASS |
 | `test_step_hide::test_api_hide_unhide_list_check` | PASS |
@@ -55,5 +57,5 @@ Date: 2026-10-13 11:27
 
 ## Full test suite
 
-250 of 250 tests pass.
+252 of 252 tests pass.
 
