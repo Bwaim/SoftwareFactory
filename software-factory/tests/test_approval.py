@@ -68,3 +68,18 @@ def test_open_ide_bad_command_is_factory_error(uv):
         inited.factory("config", "set", "user-validation", "ide_command", command)
         r = run("open-ide", check=False)
         assert r.returncode == 1 and "Traceback" not in r.stderr and r.stderr.startswith("Error:")
+
+
+def test_worktree_target_prompt_has_no_unset_key(inited):
+    write_pipeline(inited.fdir, {"id": "wt", "steps": ["user-validation"]})
+    task_from_pipeline(inited, "wt")
+    out = inited.factory("next", "--task", "t1").stdout
+    assert "`worktree`" in out and "(not set)" not in out
+
+
+def test_artifact_target_prompt_names_the_key(inited):
+    write_pipeline(inited.fdir, {"id": "art", "steps": [{"id": "user-validation", "with": {"target": "artifact", "artifact_key": "spec"}}]})
+    task_from_pipeline(inited, "art")
+    out = inited.factory("next", "--task", "t1").stdout
+    assert "Only when the target is artifact: the path stored in the task key `spec` (`factory state get spec`)" in out
+    assert "(not set)" not in out

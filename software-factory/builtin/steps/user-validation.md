@@ -13,13 +13,13 @@ config:
     default: worktree
   artifact_key:
     description: The task state key that holds the artifact path, when target is artifact
-    default: ""
+    default: none
 ---
 
 The task is now `awaiting_approval`.
 
 1. Show what to validate. The target is `{{config.target}}`:
-   - `artifact`: the path stored in the task key `{{config.artifact_key}}` (`factory state get {{config.artifact_key}}`), and a short summary of the file.
+   - Only when the target is artifact: the path stored in the task key `{{config.artifact_key}}` (`factory state get {{config.artifact_key}}`), and a short summary of the file.
    - `worktree`: `git status` and a short summary of the diff. Offer `factory open-ide`.
 2. Ask the user to approve or to request changes. Ask in plain text, never with the AskUserQuestion tool, then end your turn. The answer can come from this tab, the orchestrator or the dashboard.
 3. Run `factory approve` only after a clear typed approval from the user, for example "approve" or "yes, I approve". Then run `factory done`. Any other answer is not an approval. A greeting, a question or an unclear text is not an approval: answer it and ask again.
