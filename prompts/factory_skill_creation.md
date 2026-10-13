@@ -542,7 +542,7 @@ Save the path with `factory state set plan <path>`.
 - At start, after the version check, if paused tasks exist, the orchestrator lists them and offers to resume all of them, some of them or none.
 - Resuming a task:
   - It starts a new terminal with `factory terminal start-session` in the task worktree, or in the main repository for `new-step-assistant`.
-  - Claude starts with the same args as at launch (see Task launch), plus `--resume <session-id>`, so the conversation continues.
+  - Claude starts with the same args as at launch (see Task launch), with `--resume <session-id>` in place of `--session-id <uuid>`, so the conversation continues. Claude refuses both flags together.
   - The prompt is: "The factory resumed this task. Run `factory status`, then continue with `factory next`."
   - It restores the saved status and saves the new terminal handle.
 - "Resume a task" in the menu lists the paused tasks, and the tasks that are not `finished` whose session state is `gone`.
@@ -658,6 +658,8 @@ Users ask for a dark theme. Start with the settings screen only.
   - In a worktree: `herdr worktree open --path <cwd>`. In the main repository: `herdr tab create`.
   - Then `herdr agent start <name> --kind claude --pane <pane_id> -- <claude args>`, then `herdr agent prompt <name> <prompt>`.
   - The pane id is read from the JSON response, never guessed.
+  - A worktree of a repository the user already trusts in Claude does not show the folder trust dialog. If the dialog shows anyway, the adapter never answers it. It closes what it opened and fails with: "Claude asks to trust the folder <cwd>. Open Claude once in the main repository and trust it, then launch again."
+  - `herdr worktree open` can also create a workspace for the main repository folder, without returning its id. The adapter compares the workspace list before and after, records a new workspace whose folder is the main repository, and closes it with the task. It never closes a workspace that already existed.
   - The handle is the Herdr agent name and the workspace or tab id.
 - `close`: closes the workspace or the tab. Check that this also stops the Claude process. If it does not, stop it first.
 - `send-prompt`: `herdr agent prompt`. `focus`: `herdr agent focus`. `state`: `herdr agent get`. `wait-idle`: `herdr agent wait`. `notify`: `herdr notification`. Check the exact syntax with the installed `herdr` binary.
