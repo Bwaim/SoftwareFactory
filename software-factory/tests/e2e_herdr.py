@@ -18,9 +18,9 @@ handles = []
 state = {}
 LIVE_STATUSES = {"idle", "working", "done", "blocked"}
 
-STEP_ONE = "---\nid: e2e-one\ndescription: Write one.txt\ncategory: test\ntype: script\ndone_when: one.txt exists\ndone_check: test -f \"$(factory artifact path one.txt)\"\n---\n\ne2e-one.sh\n"
-STEP_HOLD = "---\nid: e2e-hold\ndescription: Wait for the test\ncategory: test\ntype: prompt\ndone_when: The test marks it done.\nwait_external: true\n---\n\nRun `factory wait`. Then stop and wait for a message.\n"
-STEP_TWO = "---\nid: e2e-two\ndescription: Write two.txt\ncategory: test\ntype: script\ndone_when: two.txt exists\ndone_check: test -f \"$(factory artifact path two.txt)\"\n---\n\ne2e-two.sh\n"
+STEP_ONE = "---\nid: e2e-one\ndescription: Write one.txt\ncategory: test\ntype: command\ndone_when: one.txt exists\n---\n\nbash \"$FACTORY_STEP_DIR/e2e-one.sh\"\n"
+STEP_HOLD = "---\nid: e2e-hold\ndescription: Wait for the test\ncategory: test\ntype: ai\ndone_when: The test marks it done.\nwait_external: true\n---\n\nRun `factory wait`. Then stop and wait for a message.\n"
+STEP_TWO = "---\nid: e2e-two\ndescription: Write two.txt\ncategory: test\ntype: command\ndone_when: two.txt exists\n---\n\nbash \"$FACTORY_STEP_DIR/e2e-two.sh\"\n"
 PIPELINE = "id: e2e\ndescription: End-to-end test pipeline\nsteps:\n  - e2e-one\n  - e2e-hold\n  - e2e-two\n"
 
 
@@ -280,7 +280,7 @@ def run():
     started = wait_for(lambda: any(e["type"] == "step_started" and e["step"] == "e2e-one" for e in task_events(fdir, tid)), 180, tid, samples)
     record("Claude receives the first prompt and runs factory next", started)
     waiting = wait_for(lambda: task_json(fdir, tid)["status"] == "waiting_external", 300, tid, samples)
-    record("first script step runs with factory next and factory done", waiting and (fdir / "tasks" / tid / "artifacts" / "one.txt").exists())
+    record("first command step runs with factory next and factory done", waiting and (fdir / "tasks" / tid / "artifacts" / "one.txt").exists())
 
     sent = sh(["factory", "terminal", "send-prompt", tid, "Reply with the word OK only. Do not run any command.", "--wait"], cwd=repo, check=False)
     last_event = task_events(fdir, tid)[-1]
