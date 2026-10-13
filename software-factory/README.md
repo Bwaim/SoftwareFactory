@@ -228,7 +228,7 @@ Local server:
   - Built-in steps cannot be edited. Copy them to local instead.
   - The form never writes a script file. Put a script next to the step by hand.
 - Delete: the detail of a local or generic step has a "Delete" button.
-  - It first shows what the delete does: the files it removes, the step that replaces it, and the pipelines, composite steps and tasks that still use it.
+  - It first shows what the delete does: the files it removes, the step that replaces it, and the pipelines, group steps and tasks that still use it.
   - A step that is still used cannot be deleted. Remove it from its users first.
   - "Confirm delete" removes the files. The list of steps reloads.
   - For a generic step, the editor offers the library commit.

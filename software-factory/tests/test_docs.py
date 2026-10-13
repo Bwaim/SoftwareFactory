@@ -76,3 +76,4 @@ def test_readme_describes_step_editor():
                    "factory pipeline keys", "factory step edit", "factory run-command", "step form"):
         assert needle in text, needle
     assert "run-script" not in text and "new-step-assistant" not in text and "Answer the questions of the assistant" not in text
+    assert "composite" not in text and "--worktree" not in text
