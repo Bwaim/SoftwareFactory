@@ -113,7 +113,7 @@ All routes keep the token, Host and Origin checks.
   - "Delete" calls the dry-run route and shows the files, the replacing level, the users and the warnings in the panel.
   - When the plan is blocked, it shows the users and no Confirm button.
   - Else it shows a "Confirm delete" button. No browser dialog.
-  - After the delete, it reloads the step list and closes the panel.
+  - After the delete, the panel shows the result, and the commit box when there is an offer. The step list reloads.
   - When the result has `library_commit`, it shows the existing "Commit to library" box.
 - The editor never blocks a save for hidden steps.
 

@@ -77,6 +77,15 @@ def test_data_without_hidden_steps(inited, ctx):
     assert inited.factory.json("version", "check") == report
 
 
+def test_hidden_steps_not_a_list(inited, ctx):
+    p = inited.fdir / "factory.yaml"
+    data = yaml.safe_load(p.read_text())
+    data["hidden_steps"] = "foo"
+    p.write_text(yaml.safe_dump(data, sort_keys=False))
+    assert hidden.ids(ctx) == []
+    assert inited.factory.json("step", "list")
+
+
 def hidden_pipeline(inited):
     write_step(inited.fdir, "quiet", {})
     write_pipeline(inited.fdir, {"id": "hp", "steps": ["quiet", "quiet"]})

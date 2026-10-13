@@ -213,10 +213,11 @@ Local server:
   - A step that is still used cannot be deleted. Remove it from its users first.
   - "Confirm delete" removes the files. The list of steps reloads.
   - For a generic step, the editor offers the library commit.
+  - The editor and the menu delete the step that is used now. To delete a generic step that a local step overrides, run `factory step delete <id> --level generic`.
+  - Built-in steps cannot be deleted. Hide them instead.
 - Hide: each available step has a "Hide" button. A hidden step is not in the list. Pipelines that use it still run it. The choice is saved in `.factory/factory.yaml` and is never committed.
   - "Show hidden steps" shows the hidden steps, greyed, each with an "Unhide" button. The browser remembers this choice.
   - A hidden step in the pipeline has a `hidden` mark. The checks warn: "A hidden step is used". It does not block the save.
-  - Built-in steps cannot be deleted. Hide them instead.
 
 ### Dashboard
 

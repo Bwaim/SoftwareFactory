@@ -41,6 +41,8 @@ def script_files(reg, target):
     script = script_of(target)
     if script is None or not script.is_file() or script.parent != target.path.parent.resolve():
         return []
+    if script in {s.path.resolve() for variants in reg.variants.values() for s in variants}:
+        return []
     for variants in reg.variants.values():
         for other in variants:
             if other.path.resolve() != target.path.resolve() and script_of(other) == script:

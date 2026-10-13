@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from conftest import git, make_task, task_json, write_pipeline, write_step
+from conftest import git, make_task, write_pipeline, write_step
 from factory import catalog, hidden, repo, step_delete
 from factory.errors import FactoryError
 from factory.registry import Registry, all_pipeline_files
@@ -79,6 +79,15 @@ def test_delete_local_step_removes_file(inited, ctx):
     out = step_delete.delete(ctx, "solo")
     assert not (inited.fdir / "steps" / "solo.md").exists()
     assert [Path(p).name for p in out["removed"]] == ["solo.md"] and out["library_commit"] is None
+
+
+def test_script_naming_a_step_file_is_not_removed(inited, ctx):
+    write_step(inited.fdir, "other", {})
+    write_step(inited.fdir, "bad", {"type": "script"}, body="other.md\n")
+    out = step_delete.delete(ctx, "bad")
+    assert [Path(p).name for p in out["removed"]] == ["bad.md"]
+    assert (inited.fdir / "steps" / "other.md").exists()
+    assert not (inited.fdir / "steps" / "bad.md").exists()
 
 
 def test_local_override_is_replaced_by_generic(inited, ctx):

@@ -10,7 +10,8 @@ def path(ctx):
 
 
 def ids(ctx):
-    return [str(i) for i in ctx.factory_yaml().get(KEY) or []]
+    value = ctx.factory_yaml().get(KEY)
+    return [str(i) for i in value] if isinstance(value, list) else []
 
 
 def remove(data, sid):
