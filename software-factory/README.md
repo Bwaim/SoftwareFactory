@@ -147,7 +147,7 @@ Step execution, inside a task session:
 - `factory next`: show the current step.
 - `factory done`: finish the current step.
 - `factory skip`: skip the current step, when it is not required.
-- `factory run-command`: run the command of the current `command` step. It prints the output and the exit code.
+- `factory run-command`: run the command of the current `command` step. It prints the output and the exit code, then names each output that is not optional and still not set. The session never sets these outputs itself.
 - `factory goto <step_path> --reason <text>`: go back to an earlier step.
 - `factory config get <step> <key>`: read a step config value.
 - `factory config set <step> <key> <value>`: save a step config value.

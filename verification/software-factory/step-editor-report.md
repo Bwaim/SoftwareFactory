@@ -1,10 +1,10 @@
 # Step editor verification report
 
-Date: 2026-10-13 18:31
+Date: 2026-10-13 20:24
 
 ## Milestone 1. Step format and runtime
 
-90 of 90 tests pass.
+91 of 91 tests pass.
 
 | Test | Result |
 |---|---|
@@ -64,6 +64,7 @@ Date: 2026-10-13 18:31
 | `test_runtime_v2::test_group_step_shows_full_path` | PASS |
 | `test_runtime_v2::test_first_prompt_never_adds_task_flag` | PASS |
 | `test_runtime_v2::test_command_next_and_env` | PASS |
+| `test_runtime_v2::test_command_sets_wrong_key` | PASS |
 | `test_runtime_v2::test_done_refused_until_command_exits_0` | PASS |
 | `test_runtime_v2::test_goto_clears_command_result` | PASS |
 | `test_runtime_v2::test_command_key_value_is_never_run` | PASS |
@@ -148,7 +149,7 @@ Date: 2026-10-13 18:31
 
 ## Full test suite
 
-342 of 342 tests pass.
+343 of 343 tests pass.
 
 ## Updated tests
 
@@ -189,6 +190,7 @@ Date: 2026-10-13 18:31
 - tests/test_init_menu.py::test_init_creates_files_and_exclude: init now writes data version 2
 - tests/test_library.py::test_commit_adds_changed_library_factory_yaml: the library was already at version 2, so the test changes it to 3 to make a real change
 - tests/test_pipeline_check.py::test_each_problem_type: the `reads` warning was replaced by the computed-keys warning
+- tests/test_runtime_v2.py::test_command_next_and_env: the command footer no longer has the title "The command sets these outputs:". The test now checks the output line with its type and description
 
 ## Definition Of Done
 
@@ -196,7 +198,7 @@ Date: 2026-10-13 18:31
 
 - Plan exists under `plans/`, written before implementation: covered by `plans/2026-10-13-step-editor.md`. The build followed its tasks, one commit per task on the branch.
 - Work is on `step-editor`, `master` is unchanged: `git log master -1 --format=%h` gives `6929935`, the branch base.
-- Existing tests pass or are updated on purpose: covered by the full suite above (339 of 339) and the "Updated tests" list. `tests/e2e_herdr.py` was updated but not run, because it needs a real Herdr.
+- Existing tests pass or are updated on purpose: covered by the full suite above and the "Updated tests" list. `tests/e2e_herdr.py` was updated but not run, because it needs a real Herdr.
 
 ### Task keys
 
@@ -222,6 +224,7 @@ Date: 2026-10-13 18:31
 ### Step runtime
 
 - `factory next` prompt and footer, subagent prompt, `wait_external`: covered by `test_runtime_v2::test_next_prints_exact_prompt_then_footer`, `test_subagent_prompt_is_the_same_text_with_a_report_line`, `test_wait_external_ends_with_factory_wait`.
+- A `command` step whose command sets the wrong key: `factory run-command` names the missing output, and the `factory next` text has no `factory state set` line: covered by `test_runtime_v2::test_command_sets_wrong_key`.
 - `factory run-command` and `factory done` order of checks: covered by `test_runtime_v2::test_done_refused_until_command_exits_0`, `test_goto_clears_command_result`, `test_file_output_must_exist`.
 - `factory state set` for `file` outputs, absolute path: covered by `test_runtime_v2::test_file_output_must_exist`, `test_state_set_file_relative_to_caller`.
 - Catalog steps drop the `test -f` done checks: covered by `test_catalog::test_catalog_steps_are_version_2`.

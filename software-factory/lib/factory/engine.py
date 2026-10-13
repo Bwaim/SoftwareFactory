@@ -416,16 +416,23 @@ def run_command(ctx, tid):
     position = task["position"]
     state.update(ctx, tid, lambda t: t.__setitem__("command_result", {"position": position, "exit_code": r.returncode}))
     print(f"Exit code: {r.returncode}", flush=True)
+    for key in missing_outputs(state.load(ctx, tid), step):
+        print(f"The command did not set the output `{key}`.", flush=True)
     return r.returncode
+
+
+def missing_outputs(task, step):
+    values = task.get("state") or {}
+    return [key for key, out in keys.outputs_of(step).items()
+            if not out["optional"] and (values.get(key) is None or str(values.get(key)).strip() == "")]
 
 
 def output_problem(task, step):
     values = task.get("state") or {}
     outputs = keys.outputs_of(step)
-    for key, out in outputs.items():
-        value = values.get(key)
-        if not out["optional"] and (value is None or str(value).strip() == ""):
-            return f"The output `{key}` is not set. Set it with `factory state set {key} <value>`."
+    missing = missing_outputs(task, step)
+    if missing:
+        return f"The output `{missing[0]}` is not set. Set it with `factory state set {missing[0]} <value>`."
     for key, out in outputs.items():
         value = values.get(key)
         if out["type"] == "file" and value not in (None, "") and not Path(str(value)).exists():

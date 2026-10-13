@@ -91,12 +91,32 @@ def cmd(inited):
 def test_command_next_and_env(cmd):
     inited, step = cmd
     out = run(inited, "next").stdout
-    assert "Run `factory run-command`." in out and "The command sets these outputs:" in out
+    assert "Run `factory run-command`." in out
+    assert "- `echoed` (file): Echo file." in out
     r = run(inited, "run-command")
     assert r.stdout.rstrip().endswith("Exit code: 0")
     text = (inited.fdir / "tasks" / "t1" / "artifacts" / "echo.txt").read_text()
     assert text == f"T-1|hello|t1|{step.parent.resolve()}"
     assert "The pipeline is finished" in run(inited, "done").stdout
+
+
+def test_command_sets_wrong_key(inited):
+    write_step(inited.fdir, "wrong", {
+        "type": "command",
+        "outputs": {"out": {"type": "file", "description": "Out file"},
+                    "extra": {"type": "text", "description": "Extra", "optional": True}},
+    }, body="factory state set result 1\n")
+    write_pipeline(inited.fdir, {"id": "w", "steps": ["wrong"]})
+    task_from_pipeline(inited, "w")
+    out = run(inited, "next").stdout
+    assert "factory state set" not in out and "factory artifact path" not in out
+    assert ("The command sets these outputs. Never set them yourself and never write their files. "
+            "If one is missing, run `factory block` and tell the user that the step command did not set it.") in out
+    assert "- `out` (file): Out file." in out and "- `extra` (text, optional): Extra." in out
+    r = run(inited, "run-command")
+    assert "The command did not set the output `out`." in r.stdout
+    assert "`extra`" not in r.stdout
+    assert task_json(inited.fdir, "t1")["state"]["result"] == "1"
 
 
 def test_done_refused_until_command_exits_0(cmd):

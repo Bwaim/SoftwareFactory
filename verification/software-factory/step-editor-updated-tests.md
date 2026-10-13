@@ -36,3 +36,4 @@
 - tests/test_init_menu.py::test_init_creates_files_and_exclude: init now writes data version 2
 - tests/test_library.py::test_commit_adds_changed_library_factory_yaml: the library was already at version 2, so the test changes it to 3 to make a real change
 - tests/test_pipeline_check.py::test_each_problem_type: the `reads` warning was replaced by the computed-keys warning
+- tests/test_runtime_v2.py::test_command_next_and_env: the command footer no longer has the title "The command sets these outputs:". The test now checks the output line with its type and description
