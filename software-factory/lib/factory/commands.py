@@ -22,6 +22,7 @@ def register(sub, common):
     sts.add_parser("unhide", parents=[common]).add_argument("id")
     sh = sts.add_parser("show", parents=[common]); sh.add_argument("id")
     sd = sts.add_parser("delete", parents=[common]); sd.add_argument("id"); sd.add_argument("--level", choices=["local", "generic"]); sd.add_argument("--dry-run", action="store_true")
+    se = sts.add_parser("edit", parents=[common]); se.add_argument("id", nargs="?")
     p = sub.add_parser("config")
     cs = p.add_subparsers(dest="action", required=True)
     g = cs.add_parser("get", parents=[common]); g.add_argument("step"); g.add_argument("key")
@@ -596,6 +597,19 @@ def pipeline_edit_cmd(args):
     url = server.page_url(info, "editor", **({"id": args.id} if args.id else {}))
     server.open_page(url)
     print(f"Pipeline editor: {url}")
+
+
+@cli.command("step edit")
+def step_edit_cmd(args):
+    from . import server
+    from .registry import Registry
+    ctx = ctx_of(args)
+    if args.id:
+        Registry.load(ctx).step(args.id)
+    info = server.ensure_server(ctx)
+    url = server.page_url(info, "editor", **({"step": args.id} if args.id else {"new_step": "1"}))
+    server.open_page(url)
+    print(f"Step editor: {url}")
 
 
 @cli.command("step list")

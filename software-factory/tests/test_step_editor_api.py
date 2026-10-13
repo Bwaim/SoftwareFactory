@@ -121,3 +121,22 @@ def test_routes_need_token(se):
     for path in ("/api/steps/check", "/api/steps/preview", "/api/steps/impact", "/api/steps/save"):
         assert request(i, "POST", path, {}, token=False)[0] == 401
     assert request(i, "GET", "/api/step-form", token=False)[0] == 401
+
+
+def test_step_edit_cli(inited):
+    try:
+        out = inited.factory("step", "edit").stdout
+        assert "Step editor: http://127.0.0.1:" in out and "new_step=1" in out
+        out = inited.factory("step", "edit", "user-validation").stdout
+        assert "step=user-validation" in out
+        r = inited.factory("step", "edit", "nope", check=False)
+        assert r.returncode == 1 and "does not exist" in r.stderr
+    finally:
+        inited.factory("server", "stop", check=False)
+
+
+def test_skill_create_step_runs_step_edit():
+    from conftest import SF
+    skill = (SF / "skills" / "software-factory" / "SKILL.md").read_text()
+    assert "**Create a new step** (`new-step`): run `factory step edit`" in skill
+    assert "new-step-assistant" not in skill
