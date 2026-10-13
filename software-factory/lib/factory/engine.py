@@ -431,6 +431,8 @@ def output_problem(task, step):
     values = task.get("state") or {}
     outputs = keys.outputs_of(step)
     missing = missing_outputs(task, step)
+    if missing and step.type == "command":
+        return f"The step command did not set the output `{missing[0]}`. Run `factory block` and tell the user."
     if missing:
         return f"The output `{missing[0]}` is not set. Set it with `factory state set {missing[0]} <value>`."
     for key, out in outputs.items():

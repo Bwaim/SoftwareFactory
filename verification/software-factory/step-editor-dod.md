@@ -31,6 +31,7 @@
 
 - `factory next` prompt and footer, subagent prompt, `wait_external`: covered by `test_runtime_v2::test_next_prints_exact_prompt_then_footer`, `test_subagent_prompt_is_the_same_text_with_a_report_line`, `test_wait_external_ends_with_factory_wait`.
 - A `command` step whose command sets the wrong key: `factory run-command` names the missing output, and the `factory next` text has no `factory state set` line: covered by `test_runtime_v2::test_command_sets_wrong_key`.
+- `factory done` on a `command` step with a missing output names the output and says `factory block`, never `factory state set`. An `ai` step keeps the `factory state set` message: covered by `test_runtime_v2::test_command_sets_wrong_key`, `test_done_refused_until_command_exits_0`, `test_file_output_must_exist`.
 - `factory run-command` and `factory done` order of checks: covered by `test_runtime_v2::test_done_refused_until_command_exits_0`, `test_goto_clears_command_result`, `test_file_output_must_exist`.
 - `factory state set` for `file` outputs, absolute path: covered by `test_runtime_v2::test_file_output_must_exist`, `test_state_set_file_relative_to_caller`.
 - Catalog steps drop the `test -f` done checks: covered by `test_catalog::test_catalog_steps_are_version_2`.

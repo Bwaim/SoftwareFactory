@@ -37,3 +37,4 @@
 - tests/test_library.py::test_commit_adds_changed_library_factory_yaml: the library was already at version 2, so the test changes it to 3 to make a real change
 - tests/test_pipeline_check.py::test_each_problem_type: the `reads` warning was replaced by the computed-keys warning
 - tests/test_runtime_v2.py::test_command_next_and_env: the command footer no longer has the title "The command sets these outputs:". The test now checks the output line with its type and description
+- tests/test_runtime_v2.py::test_done_refused_until_command_exits_0: `factory done` on a command step now says "The step command did not set the output" instead of "The output is not set"

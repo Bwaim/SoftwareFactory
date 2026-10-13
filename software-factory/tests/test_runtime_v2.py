@@ -117,13 +117,17 @@ def test_command_sets_wrong_key(inited):
     assert "The command did not set the output `out`." in r.stdout
     assert "`extra`" not in r.stdout
     assert task_json(inited.fdir, "t1")["state"]["result"] == "1"
+    r = run(inited, "done", check=False)
+    assert r.returncode == 1
+    assert "The step command did not set the output `out`. Run `factory block` and tell the user." in r.stderr
+    assert "factory state set" not in r.stderr + r.stdout
 
 
 def test_done_refused_until_command_exits_0(cmd):
     inited, _ = cmd
     run(inited, "next")
     r = run(inited, "done", check=False)
-    assert r.returncode == 1 and "The output `echoed` is not set" in r.stderr
+    assert r.returncode == 1 and "The step command did not set the output `echoed`." in r.stderr
     run(inited, "state", "set", "echoed", str(inited.repo / "README.md"))
     r = run(inited, "done", check=False)
     assert r.returncode == 1 and "Run `factory run-command` first." in r.stderr
@@ -162,6 +166,8 @@ def test_command_key_value_is_never_run(inited):
 
 def test_file_output_must_exist(ai):
     run(ai, "next")
+    r = run(ai, "done", check=False)
+    assert r.returncode == 1 and "The output `plan` is not set. Set it with `factory state set plan <value>`." in r.stderr
     run(ai, "state", "set", "note", "free text, not checked")
     r = run(ai, "state", "set", "plan", "missing.md", check=False)
     assert r.returncode == 1 and "The path does not exist" in r.stderr
