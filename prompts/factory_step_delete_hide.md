@@ -65,7 +65,7 @@ Add two features to the existing software factory:
   - It removes the id from `hidden_steps` (see Hide a step), unless another level still has a step with this id.
   - It keeps the step section in `.factory/config.yaml`, so the values come back if the step is installed again.
   - A catalog step that is deleted shows as not installed in the catalog.
-- For a generic step, it offers the library commit, with the message `Factory library: delete step <id>`. The commit contains the removed files and nothing else.
+- For a generic step, it offers the library commit, with the message `Factory library: delete step <id>`. The commit contains the removed files, plus the library's `factory.yaml` when it is new or changed (see Library commits in `MAIN_PROMPT`), and nothing else.
 - The orchestrator menu has a new action "Delete a step", in the group "Pipelines and steps", after "Create a new step":
   - It lists the local and generic steps, with their level and category.
   - The user selects one. The orchestrator shows the dry run, and deletes only after the user confirms.
