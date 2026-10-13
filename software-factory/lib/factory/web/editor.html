@@ -68,6 +68,7 @@ const params = new URLSearchParams(location.search);
 const TOKEN = params.get("token");
 const CHECK_DELAY_MS = 300;
 const SHOW_HIDDEN_KEY = "factory-editor-show-hidden";
+const KEY_TYPES = ["text", "long-text", "file"];
 function readShowHidden() { try { return localStorage.getItem(SHOW_HIDDEN_KEY) === "1"; } catch (e) { return false; } }
 function saveShowHidden(value) { try { localStorage.setItem(SHOW_HIDDEN_KEY, value ? "1" : "0"); } catch (e) {} }
 const state = { steps: [], columns: [], pipelines: [], loadedLevel: null, saveLevel: "local", model: null, checkTimer: null, checkCount: 0, hasError: true, commit: null, savedPath: null, original: null, confirmReplace: false, showHidden: readShowHidden() };
@@ -108,7 +109,7 @@ function modelOf(data) {
   const extra = Object.fromEntries(Object.entries(data).filter(([k]) => !known.has(k) && !k.startsWith("_")));
   return { id: data.id || "", description: data.description || "", model: claude.model || "", effort: claude.effort || "",
     start_column: data.start_column || "",
-    inputs: Object.entries(data.inputs || {}).map(([key, v]) => ({ key, description: (v && v.description) || "" })),
+    inputs: Object.entries(data.inputs || {}).map(([key, v]) => ({ key, type: (v && v.type) || "text", description: (v && v.description) || "" })),
     steps: (data.steps || []).map(entryOf), extra };
 }
 function parseValue(text) {
@@ -118,7 +119,7 @@ function parseValue(text) {
 function dataOf(m) {
   const data = { ...m.extra, id: m.id, description: m.description, claude: { model: m.model, effort: m.effort },
     start_column: m.start_column, inputs: {}, steps: [] };
-  for (const r of m.inputs) if (r.key) data.inputs[r.key] = { description: r.description };
+  for (const r of m.inputs) if (r.key) data.inputs[r.key] = { type: r.type, description: r.description };
   for (const s of m.steps) {
     const w = {};
     for (const r of s.with) if (r.key) w[r.key] = parseValue(r.value);
@@ -157,6 +158,21 @@ function pairRows(rows, keyName, valueName, keyHint, valueHint) {
   return box;
 }
 
+function inputRows(rows) {
+  const box = el("div");
+  const draw = () => {
+    clear(box);
+    rows.forEach((r, i) => box.append(el("div", { class: "row" },
+      textInput(r.key, (v) => { r.key = v; changed(); }, "key"),
+      selectInput(KEY_TYPES, r.type || "text", (v) => { r.type = v; changed(); }),
+      textInput(r.description, (v) => { r.description = v; changed(); }, "description"),
+      el("button", { type: "button", onclick: () => { rows.splice(i, 1); draw(); changed(); } }, "Remove"))));
+    box.append(el("button", { type: "button", onclick: () => { rows.push({ key: "", type: "text", description: "" }); draw(); } }, "Add"));
+  };
+  draw();
+  return box;
+}
+
 function renderForm() {
   const m = state.model, f = clear(byId("form"));
   f.append(
@@ -165,7 +181,7 @@ function renderForm() {
     field("model", textInput(m.model, (v) => { m.model = v; changed(); }, "session model")),
     field("effort", textInput(m.effort, (v) => { m.effort = v; changed(); }, "session effort")),
     field("start_column", selectInput(["", ...state.columns], m.start_column, (v) => { m.start_column = v; changed(); })),
-    field("inputs", pairRows(m.inputs, "key", "description", "key", "description")));
+    field("inputs", inputRows(m.inputs)));
 }
 
 function renderPipeline() {

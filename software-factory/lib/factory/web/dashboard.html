@@ -396,7 +396,11 @@ async function openLaunch(prefill) {
     clear(inputsBox);
     form.inputs = {};
     for (const name of names) {
-      const node = el("input", { type: "text" });
+      const spec = detail.data.inputs[name] || {};
+      const type = spec.type || "text";
+      const node = type === "long-text"
+        ? el("textarea", { rows: "4" })
+        : el("input", { type: "text", placeholder: type === "file" ? "Path, absolute or relative to the main repository" : "" });
       node.value = (prefill.inputs && prefill.inputs[name]) || "";
       node.addEventListener("input", invalidate);
       form.inputs[name] = node;

@@ -14,8 +14,15 @@ def step_detail(reg, step, hidden_ids=()):
             "uses": keys.step_uses(reg, step.id), "outputs": keys.step_outputs(reg, step.id), "children": step.children}
 
 
+def input_rows(data):
+    from . import keys
+    return {name: {"type": keys.key_type(spec), "description": (spec or {}).get("description", "") if isinstance(spec, dict) else ""}
+            for name, spec in (data.get("inputs") or {}).items()}
+
+
 def list_pipelines(reg):
-    return [{"id": p.id, "description": p.data.get("description", ""), "level": p.level, "path": str(p.path)}
+    return [{"id": p.id, "description": p.data.get("description", ""), "level": p.level, "path": str(p.path),
+             "inputs": input_rows(p.data)}
             for p in sorted(reg.pipelines.values(), key=lambda p: p.id)]
 
 

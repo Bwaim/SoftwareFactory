@@ -4,7 +4,7 @@ import sys
 import unicodedata
 from pathlib import Path
 
-from . import adapters, config, events, pipeline_check, repo, session, state
+from . import adapters, config, events, keys, pipeline_check, repo, session, state
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, Registry
 
@@ -111,11 +111,24 @@ def check_arguments(description, inputs, task_id=None):
         raise FactoryError("The inputs must be text values.")
 
 
+def resolve_inputs(ctx, pipeline, inputs, report):
+    resolved = dict(inputs)
+    for name, spec in pipeline.inputs.items():
+        value = str(inputs.get(name, "")).strip()
+        if keys.key_type(spec) != "file" or not value:
+            continue
+        path = (ctx.main / Path(value).expanduser()).resolve()
+        if not path.exists():
+            report["errors"].append(f"The input `{name}` is a path that does not exist: {path}.")
+        resolved[name] = str(path)
+    return resolved
+
+
 def plan_launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlog=None):
     report = {
         "ok": False, "errors": [], "task_id": None, "pipeline": pipeline_id, "description": description,
         "worktree": None, "base_ref": None, "branch": None, "branch_case": "none", "fast_forward": False,
-        "missing_inputs": [], "missing_config": [], "summary": None,
+        "missing_inputs": [], "missing_config": [], "summary": None, "inputs": {},
     }
     check_arguments(description, inputs, task_id)
     reg = Registry.load(ctx)
@@ -130,6 +143,7 @@ def plan_launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlo
     if not (report["description"] or "").strip():
         report["errors"].append("The description is empty.")
     report["missing_inputs"] = [k for k in pipeline.inputs if not str(inputs.get(k, "")).strip()]
+    report["inputs"] = resolve_inputs(ctx, pipeline, inputs, report)
     if task_id:
         if not TASK_ID_RE.fullmatch(task_id):
             report["errors"].append(f"The id `{task_id}` must match [a-z][a-z0-9_-]{{0,31}}.")
@@ -193,7 +207,7 @@ def new_task(ctx, reg, report, inputs):
     steps = reg.expand(pipeline)
     position = 1 if steps and steps[0]["id"] == CREATE_WORKTREE else 0
     columns = ctx.columns()
-    task_state = {k: v for k, v in inputs.items()}
+    task_state = dict(report["inputs"])
     if report["summary"]:
         task_state["summary"] = report["summary"]
     if report["branch"]:
