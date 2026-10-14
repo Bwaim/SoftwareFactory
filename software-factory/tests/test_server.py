@@ -126,7 +126,7 @@ def test_server_polls_waiting_tasks_on_its_own(inited):
     write_pipeline(inited.fdir, {"id": "w", "steps": ["wait-review"]})
     task_from_pipeline(inited, "w", terminal_handle={"agent": "t1"})
     inited.factory("next", "--task", "t1")
-    inited.factory("wait", "--task", "t1")
+    inited.factory("wait", "--task", "t1", env={"FACTORY_POLL_SECONDS": "1"})
     assert task_json(inited.fdir, "t1")["status"] == "waiting_external"
     flag.write_text("ok")
     try:

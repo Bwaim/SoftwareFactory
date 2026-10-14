@@ -95,7 +95,7 @@ def register(sub, common):
     sub.add_parser("dashboard", parents=[common])
     p = sub.add_parser("server")
     svs = p.add_subparsers(dest="action", required=True)
-    svs.add_parser("stop", parents=[common])
+    st = svs.add_parser("stop", parents=[common]); st.add_argument("--unless-waiting", action="store_true")
     p = sub.add_parser("catalog")
     cts = p.add_subparsers(dest="action", required=True)
     cts.add_parser("list", parents=[common])
@@ -170,12 +170,15 @@ def unblock_cmd(args):
 
 @cli.command("tasks")
 def tasks_cmd(args):
-    from . import board
-    rows = board.task_rows(ctx_of(args))
+    from . import board, engine, server
+    ctx = ctx_of(args)
+    rows = board.task_rows(ctx)
     if args.json:
         cli.emit(rows, True)
     else:
         print(board.render_rows(rows))
+    if engine.waiting_checks(ctx):
+        server.keep_polling(ctx)
 
 
 @cli.command("pause")
@@ -194,9 +197,12 @@ def pause_cmd(args):
 
 @cli.command("resume")
 def resume_cmd(args):
-    from . import session
-    session.resume(ctx_of(args), args.id)
+    from . import engine, server, session
+    ctx = ctx_of(args)
+    session.resume(ctx, args.id)
     print(f"Task {args.id} resumed.")
+    if args.id in engine.waiting_checks(ctx):
+        server.keep_polling(ctx)
 
 
 @cli.command("terminal focus")
@@ -466,9 +472,11 @@ def open_ide_cmd(args):
 
 @cli.command("wait")
 def wait_cmd(args):
-    from . import engine
+    from . import engine, server
     ctx, tid = task_of(args)
     print(engine.wait(ctx, tid))
+    if tid in engine.waiting_checks(ctx):
+        server.keep_polling(ctx)
 
 
 @cli.command("poll")
@@ -561,8 +569,13 @@ def dashboard_cmd(args):
 
 @cli.command("server stop")
 def server_stop_cmd(args):
-    from . import server
-    print("Server stopped." if server.stop_server(ctx_of(args)) else "The server was not running.")
+    from . import engine, server
+    ctx = ctx_of(args)
+    ids = engine.waiting_checks(ctx) if args.unless_waiting else []
+    if ids and server.running(ctx):
+        print(f"The server keeps running for the done checks of tasks {', '.join(ids)}.")
+        return
+    print("Server stopped." if server.stop_server(ctx) else "The server was not running.")
 
 
 @cli.command("pipeline keys")

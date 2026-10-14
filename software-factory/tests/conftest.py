@@ -126,7 +126,9 @@ class Inited:
 def inited(factory, origin_repo, library_path, work):
     factory("init", "--library", library_path, "--create-library")
     factory("config", "set", "create-worktree", "worktree_root", work / "worktrees")
-    return Inited(origin_repo, library_path, factory, work)
+    yield Inited(origin_repo, library_path, factory, work)
+    if (origin_repo / ".factory" / "server.json").exists():
+        factory("server", "stop", check=False)
 
 
 def write_step(root, sid, manifest, body="Do the step.\n"):

@@ -20,6 +20,7 @@ FALLBACK_POLL_SECONDS = 300
 MAX_BODY_BYTES = 1024 * 1024
 SERVER_INFO_MODE = 0o600
 WEB_DIR = Path(__file__).resolve().parent / "web"
+START_WARNING = "Warning: the local server did not start, so done checks do not run. See .factory/server.log."
 PAGES = {"/editor": "editor.html", "/dashboard": "dashboard.html"}
 
 
@@ -66,10 +67,19 @@ class Server:
     def stop(self):
         threading.Thread(target=self.httpd.shutdown, daemon=True).start()
 
+    def replaced(self):
+        return (read_info(self.ctx) or {}).get("pid") != os.getpid()
+
     def watch_idle(self):
+        from . import engine
         while True:
             time.sleep(min(30, IDLE_SECONDS))
-            if time.time() - self.last > IDLE_SECONDS:
+            try:
+                done = self.replaced() or (time.time() - self.last > IDLE_SECONDS and not engine.waiting_checks(self.ctx))
+            except Exception as e:
+                print(f"idle check failed: {e}", file=sys.stderr, flush=True)
+                continue
+            if done:
                 self.stop()
                 return
 
@@ -215,24 +225,32 @@ def running(ctx):
 
 
 def ensure_server(ctx):
-    info = running(ctx)
-    if info:
-        return info
-    old_pid = (read_info(ctx) or {}).get("pid")
-    with open(ctx.fdir / "server.log", "a") as log:
-        child = subprocess.Popen(
-            [sys.executable, str(repo.PLUGIN_ROOT / "bin" / "factory"), "serve"],
-            cwd=ctx.main, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-            start_new_session=True, close_fds=True,
-        )
-    deadline = time.time() + START_TIMEOUT
-    while time.time() < deadline and child.poll() is None:
-        info = read_info(ctx)
-        if info and info.get("pid") != old_pid and ping(info):
+    with fsio.locked(info_path(ctx)):
+        info = running(ctx)
+        if info:
             return info
-        time.sleep(0.2)
-    stop_child(ctx, child)
-    raise FactoryError("The local server did not start. See .factory/server.log.")
+        old_pid = (read_info(ctx) or {}).get("pid")
+        with open(ctx.fdir / "server.log", "a") as log:
+            child = subprocess.Popen(
+                [sys.executable, str(repo.PLUGIN_ROOT / "bin" / "factory"), "serve"],
+                cwd=ctx.main, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                start_new_session=True, close_fds=True,
+            )
+        deadline = time.time() + START_TIMEOUT
+        while time.time() < deadline and child.poll() is None:
+            info = read_info(ctx)
+            if info and info.get("pid") != old_pid and ping(info):
+                return info
+            time.sleep(0.2)
+        stop_child(ctx, child)
+        raise FactoryError("The local server did not start. See .factory/server.log.")
+
+
+def keep_polling(ctx):
+    try:
+        ensure_server(ctx)
+    except Exception:
+        print(START_WARNING, file=sys.stderr)
 
 
 def stop_child(ctx, child):

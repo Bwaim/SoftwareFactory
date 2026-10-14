@@ -448,6 +448,30 @@ def poll(ctx):
     return results
 
 
+
+def is_waiting_check(reg, task):
+    if task["status"] != "waiting_external":
+        return False
+    entry = state.current_entry(task)
+    return entry is not None and bool(reg.step(entry["id"]).done_check)
+
+
+def waiting_checks(ctx):
+    try:
+        reg = Registry.load(ctx)
+        tasks = state.list_tasks(ctx)
+    except Exception:
+        return []
+    ids = []
+    for task in tasks:
+        try:
+            if is_waiting_check(reg, task):
+                ids.append(task["id"])
+        except Exception:
+            continue
+    return ids
+
+
 def external_done(ctx, tid):
     task = state.load(ctx, tid)
     if task["status"] != "waiting_external":

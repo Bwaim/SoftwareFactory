@@ -6,7 +6,7 @@ def config_path(ctx):
 
 
 def saved_section(ctx, step_id):
-    data = fsio.read_yaml(config_path(ctx), {}) or {}
+    data = fsio.require_map(config_path(ctx), fsio.read_yaml(config_path(ctx), {}))
     return data.get(step_id) or {}
 
 
@@ -31,6 +31,7 @@ def get_value(ctx, step_id, key):
 
 def set_value(ctx, step_id, key, value):
     def change(data):
+        fsio.require_map(config_path(ctx), data)
         section = data.get(step_id) or {}
         section[key] = value
         data[step_id] = section

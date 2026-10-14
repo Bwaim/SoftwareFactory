@@ -36,7 +36,8 @@ class Ctx:
         return self.main / ".factory"
 
     def factory_yaml(self):
-        return fsio.read_yaml(self.fdir / "factory.yaml", {}) or {}
+        path = self.fdir / "factory.yaml"
+        return fsio.require_map(path, fsio.read_yaml(path, {}))
 
     def library(self):
         lib = self.factory_yaml().get("library")

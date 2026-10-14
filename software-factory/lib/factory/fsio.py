@@ -7,6 +7,8 @@ from pathlib import Path
 
 import yaml
 
+from .errors import FactoryError
+
 
 def atomic_write_text(path, text):
     path = Path(path)
@@ -41,12 +43,28 @@ def read_text(path, default=""):
     return path.read_text() if path.exists() else default
 
 
+def yaml_problem(path, error):
+    problem = getattr(error, "problem", None) or str(error).splitlines()[0]
+    mark = getattr(error, "problem_mark", None)
+    line = f", line {mark.line + 1}" if mark else ""
+    return f"{path}: {problem}{line}."
+
+
 def read_yaml(path, default=None):
     path = Path(path)
     if not path.exists():
         return default
-    data = yaml.safe_load(path.read_text())
+    try:
+        data = yaml.safe_load(path.read_text())
+    except (yaml.YAMLError, UnicodeDecodeError) as e:
+        raise FactoryError(yaml_problem(path, e))
     return default if data is None else data
+
+
+def require_map(path, data):
+    if not isinstance(data, dict):
+        raise FactoryError(f"{path}: the file must be a map of keys.")
+    return data
 
 
 def dump_yaml(data):

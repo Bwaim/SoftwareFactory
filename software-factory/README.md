@@ -127,7 +127,7 @@ Herdr adapter:
 - **Remove a backlog entry**: remove an entry from the backlog.
 - **Open dashboard**: start the local server and print the dashboard URL.
 - **Init the factory**: set up the repository. Shown only before init.
-- **Exit**: ask to pause all tasks. Then stop the local server.
+- **Exit**: ask to pause all tasks. Then stop the local server, unless a task waits on a done check.
 
 ### Commands
 
@@ -212,6 +212,7 @@ Local server:
 - `factory serve`: run the local server in the foreground.
 - `factory dashboard`: start the local server if needed and print the dashboard URL.
 - `factory server stop`: stop the local server.
+- `factory server stop --unless-waiting`: stop the local server only when no task waits on a done check.
 
 ### Pipeline editor
 
@@ -369,7 +370,10 @@ Only `http` and `https` URLs are used.
 - The server checks the `Host` header. It must be `127.0.0.1` and the server port.
 - The server checks the `Origin` header. If present, it must be the server itself.
 - The server stops after 30 minutes without requests. `factory dashboard` starts it again.
-- `factory server stop` stops it now. The menu action "Exit" stops it too.
+- While a task waits on a step with a `done_check`, the server keeps running, so the checks run without an open page.
+- `factory wait`, `factory resume` and `factory tasks` start the server when a task waits on a done check. After a restart of the computer, the orchestrator start runs `factory tasks`, so the polling starts again.
+- Only one server runs per repository. A server that is replaced stops by itself.
+- `factory server stop` stops it now. The menu action "Exit" runs `factory server stop --unless-waiting`.
 - The file `.factory/server.json` holds the port and the token. Only you can read it.
 - The log is `.factory/server.log`.
 
@@ -427,6 +431,8 @@ Each task logs its events in `.factory/tasks/<id>/events.jsonl`, one JSON object
 ### `.factory/factory.yaml` fields
 
 `version`, `library`, `terminal`, `columns`, `poll_minutes`, `ticket_url`, `hidden_steps` (optional: the ids of hidden steps).
+
+When `factory.yaml` or `config.yaml` is not valid YAML, every command prints `Error: <path>: <problem>, line <n>.` and exits with code 1.
 
 ## Troubleshooting
 
