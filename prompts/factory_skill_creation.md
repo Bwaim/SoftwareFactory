@@ -85,7 +85,7 @@ A local dashboard shows all tasks as a Kanban board and the backlog, and lets me
   - Factory
     - Open dashboard: starts the local server if needed and opens the dashboard in the browser
     - Init the factory. When the factory is not initialized in the repository, this is the only action shown. After init, it is never shown.
-    - Exit: stops the menu and the local server. It first asks whether to pause all tasks (see Pause and resume).
+    - Exit: stops the menu and the local server. It first asks whether to pause all tasks (see Pause and resume). The server keeps running while a task waits on a step with a `done_check` (see Local server).
 
 ### Factory elements
 
@@ -366,7 +366,7 @@ Save the plan in the artifacts folder, not in the repository.
   - It listens on `127.0.0.1` only, on a free port.
   - It generates a random token at start. The page URL carries it, and every API request must send it.
   - It rejects requests whose `Origin` header is not the server itself.
-- It stops on Exit from the orchestrator, or after 30 minutes without requests. An open dashboard page sends requests every 5 seconds, so the server stays alive while a page is open.
+- It stops after 30 minutes without requests. An open dashboard page sends requests every 5 seconds, so the server stays alive while a page is open. While a task is `waiting_external` on a step with a `done_check`, the server never stops for lack of requests, so its checks keep running without an open page. Exit from the orchestrator stops the server only when no task waits with a `done_check`. Otherwise Exit says that the server keeps running for the waiting checks.
 
 #### Dashboard
 
@@ -646,6 +646,7 @@ Save the plan in the artifacts folder, not in the repository.
 - `factory poll` runs:
   - Every `poll_minutes` while the dashboard server runs. `poll_minutes` is in `.factory/factory.yaml`, default 5.
   - From the menu action "Check waiting tasks".
+- `factory wait` on a step with a `done_check` starts the server if it is not running. So do `factory resume` of such a task, and `factory tasks`, which the orchestrator runs at start. After a restart of the computer, the first of these commands starts the polling again.
 - `paused` tasks are not polled. Resume restores `waiting_external`, and polling starts again.
 
 ##### Pause and resume
@@ -731,6 +732,7 @@ Users ask for a dark theme. Start with the settings screen only.
 - The factory ships a `factory` CLI. It is the only way the orchestrator and the task sessions read and write `.factory/`.
 - It finds the main repository from any worktree with `git rev-parse --git-common-dir`. Task sessions in a worktree always use the `.factory/` of the main repository.
 - It finds the current task from the worktree path. Any task command can also name the task with `--task <id>`. When the task cannot be found, the error message says to add `--task <id>`.
+- A command never prints a Python traceback for a problem the user can fix. When `.factory/factory.yaml` or `.factory/config.yaml` is not valid YAML, every command prints `Error: <path>: <problem>, line <n>.` and exits with code 1.
 - It writes every file atomically: it writes a temporary file, then renames it. It holds a lock while it changes a shared file (`config.yaml`, `backlog.md`), so parallel sessions never lose a write.
 - It merges steps and pipelines from three levels. When two have the same id, the first level wins:
   1. Local: `.factory/` of the main repository
@@ -930,6 +932,9 @@ The library, a folder in any git repository:
   - A task starts in `start_column` and moves when a step with a `column` starts. The pipeline entry wins over the manifest. An unknown column is a pipeline check error.
   - `user-validation` sets `awaiting_approval`. `factory approve` lets `factory done` pass. `factory request-changes` sets `active` and sends the text with the fake adapter.
   - `factory wait` sets `waiting_external`. `factory poll` ends the wait when the `done_check` passes, sends the message with the fake adapter, and skips paused tasks. `factory external-done` ends a wait without a `done_check`.
+  - With a short idle time, the server keeps running while a task waits on a step with a `done_check`, and stops when no task waits.
+  - `factory wait` on a step with a `done_check` starts the server. `factory wait` on a step without one does not.
+  - An invalid `factory.yaml` gives the one-line error and exit code 1, with no traceback.
   - `factory launch --dry-run` reports the id, the worktree path and the branch case, and changes nothing. A taken id gets a suffix.
   - When the fake adapter fails to start the session, `factory launch` removes the worktree, the branch and the task folder it created.
   - `factory delete --dry-run` shows uncommitted changes and unpushed commits, and changes nothing. `factory delete` refuses them without `--confirm-unpushed`.
