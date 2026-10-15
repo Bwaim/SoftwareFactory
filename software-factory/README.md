@@ -296,7 +296,7 @@ Each card shows:
 - The pipeline and the current step.
 - The status, with an icon and the time in this status. The reason is shown below when there is one.
 - A red "Session gone" tag when the terminal session is not there. Not shown for `paused` and `finished` tasks.
-- The artifacts of the task. Click a name to read it.
+- The artifacts of the task. Click a name to read it. The viewer closes with Escape, a click outside it, or its Close button. Its title bar stays visible, and the text scrolls inside it. A form, for example "Request changes", never closes on a click outside. Escape on a form with typed text asks "Discard the typed text?".
 - "To validate", when the step waits for your approval. It links to the artifact to read. If the step validates code, it has an "Open in IDE" button.
 
 Colors and icons:

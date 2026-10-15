@@ -49,8 +49,11 @@ a, .link { color: var(--accent); cursor: pointer; }
 .artifacts { margin: 4px 0; display: flex; gap: 8px; flex-wrap: wrap; }
 .check { margin: 6px 0; font-size: 13px; }
 #modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 10; }
-#modal .box { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 16px; width: min(720px, 92vw); max-height: 86vh; overflow: auto; box-sizing: border-box; }
-#modal h3 { margin: 0 0 10px; }
+#modal .box { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; width: min(720px, 92vw); max-height: calc(100vh - 2rem); display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
+#modal .bar { flex: none; display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+#modal .bar h3 { margin: 0; overflow-wrap: anywhere; }
+#modal .content { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px 16px 16px; }
+#modal .discard { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--awaiting_approval); }
 pre { white-space: pre-wrap; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--panel); margin: 8px 0; }
 .field { display: grid; grid-template-columns: 130px 1fr; gap: 8px; margin: 6px 0; align-items: start; }
 .field input, .field select { width: 100%; box-sizing: border-box; }
@@ -80,7 +83,7 @@ const JOB_POLL_MS = 1000;
 const HIDDEN_KEY = "factory.hiddenColumns";
 const ICONS = { active: "▶", blocked: "⛔", awaiting_approval: "✋", waiting_external: "⏳", paused: "⏸", finished: "✓" };
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
-const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, pollFailed: false };
+const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false };
 const byId = (id) => document.getElementById(id);
 
 async function api(path, body, quiet) {
@@ -117,14 +120,45 @@ function saveHidden() {
   try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(state.hidden)); } catch (e) {}
 }
 function modalOpen() { return !byId("modal").hidden; }
-function closeModal() { const m = byId("modal"); m.hidden = true; clear(m); state.lastKey = null; }
-function openModal(title, ...content) {
+function closeModal() { const m = byId("modal"); m.hidden = true; clear(m); m.dataset.dismissable = ""; state.lastKey = null; state.modalStart = new WeakMap(); }
+function textFields(m) { return [...m.querySelectorAll("textarea, input:not([type]), input[type=text]")]; }
+function showModal({ title, content, dismissable = false, headButtons = [] }) {
   const m = clear(byId("modal"));
-  m.append(el("div", { class: "box" }, el("h3", {}, title), ...content));
+  m.append(el("div", { class: "box" }, el("div", { class: "bar" }, el("h3", {}, title), ...headButtons), el("div", { class: "content" }, ...content)));
+  m.dataset.dismissable = dismissable ? "1" : "";
   m.hidden = false;
+  state.modalStart = new WeakMap(textFields(m).map((n) => [n, n.value]));
   return m;
 }
+function openModal(title, ...content) { return showModal({ title, content }); }
 function closeButton(label = "Close") { return el("button", { onclick: closeModal }, label); }
+function typedText() {
+  const m = byId("modal");
+  return textFields(m).some((n) => n.value !== (state.modalStart.has(n) ? state.modalStart.get(n) : n.defaultValue));
+}
+function askDiscard() {
+  const box = byId("modal").querySelector(".box");
+  if (!box || box.querySelector(".discard")) return;
+  const row = el("div", { class: "discard" }, el("span", {}, "Discard the typed text?"),
+    el("button", { class: "danger", onclick: closeModal }, "Discard"),
+    el("button", { onclick: () => row.remove() }, "Keep editing"));
+  box.querySelector(".bar").after(row);
+}
+let pressedOnBackdrop = false;
+byId("modal").addEventListener("mousedown", (e) => { pressedOnBackdrop = e.target === byId("modal"); });
+byId("modal").addEventListener("click", (e) => {
+  const m = byId("modal");
+  if (e.target === m && pressedOnBackdrop && m.dataset.dismissable) closeModal();
+  pressedOnBackdrop = false;
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !modalOpen()) return;
+  e.preventDefault();
+  const m = byId("modal");
+  const discard = m.querySelector(".discard");
+  if (discard) { discard.remove(); return; }
+  if (m.dataset.dismissable || !typedText()) closeModal(); else askDiscard();
+});
 function button(label, onclick, opts = {}) {
   const b = el("button", { class: opts.cls || "", disabled: !!opts.disabled, title: opts.disabled && opts.hint ? opts.hint : null }, label);
   b.addEventListener("click", async () => {
@@ -282,7 +316,7 @@ function taskButtons(t) {
 }
 async function openArtifact(tid, name) {
   const data = await api(`/api/tasks/${tid}/artifacts/${encodeURIComponent(name)}`);
-  openModal(`${tid} / ${name}`, el("pre", {}, data.text), el("div", { class: "footer" }, closeButton()));
+  showModal({ title: `${tid} / ${name}`, content: [el("pre", {}, data.text)], dismissable: true, headButtons: [closeButton()] });
 }
 function openRequestChanges(t) {
   const text = el("textarea", { placeholder: "What should change?" });
