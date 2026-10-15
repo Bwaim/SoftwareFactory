@@ -118,7 +118,7 @@ Herdr adapter:
 - **Send a prompt to a task**: send text to a task session.
 - **Resume a task**: restart a paused task, or a task whose session is gone.
 - **Delete a task**: close its terminal, remove its worktree and archive its folder.
-- **Clean finished tasks**: delete finished tasks whose work is merged.
+- **Clean finished tasks**: delete finished tasks whose work is merged. A squash-merged branch counts as merged.
 - **Create or edit a pipeline**: open the pipeline editor in the browser.
 - **Create a new step**: open the step form in the pipeline editor.
 - **Delete a step**: delete a local or generic step. It first shows what the delete does, then asks you to confirm.
@@ -342,6 +342,8 @@ The "Clean" button of the `Done` column lists the finished tasks that can be del
 2. For each task, the dialog shows uncommitted changes, unpushed commits and failed checks.
 3. If something would be lost, tick "I accept losing these changes" for that task.
 4. Click "Delete selected". A task you did not accept is skipped.
+
+A branch merged with a squash merge counts as merged when its content is already in `origin/<base_ref>`: `git merge-tree --write-tree` gives the tree of `origin/<base_ref>`. Its commits are not listed as lost, the reason is "merged (squash)", and the delete removes the local branch. When `origin/<base_ref>` later changed the same lines, the task counts as not merged, and the delete asks for `--confirm-unpushed`.
 
 #### Backlog view
 

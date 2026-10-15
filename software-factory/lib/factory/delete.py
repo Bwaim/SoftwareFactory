@@ -23,6 +23,21 @@ def is_ancestor(cwd, a, b):
     return repo.git(["merge-base", "--is-ancestor", a, b], cwd, check=False).returncode == 0
 
 
+def content_merged(ctx, rev, base_ref):
+    base = f"refs/remotes/origin/{base_ref}"
+    if not ref_exists(ctx.main, base):
+        return False
+    r = repo.git(["merge-tree", "--write-tree", base, rev], ctx.main, check=False)
+    if r.returncode != 0 or not r.stdout.strip():
+        return False
+    base_tree = repo.git(["rev-parse", f"{base}^{{tree}}"], ctx.main, check=False).stdout.strip()
+    return r.stdout.splitlines()[0].strip() == base_tree
+
+
+def head_commit(worktree):
+    return repo.git(["rev-parse", "HEAD"], worktree, check=False).stdout.strip()
+
+
 def branch_merged_or_pushed(ctx, branch, base_ref):
     local = f"refs/heads/{branch}"
     if not ref_exists(ctx.main, local):
@@ -57,6 +72,8 @@ def merge_state(ctx, branch, base_ref):
     base = f"refs/remotes/origin/{base_ref}"
     if ref_exists(ctx.main, local) and ref_exists(ctx.main, base) and is_ancestor(ctx.main, local, base):
         return True, f"merged into origin/{base_ref}"
+    if ref_exists(ctx.main, local) and content_merged(ctx, local, base_ref):
+        return True, "merged (squash)"
     if tracks_own_branch(ctx, branch) and not ref_exists(ctx.main, f"refs/remotes/origin/{branch}"):
         return True, "pushed, and its remote branch was deleted"
     return False, "not merged"
@@ -81,18 +98,25 @@ def plan_delete(ctx, tid):
     base_ref = task.get("base_ref") or "main"
     plan = {
         "task_id": tid, "session_id": task.get("session_id"), "terminal_handle": task.get("terminal_handle"),
-        "worktree": worktree, "branch": None, "uncommitted": [], "unpushed": [],
-        "delete_branch": False, "needs_confirm": False, "check_errors": [],
+        "worktree": worktree, "branch": None, "base_ref": base_ref, "uncommitted": [], "unpushed": [],
+        "squash_merged": False, "delete_branch": False, "needs_confirm": False, "check_errors": [],
     }
     errors = plan["check_errors"]
     if worktree and Path(worktree).exists():
+        repo.git(["fetch", "origin", "--prune"], ctx.main, check=False)
         plan["uncommitted"] = git_lines(["status", "--porcelain"], worktree, "Cannot check uncommitted changes", errors)
         branch = current_branch(worktree)
         plan["branch"] = branch
         upstream = f"origin/{branch}" if branch and ref_exists(worktree, f"refs/remotes/origin/{branch}") else f"origin/{base_ref}"
         plan["unpushed"] = git_lines(["log", "--oneline", f"{upstream}..HEAD"], worktree, "Cannot check unpushed commits", errors)
+        if plan["unpushed"] and not errors:
+            rev = f"refs/heads/{branch}" if branch else head_commit(worktree)
+            if rev and content_merged(ctx, rev, base_ref):
+                plan["squash_merged"] = True
+                plan["unpushed"] = []
         if branch:
-            plan["delete_branch"] = not errors and not plan["unpushed"] and branch_merged_or_pushed(ctx, branch, base_ref)
+            merged = plan["squash_merged"] or branch_merged_or_pushed(ctx, branch, base_ref)
+            plan["delete_branch"] = not errors and not plan["unpushed"] and merged
     plan["needs_confirm"] = bool(plan["uncommitted"] or plan["unpushed"] or errors)
     return plan
 
@@ -107,6 +131,8 @@ def render_plan(plan):
         else:
             lines.append(f"- Local branch {plan['branch']} is kept: it is not pushed or merged")
     lines.append("- The task folder moves to .factory/tasks/archive/")
+    if plan.get("squash_merged"):
+        lines.append(f"The branch is merged into origin/{plan['base_ref']} (squash merge). Its commits are not lost.")
     if plan["uncommitted"]:
         lines += ["Uncommitted changes:"] + [f"  {line}" for line in plan["uncommitted"]]
     if plan["unpushed"]:
