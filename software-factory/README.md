@@ -177,7 +177,7 @@ Task life:
 - `factory open-ide`: open the task worktree in the IDE.
 - `factory terminal focus <id>`: focus the task session.
 - `factory terminal send-prompt <id> <text> [--wait]`: send a prompt to a task session.
-- `factory terminal start-session <name> <cwd> <prompt> -- <claude args>`: start a Claude session in the terminal. Prints the session handle as JSON.
+- `factory terminal start-session <name> <cwd> <prompt> -- <claude args>`: start a Claude session in the terminal. Prints the session handle as JSON. Herdr accepts names that match `^[a-z][a-z0-9_-]{0,31}$`, so the adapter turns any name into a valid one: lowercase, other characters become `-`, the prefix `t-` when it does not start with a letter, and a name longer than 32 characters ends with `-` and 4 characters of a hash. The `agent` field of the handle is the real Herdr name. Later calls use the handle.
 - `factory terminal close <handle-json>`: close a session.
 - `factory terminal state <handle-json>`: print the session state.
 - `factory terminal wait-idle <handle-json> [--timeout <seconds>]`: wait until the session is idle.

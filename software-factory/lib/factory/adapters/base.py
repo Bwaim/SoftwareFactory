@@ -1,6 +1,25 @@
+import hashlib
+import re
+
 from ..errors import FactoryError
 
 OPTIONAL = ("send_prompt", "focus", "state", "wait_idle", "notify")
+HERDR_NAME_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
+HERDR_NAME_MAX = 32
+HASH_CHARS = 4
+
+
+def herdr_name(name):
+    if HERDR_NAME_RE.fullmatch(name):
+        return name
+    text = re.sub(r"[^a-z0-9_-]+", "-", name.lower()).strip("-")
+    if not text[:1].isalpha():
+        text = f"t-{text}" if text else "t"
+    if len(text) <= HERDR_NAME_MAX:
+        return text
+    digest = hashlib.sha1(name.encode()).hexdigest()[:HASH_CHARS]
+    start = text[:HERDR_NAME_MAX - HASH_CHARS - 1].rstrip("-_")
+    return f"{start}-{digest}"
 
 
 class AdapterError(FactoryError):

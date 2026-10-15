@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 
-from .base import OPTIONAL, Adapter, AdapterError
+from .base import OPTIONAL, Adapter, AdapterError, herdr_name
 
 TRUST_MARKERS = ("is this a project you created or one you trust", "yes, i trust this folder")
 START_TIMEOUT_MS = 60000
@@ -92,6 +92,7 @@ class HerdrAdapter(Adapter):
         return r.stdout
 
     def start_session(self, name, cwd, prompt, claude_args):
+        name = herdr_name(name)
         if self.find_agent(name) is not None:
             raise AdapterError(f"A Herdr agent named {name} already exists. Close it or launch with another --id.")
         before = set(self.main_repo_workspace_ids(self.workspaces()))

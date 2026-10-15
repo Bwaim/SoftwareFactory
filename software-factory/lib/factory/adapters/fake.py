@@ -1,5 +1,5 @@
 from .. import fsio
-from .base import OPTIONAL, Adapter, AdapterError
+from .base import OPTIONAL, Adapter, AdapterError, herdr_name
 
 
 class FakeAdapter(Adapter):
@@ -24,10 +24,11 @@ class FakeAdapter(Adapter):
         return bool(cfg.get("check_ok", True)), cfg.get("check_message", "Fake terminal is available.")
 
     def start_session(self, name, cwd, prompt, claude_args):
-        self.record("start_session", name=name, cwd=str(cwd), prompt=prompt, args=list(claude_args))
+        real = herdr_name(name)
+        self.record("start_session", name=name, herdr_name=real, cwd=str(cwd), prompt=prompt, args=list(claude_args))
         if self.cfg().get("fail_start"):
             raise AdapterError("The fake adapter failed to start the session.")
-        return {"agent": name, "fake": True}
+        return {"agent": real, "fake": True}
 
     def close(self, handle):
         self.record("close", handle=handle)
