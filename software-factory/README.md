@@ -386,7 +386,7 @@ Only `http` and `https` URLs are used.
 
 ### Step manifest fields
 
-`id`, `description`, `category`, `type` (`ai`, `command` or `group`), `outputs`, `done_when`, `done_check`, `config`, `required`, `run_in`, `model`, `effort` (only for `ai`), `requires`, `column`, `wait_external`, `steps` (only for `group`).
+`id`, `description`, `category`, `type` (`ai`, `command` or `group`), `outputs`, `done_when`, `done_check`, `config`, `required`, `run_in`, `model`, `effort` (only for `ai`), `requires`, `column`, `wait_external`, `exclusive`, `steps` (only for `group`).
 
 `factory done` checks, in this order: every output that is not optional is set, every `file` output points to a path that exists, a `command` step's last `factory run-command` exited with 0, then the `done_check`.
 

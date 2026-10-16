@@ -421,7 +421,7 @@ function formModelOf(detail, duplicate) {
     original: m,
     id: duplicate ? "" : (m.id || ""), description: m.description || "", category: m.category || "", newCategory: "",
     type: m.type || "ai", run_in: m.run_in || "", model: m.model || "", effort: m.effort || "", column: m.column || "",
-    required: !!m.required, wait_external: !!m.wait_external, done_when: m.done_when || "", done_check: m.done_check || "",
+    required: !!m.required, wait_external: !!m.wait_external, exclusive: m.exclusive || "", done_when: m.done_when || "", done_check: m.done_check || "",
     requires: [...(m.requires || [])],
     config: Object.entries(m.config || {}).map(([key, v]) => ({ key, description: (v && v.description) || "",
       default: v && "default" in v ? String(v.default) : "", hasDefault: !!(v && "default" in v), edited: false })),
@@ -430,7 +430,7 @@ function formModelOf(detail, duplicate) {
     steps: [...(m.steps || [])], body: detail && m.type !== "group" ? detail.body : "",
   };
 }
-const FORM_KEYS = ["id", "description", "category", "type", "done_when", "done_check", "required", "wait_external", "column",
+const FORM_KEYS = ["id", "description", "category", "type", "done_when", "done_check", "required", "wait_external", "exclusive", "column",
   "requires", "config", "run_in", "model", "effort", "steps", "outputs"];
 function manifestOf(f) {
   const m = { ...f.original };
@@ -438,6 +438,7 @@ function manifestOf(f) {
   Object.assign(m, { id: f.id, description: f.description, category: f.newCategory || f.category, type: f.type,
     done_when: f.done_when, done_check: f.done_check, required: f.required, wait_external: f.wait_external,
     column: f.column, requires: f.requires.filter(Boolean), config: {} });
+  if (f.exclusive) m.exclusive = f.exclusive;
   if (f.type === "ai") Object.assign(m, { run_in: f.run_in, model: f.model, effort: f.effort });
   if (f.type === "group") m.steps = f.steps;
   else {
@@ -617,6 +618,7 @@ function renderStepForm() {
   left.append(field("column", selectInput(["", ...state.columns], f.column, (v) => { f.column = v; formChanged(); })),
     field("required", checkbox(f.required, (v) => { f.required = v; formChanged(); })),
     field("wait_external", checkbox(f.wait_external, (v) => { f.wait_external = v; formChanged(); })),
+    field("exclusive", textInput(f.exclusive, (v) => { f.exclusive = v.trim(); formChanged(); }, "android-emulator")),
     field("done_when", textInput(f.done_when, (v) => { f.done_when = v; formChanged(); })),
     field("done_check", textInput(f.done_check, (v) => { f.done_check = v; formChanged(); }, "optional shell command")),
     field("requires", requiresRows(f.requires)),

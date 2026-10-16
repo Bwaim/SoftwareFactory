@@ -63,7 +63,8 @@ def missing_scripts(ctx, body, level):
 def preview(ctx, manifest, body):
     manifest = require_input(manifest, body)
     step = candidate(manifest, body)
-    text = render.step_text(step, render.show_names(body), f"Step: {step.id}", keys.outputs_of(step), step.model, step.effort)
+    text = render.step_text(step, render.show_names(body), f"Step: {step.id}", keys.outputs_of(step), step.model, step.effort,
+                            exclusive=step.exclusive)
     return {"text": text}
 
 

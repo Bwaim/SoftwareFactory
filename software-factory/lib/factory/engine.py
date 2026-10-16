@@ -98,7 +98,8 @@ def step_line(task):
 def render_step(task, entry, step, values):
     prompt = render.fill(step.body, key_values(task), values) if step.type == "ai" else ""
     model, effort = settings(entry, step)
-    return render.step_text(step, prompt, step_line(task), keys.outputs_of(step), model, effort, loops.controlled_keys(task, step))
+    return render.step_text(step, prompt, step_line(task), keys.outputs_of(step), model, effort, loops.controlled_keys(task, step),
+                            exclusive=step.exclusive)
 
 
 def render_missing(task, step, missing):

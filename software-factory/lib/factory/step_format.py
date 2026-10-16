@@ -5,11 +5,12 @@ import yaml
 from . import keys
 
 STEP_ID_RE = re.compile(r"[a-z][a-z0-9_-]{0,63}")
+EXCLUSIVE_RE = re.compile(r"[a-z][a-z0-9_-]*")
 TYPES = ("ai", "command", "group")
 OLD_TYPES = ("prompt", "skill", "script", "composite")
 RUN_IN = ("session", "subagent")
 FIELD_ORDER = ("id", "description", "category", "type", "outputs", "done_when", "done_check", "config", "required",
-               "run_in", "model", "effort", "requires", "column", "wait_external", "steps")
+               "run_in", "model", "effort", "requires", "column", "wait_external", "exclusive", "steps")
 KEY_RULE = "must use lowercase letters, digits and `_`, and start with a letter"
 
 
@@ -93,6 +94,16 @@ def check_run(stype, manifest, errors, warnings):
                 warnings.append(f"`{name}` has no effect on a step that runs in the session.")
 
 
+def check_exclusive(stype, manifest, errors):
+    if "exclusive" not in manifest:
+        return
+    value = manifest["exclusive"]
+    if not isinstance(value, str) or EXCLUSIVE_RE.fullmatch(value) is None:
+        errors.append(f"The exclusive name `{value}` must match [a-z][a-z0-9_-]*.")
+    if stype == "group":
+        errors.append("`exclusive` applies only to `ai` and `command` steps. Set it on the child steps.")
+
+
 def validate(manifest, body):
     if not isinstance(manifest, dict):
         return ["The manifest must be a YAML mapping."], []
@@ -116,6 +127,7 @@ def validate(manifest, body):
     if keys.has_placeholder(str(manifest.get("done_check") or "")):
         errors.append("`done_check` cannot use `{{...}}` placeholders. Use $FACTORY_KEY_<KEY>.")
     check_run(stype, manifest, errors, warnings)
+    check_exclusive(stype, manifest, errors)
     if not manifest.get("description"):
         warnings.append("The description is empty.")
     return errors, warnings

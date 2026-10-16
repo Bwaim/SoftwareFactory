@@ -50,6 +50,16 @@ def output_lines(outputs, title):
     return [title] + [output_line(name, out) for name, out in outputs.items()]
 
 
+def exclusive_line(name):
+    return (f"This step uses `{name}`. Only one task at a time runs it. "
+            f"Before a long wait for the user, free it with `factory exclusive release {name}`. "
+            f"Take it again with `factory exclusive acquire {name}`.")
+
+
+def released_line(name):
+    return f"You released `{name}`. Run `factory exclusive acquire {name}` before you use it again."
+
+
 def end_line(step):
     return WAIT_END if step.wait_external else SESSION_END
 
@@ -90,8 +100,10 @@ def command_text(step_line, step, outputs, extra=()):
     return "\n".join(lines + [COMMAND_RETRY] + IF_NEEDED + [end_line(step)])
 
 
-def step_text(step, prompt, step_line, outputs, model=None, effort=None, loop_keys=()):
+def step_text(step, prompt, step_line, outputs, model=None, effort=None, loop_keys=(), exclusive=None):
     extra = loop_lines(step, loop_keys)
+    if exclusive:
+        extra.append(exclusive_line(exclusive))
     if step.type == "command":
         return command_text(step_line, step, outputs, extra)
     if step.run_in == "subagent":

@@ -117,6 +117,7 @@ A step file is YAML frontmatter between two `---` lines, then the body.
 | `requires` | list of skills (`/plugin:skill`) or programs on PATH | `ai`, `command` |
 | `column` | a board column from `columns` in `.factory/factory.yaml` | `ai`, `command` |
 | `wait_external` | `true`: the step ends with `factory wait` | `ai`, `command` |
+| `exclusive` | Name of a resource that only one task at a time can use, like `android-emulator`. Steps with the same name share it. Lowercase letters, digits, `-`, `_` | `ai`, `command` |
 | `steps` | list of child step ids | `group` |
 
 - Leave out empty fields.

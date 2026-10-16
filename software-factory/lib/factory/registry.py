@@ -80,6 +80,10 @@ class Step:
         return bool(self.get("wait_external", False))
 
     @property
+    def exclusive(self):
+        return self.get("exclusive") or None
+
+    @property
     def requires(self):
         return list(self.get("requires") or [])
 
