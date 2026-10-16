@@ -385,9 +385,11 @@ Save the plan in the artifacts folder, not in the repository.
   - The status as text and an icon, and the time in the current status, for example "blocked for 2 h"
   - A background color from the status: `active` green, `blocked` red, `awaiting_approval` amber, `waiting_external` blue, `paused` grey. Done cards are neutral.
   - A clear marker when the session state is `gone`
-  - The list of artifacts. Clicking one shows it in the page, as plain text.
+  - The list of artifacts. Clicking one shows it in the page, as plain text. The viewer closes with Escape, a click outside it, or its Close button. Its title bar with the Close button always stays visible, and the text scrolls inside the viewer. A form, for example Request changes, never closes on a click outside, and asks before Escape closes it with typed text.
+  - For a task `waiting_external` on a step with a `done_check`: "Next check in <m:ss>", counted down in the page, and the time and result of the last check.
 - Card buttons, shown only when they apply:
-  - Focus: `factory terminal focus`
+  - Focus: `factory terminal focus`, then the terminal app comes to the front (see Focus and send a prompt)
+  - Check now, when the task is `waiting_external` on a step with a `done_check`: `factory poll --task <id>`, run as a background job. The button shows "Checking…" until the result, then the card shows it.
   - Show MR: opens `mr_url` from the task state in a new tab, whenever it is set
   - Approve and Request changes, when the task is `awaiting_approval`. The card shows what to validate: a link to the artifact, or an "Open in IDE" button for `target: worktree`.
   - Mark done, when the task is `waiting_external` on a step without a `done_check`
@@ -456,7 +458,8 @@ Save the plan in the artifacts folder, not in the repository.
 ##### Task properties
 
 - A fixed id, created at launch.
-- An optional Jira ticket key, set when a ticket is assigned.
+- An optional Jira ticket key: the task state key `ticket`, from the `ticket` input or set later.
+- An optional display name: the ticket key in lowercase, set when the ticket is known only after the launch (see Task rename). Without it, the display name is the id.
 - A short description.
 - The pipeline id.
 - The pipeline inputs.
@@ -480,7 +483,7 @@ Save the plan in the artifacts folder, not in the repository.
 - A pipeline is launched with `factory launch <pipeline> --description <text> [--input <key>=<value> ...] [--id <id>] [--from-backlog <id>]`. It does not use Claude. It is the built-in step `create-task`.
 - The orchestrator menu and the dashboard both use it. They only collect the values: the menu asks the user, the dashboard shows a form.
 - `factory launch --dry-run` with the same values prints what would happen: the task id, the worktree path, the branch case (new, existing or detached), the missing inputs and the errors. The caller shows it, and launches only after the user confirms.
-- The task id is a slug of the description: lowercase, matching `[a-z][a-z0-9_-]{0,31}`. If the id is taken, a suffix `-2`, `-3` is added. `--id` sets it by hand. The id never changes.
+- The task id matches `[a-z][a-z0-9_-]{0,31}`. When the pipeline inputs have `ticket` with a value, its base is the first Jira key found in that value, in lowercase, for example `ht-4549`. Otherwise its base is a slug of the description. If the id is taken, a suffix `-2`, `-3` is added. `--id` sets it by hand. The id never changes.
 - If a part of the launch fails, it removes what it already created (worktree, branch, task folder, terminal) and reports the error.
 - With `--from-backlog`, the backlog entry is removed only after the launch succeeds.
 - The same id is used for the task folder, the terminal name and the Claude session name.
@@ -490,6 +493,15 @@ Save the plan in the artifacts folder, not in the repository.
 - It starts the task session with `factory terminal start-session`, in the worktree. Claude starts with `--name <id> --session-id <uuid> --settings <main repository>/.factory/claude-settings.json --add-dir <main repository>/.factory/tasks/<id>/artifacts`, plus `--model` and `--effort` when the pipeline sets them, and receives the first prompt (see Task execution).
 - It saves the terminal handle in the task state.
 - The orchestrator goes back to its menu without waiting for the task.
+
+##### Task rename
+
+- When the task state key `ticket` gets a value for the first time after the launch, the task gets a display name: the ticket key in lowercase, made unique among the live tasks.
+- The id does not change. The task folder, the event log and the archive keep it.
+- The Herdr agent, tab and workspace that the task owns are renamed to the display name, and the handle saves the new agent name. The Claude session gets the display name: live only when Claude Code supports it, the session is idle and no question box is open, else at the next resume, with `--name`.
+- The worktree folder is not moved: a running session works in it, and task keys can save absolute paths inside it.
+- A rename that fails does not fail `factory state set`. It logs `rename_failed`, and the card shows it.
+- The dashboard and the task list show the display name, and the id when it differs.
 
 ##### Worktree creation
 
@@ -525,6 +537,7 @@ Save the plan in the artifacts folder, not in the repository.
   - Uncommitted changes
   - Commits not pushed to `origin`
 - If there are any, the dry run shows them, and the delete runs only with `--confirm-unpushed`, after explicit user approval.
+- A branch counts as merged when its content is already in `origin/<base_ref>`: `git merge-tree --write-tree origin/<base_ref> refs/heads/<branch>`, run in the main repository, succeeds and prints the tree of `origin/<base_ref>`. This covers squash merges. A later change of the same lines on `origin/<base_ref>` makes the check report "not merged", the safe side. Then its commits are not listed as lost, and the dry run says "merged (squash)".
 - It deletes the local branch only if it is pushed or merged. It never deletes a remote branch.
 - It closes the task terminal with `factory terminal close`, then removes the worktree with `git worktree remove`.
 - It moves the task folder to `.factory/tasks/archive/<id>/`. It does not delete it.
@@ -594,6 +607,7 @@ Save the plan in the artifacts folder, not in the repository.
 ##### Focus and send a prompt
 
 - "Focus a task" lists the tasks with a live session and calls `factory terminal focus` on the selected one.
+- After the focus, the factory brings the terminal app that shows Herdr to the front, with `open -a <terminal_app>` on macOS. `terminal_app` is a config key, for example `Ghostty`, asked on first use. When it is empty or the command fails, the focus inside the terminal still works, and the user sees that the app could not be brought to the front.
 - "Send a prompt to a task" lists the tasks with a live session, asks for the text and calls `factory terminal send-prompt`.
   - It sends the user's text exactly as typed, and shows it in quotes before sending. After sending, it reports the real task status.
   - If the session is working, it asks the user to wait until the session is idle, or to send now.
@@ -604,7 +618,8 @@ Save the plan in the artifacts folder, not in the repository.
 
 - It lists the `finished` tasks. For each one, it shows if its work is merged:
   - The branch is merged into `origin/<base_ref>`, or
-  - The branch was pushed and its remote branch no longer exists, as after a merge request with "delete source branch". This also covers squash merges.
+  - The branch was pushed and its remote branch no longer exists, as after a merge request with "delete source branch".
+  - The branch content is already in `origin/<base_ref>`, as after a squash merge (see Task delete).
 - A finished task without a branch counts as merged.
 - Merged tasks are selected by default. The user can change the selection.
 - Each selected task goes through `delete-task`, with all its checks.
@@ -638,13 +653,13 @@ Save the plan in the artifacts folder, not in the repository.
 
 - A step with `wait_external: true` first does its actions, then the agent runs `factory wait`. The task becomes `waiting_external`, with the step `done_when` as the reason.
 - The wait ends in one of two ways:
-  - With a `done_check`: `factory poll` runs the `done_check` of every `waiting_external` task. Each check has a timeout of 60 seconds.
+  - With a `done_check`: `factory poll` runs the `done_check` of every `waiting_external` task. `factory poll --task <id>` runs it for one task. Only one check of a task runs at a time, across the server and the CLI, so a wait ends once. Each check has a timeout of 60 seconds. After each check, the task state saves its time, whether the wait ended, and the last lines of its output.
   - Without a `done_check`: the user marks the event as done with `factory external-done <id>`, from the dashboard or the menu.
 - When the wait ends:
   - The step is done, the task becomes `active`, and the user gets a notification if the adapter supports `notify`.
   - The session gets "The external event happened: <done_when>. Run `factory next`." If the session is gone, the factory resumes it first.
 - `factory poll` runs:
-  - Every `poll_minutes` while the dashboard server runs. `poll_minutes` is in `.factory/factory.yaml`, default 5.
+  - Every `poll_minutes` while the dashboard server runs. `poll_minutes` is in `.factory/factory.yaml`, default 5. The server saves the time of its next poll, and the tasks API returns it.
   - From the menu action "Check waiting tasks".
 - `factory wait` on a step with a `done_check` starts the server if it is not running. So do `factory resume` of such a task, and `factory tasks`, which the orchestrator runs at start. After a restart of the computer, the first of these commands starts the polling again.
 - `paused` tasks are not polled. Resume restores `waiting_external`, and polling starts again.
@@ -789,7 +804,8 @@ Users ask for a dark theme. Start with the settings screen only.
   - The pane id is read from the JSON response, never guessed.
   - A worktree of a repository the user already trusts in Claude does not show the folder trust dialog. If the dialog shows anyway, the adapter never answers it. It closes what it opened and fails with: "Claude asks to trust the folder <cwd>. Open Claude once in the main repository and trust it, then launch again."
   - `herdr worktree open` can also create a workspace for the main repository folder, without returning its id. The adapter compares the workspace list before and after, records a new workspace whose folder is the main repository, and closes it with the task. It never closes a workspace that already existed.
-  - The handle is the Herdr agent name and the workspace or tab id.
+  - Herdr accepts a name that matches `^[a-z][a-z0-9_-]{0,31}$`. The adapter turns any requested name into a valid one: lowercase, each run of other characters becomes `-`, the prefix `t-` when it does not start with a letter. A result longer than 32 characters keeps its start and ends with `-` plus 4 characters of a hash of the full name, so two long names never clash. A valid name does not change.
+  - The handle is the real Herdr agent name and the workspace or tab id. Later calls use the handle, never the requested name.
 - `close`: closes the workspace or the tab. Check that this also stops the Claude process. If it does not, stop it first.
 - `send-prompt`: `herdr agent prompt`. `focus`: `herdr agent focus`. `state`: `herdr agent get`. `wait-idle`: `herdr agent wait`. `notify`: `herdr notification`. Check the exact syntax with the installed `herdr` binary.
 - Before it delivers any text (send prompt, approve, request changes), the Herdr adapter reads the screen with `herdr agent read`. If a question box is open, it does not send. It fails with a message that says to answer in the task tab. The factory logs `prompt_failed` with the reason, and logs `prompt_sent` only after a delivery that worked. The dashboard shows the failure on the card.
