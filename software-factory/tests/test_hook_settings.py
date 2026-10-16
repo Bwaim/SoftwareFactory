@@ -47,3 +47,18 @@ def test_invalid_settings_do_not_crash(factory, origin_repo, library_path):
     v = factory.json("version", "check")
     assert v["settings_updated"] is False and "not valid JSON" in v["settings_message"]
     assert (f / "claude-settings.json").read_text() == "{not json"
+
+
+def test_link_dir_with_space_is_idempotent(factory, origin_repo, library_path, work):
+    from conftest import BIN
+    link_dir = work / "my bin"
+    link_dir.mkdir()
+    (link_dir / "factory").symlink_to(BIN)
+    env = {"FACTORY_LINK_DIR": str(link_dir)}
+    factory("init", "--library", library_path, "--create-library", env=env)
+    factory("init", "--library", library_path, env=env)
+    assert factory.json("version", "check", env=env)["settings_updated"] is False
+    s = settings(origin_repo / ".factory")
+    for event in ("Stop", "UserPromptSubmit"):
+        assert len(s["hooks"][event]) == 1
+    assert shlex.split(s["hooks"]["Stop"][0]["hooks"][0]["command"])[0] == str(link_dir / "factory")

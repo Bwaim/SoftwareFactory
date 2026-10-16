@@ -49,6 +49,14 @@ def hook_command(sub):
     return shlex.quote(str(link_dir() / "factory")) + " " + sub
 
 
+def is_hook_command(command, sub):
+    try:
+        tokens = shlex.split(str(command))
+    except ValueError:
+        return False
+    return len(tokens) >= 3 and tokens[-2:] == sub.split() and Path(tokens[0]).name == "factory"
+
+
 def settings_path(ctx):
     return ctx.fdir / "claude-settings.json"
 
@@ -56,7 +64,7 @@ def settings_path(ctx):
 def read_settings(path):
     try:
         data = json.loads(path.read_text())
-    except (ValueError, UnicodeDecodeError) as e:
+    except (ValueError, OSError) as e:
         raise FactoryError(f"{path} is not valid JSON ({e}). Fix or remove it, then run again.")
     if not isinstance(data, dict):
         raise FactoryError(f"{path} must hold a JSON object. Fix or remove it, then run again.")
@@ -79,7 +87,7 @@ def merge_settings(data, path):
         if not isinstance(groups, list):
             raise FactoryError(f"{path} has an unexpected shape in `hooks.{event}`. Fix or remove it, then run again.")
         handlers = [h for g in groups if isinstance(g, dict) and isinstance(g.get("hooks"), list) for h in g["hooks"] if isinstance(h, dict)]
-        if not any(str(h.get("command", "")).endswith("factory " + sub) for h in handlers):
+        if not any(is_hook_command(h.get("command", ""), sub) for h in handlers):
             groups.append({"hooks": [{"type": "command", "command": hook_command(sub), "timeout": 10}]})
             changed = True
     return changed
