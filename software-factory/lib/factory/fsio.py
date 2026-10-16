@@ -38,6 +38,22 @@ def locked(path):
             fcntl.flock(f, fcntl.LOCK_UN)
 
 
+@contextmanager
+def try_locked(path):
+    path = Path(path)
+    lock = path.with_name(path.name + ".lock")
+    with open(lock, "a") as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        try:
+            yield True
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def read_text(path, default=""):
     path = Path(path)
     return path.read_text() if path.exists() else default

@@ -83,7 +83,7 @@ const JOB_POLL_MS = 1000;
 const HIDDEN_KEY = "factory.hiddenColumns";
 const ICONS = { active: "▶", blocked: "⛔", awaiting_approval: "✋", waiting_external: "⏳", paused: "⏸", finished: "✓" };
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
-const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false };
+const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false };
 const byId = (id) => document.getElementById(id);
 
 async function api(path, body, quiet) {
@@ -262,6 +262,36 @@ function approvalArtifact(t) {
   return [base, a.artifact_key, a.artifact_key + ".md"].find((n) => n && t.artifacts.includes(n)) || null;
 }
 function loopText(t) { return t.loop ? ` · loop ${t.loop.n} of ${t.loop.max}` : ""; }
+function countdownText(iso) {
+  const s = Math.round((Date.parse(iso) - Date.now()) / 1000);
+  if (isNaN(s)) return "";
+  if (s <= 0) return "Next check soon";
+  return `Next check in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+function lastCheckText(c) {
+  if (c.ended) return "the wait ended";
+  const line = (c.output || "").trim().split("\n").pop();
+  return line ? `still waiting: ${line}` : "still waiting";
+}
+function checkBlock(t) {
+  const box = el("div", { class: "check" });
+  if (t.next_check_at) box.append(el("div", { "data-next-check": t.next_check_at }, countdownText(t.next_check_at)));
+  if (t.last_check) box.append(el("div", { class: "muted" }, `Last check: ${new Date(t.last_check.at).toLocaleTimeString()}, ${lastCheckText(t.last_check)}`));
+  return box;
+}
+async function checkNow(t) {
+  state.checking.add(t.id);
+  render();
+  try {
+    const res = await api(`/api/tasks/${t.id}/check`, {});
+    const job = await waitJob(res.job);
+    if (job.status === "done" && job.result.error) showError(job.result.error);
+  } finally {
+    state.checking.delete(t.id);
+    state.lastKey = null;
+    await refresh(true);
+  }
+}
 function taskCard(t) {
   const card = el("div", { class: "card s-" + t.status });
   const top = el("div", { class: "row" });
@@ -281,6 +311,7 @@ function taskCard(t) {
   }
   if (state.deliveryErrors.has(t.id)) card.append(deliveryBlock(t));
   if (t.approval) card.append(approvalBlock(t));
+  if (t.status === "waiting_external" && t.wait_has_check) card.append(checkBlock(t));
   card.append(taskButtons(t));
   return card;
 }
@@ -306,6 +337,9 @@ function taskButtons(t) {
     row.append(button("Approve", action(async () => noteDelivery(t, await api(`/api/tasks/${t.id}/approve`, {}), "The approval"))), button("Request changes", () => openRequestChanges(t)));
   }
   if (t.status === "waiting_external" && t.wait_has_check === false) row.append(button("Mark done", action(() => api(`/api/tasks/${t.id}/external-done`, {}))));
+  if (t.status === "waiting_external" && t.wait_has_check) {
+    row.append(state.checking.has(t.id) ? button("Checking…", () => {}, { disabled: true }) : button("Check now", () => checkNow(t)));
+  }
   if (!finished) {
     row.append(button("Send prompt", () => openSendPrompt(t), { disabled: down || !can("send_prompt"), hint: ADAPTER_BUTTONS }));
     if (state.pausing.has(t.id)) row.append(el("span", { class: "muted" }, "Pausing..."));
@@ -576,6 +610,7 @@ byId("tab-tasks").addEventListener("click", () => setView("tasks"));
 byId("tab-backlog").addEventListener("click", () => setView("backlog"));
 refresh(true);
 setInterval(refresh, REFRESH_MS);
+setInterval(() => { for (const n of document.querySelectorAll("[data-next-check]")) n.textContent = countdownText(n.dataset.nextCheck); }, 1000);
 </script>
 </body>
 </html>

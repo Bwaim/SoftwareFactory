@@ -1,8 +1,14 @@
+from datetime import datetime, timezone
+
 from . import loops, session, state
 from .errors import FactoryError
 from .registry import Registry
 
 PRIORITY = {"blocked": 0, "awaiting_approval": 1}
+
+
+def iso_time(epoch):
+    return datetime.fromtimestamp(epoch, timezone.utc).isoformat(timespec="seconds") if epoch else None
 
 
 def current_step(reg, task):
@@ -30,10 +36,11 @@ def artifact_names(ctx, tid):
     return sorted(p.name for p in folder.iterdir()) if folder.exists() else []
 
 
-def task_row(ctx, task, reg=None):
+def task_row(ctx, task, reg=None, next_poll=None):
     reg = reg or Registry.load(ctx)
     step = current_step(reg, task)
     waiting = task["status"] == "waiting_external"
+    has_check = bool(waiting and step and step.done_check)
     return {
         "id": task["id"],
         "description": task["description"],
@@ -51,14 +58,16 @@ def task_row(ctx, task, reg=None):
         "artifacts": artifact_names(ctx, task["id"]),
         "approval": approval_info(task),
         "wait_has_check": bool(step and step.done_check) if waiting else None,
+        "next_check_at": iso_time(next_poll) if has_check else None,
+        "last_check": task.get("last_check") if has_check else None,
         "loop": loops.current_loop(task),
     }
 
 
-def task_rows(ctx):
+def task_rows(ctx, next_poll=None):
     reg = Registry.load(ctx)
     tasks = sorted(state.list_tasks(ctx), key=lambda t: (PRIORITY.get(t["status"], len(PRIORITY)), t["created_at"]))
-    return [task_row(ctx, t, reg) for t in tasks]
+    return [task_row(ctx, t, reg, next_poll) for t in tasks]
 
 
 def render_rows(rows):

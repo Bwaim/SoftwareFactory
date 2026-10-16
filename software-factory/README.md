@@ -168,7 +168,7 @@ Task life:
 - `factory request-changes <text> [--send]`: ask for changes.
 - `factory approval check`: check that the result is approved.
 - `factory wait`: set the task to waiting for an external event.
-- `factory poll`: check the waiting tasks.
+- `factory poll [--task <id>]`: run the done check of every waiting task, or of one task. Only one check of a task runs at a time, across processes (lock file `.factory/tasks/<id>/check.lock`). A second check returns "A check is already running." After each check, the task saves `last_check`: the time, whether the wait ended, and the end of the output.
 - `factory external-done <id>`: end a wait that has no done check.
 - `factory pause [<id>] [--all] [--wait]`: pause a task or all tasks.
 - `factory resume <id>`: resume a task.
@@ -297,6 +297,7 @@ Each card shows:
 - The status, with an icon and the time in this status. The reason is shown below when there is one.
 - A red "Session gone" tag when the terminal session is not there. Not shown for `paused` and `finished` tasks.
 - The artifacts of the task. Click a name to read it. The viewer closes with Escape, a click outside it, or its Close button. Its title bar stays visible, and the text scrolls inside it. A form, for example "Request changes", never closes on a click outside. Escape on a form with typed text asks "Discard the typed text?".
+- For a task that is `waiting_external` on a step with a `done_check`: "Next check in m:ss", counted down in the page, and the last check with its time and result.
 - "To validate", when the step waits for your approval. It links to the artifact to read. If the step validates code, it has an "Open in IDE" button.
 
 Colors and icons:
@@ -316,6 +317,7 @@ Card buttons:
 - **Show MR**: open the merge request. Shown when the task has an MR link.
 - **Approve** and **Request changes**: shown when the status is `awaiting_approval`. "Request changes" asks for a text.
 - **Mark done**: shown when the status is `waiting_external` and the wait has no done check.
+- **Check now**: shown when the status is `waiting_external` and the wait has a done check. It runs `factory poll --task <id>` as a background job. The button shows "Checking…" until the result.
 - **Send prompt**: send text to the session. If the session is working, choose "Wait until idle" or "Send now".
 - **Pause**: shown when the session exists and the task is not paused. Choose "Wait until idle" or "Stop now". The card shows "Pausing..." until it ends.
 - **Resume**: shown when the task is paused or its session is gone.

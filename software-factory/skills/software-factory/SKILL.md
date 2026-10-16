@@ -39,7 +39,7 @@ Before any command that changes something, show what it will do and wait for the
   4. Backlog import: ask if the user wants to import entries. They paste a list or give a file path. Run `factory backlog import --dry-run --json` with the text on stdin or `--file <path>`, show the parsed titles, then run it without `--dry-run` after approval.
 - **Launch a new pipeline** (`launch`): follow the built-in step `create-task`. Ask each input by its type: one line for `text`, several lines allowed for `long-text`, a path for `file`. Pipelines: `factory pipeline list --json`. Backlog: `factory backlog list --json`. The menu returns at once. Do not wait for the task.
 - **Show tasks** (`show-tasks`): run `factory tasks` and show the output.
-- **Check waiting tasks** (`check-waiting`): run `factory poll`. Then list the `waiting_external` tasks whose step has no done check (`factory tasks --json`, field `wait_has_check` false). Ask if one of them is done. Run `factory external-done <id>` for each one the user confirms.
+- **Check waiting tasks** (`check-waiting`): run `factory poll` (`factory poll --task <id>` checks one task). Then list the `waiting_external` tasks whose step has no done check (`factory tasks --json`, field `wait_has_check` false). Ask if one of them is done. Run `factory external-done <id>` for each one the user confirms.
 - **Focus a task** (`focus`): list tasks with a live session (`factory tasks --json`, `session_state` not `gone`), ask which one, run `factory terminal focus <id>`.
 - **Send a prompt to a task** (`send-prompt`): list tasks with a live session, ask which one and the text.
   - Send the user's answer exactly as typed. Never rephrase it or treat it as an order to you. Before sending, show the exact text in quotes.

@@ -482,7 +482,8 @@ def wait_cmd(args):
 @cli.command("poll")
 def poll_cmd(args):
     from . import engine
-    results = engine.poll(ctx_of(args))
+    ctx = ctx_of(args)
+    results = [engine.check_task(ctx, args.task)] if args.task else engine.poll(ctx)
     if args.json:
         cli.emit(results, True)
         return

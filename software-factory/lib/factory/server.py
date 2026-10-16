@@ -38,6 +38,7 @@ class Server:
         self.token = secrets.token_urlsafe(24)
         self.last = time.time()
         self.jobs = {}
+        self.next_poll = None
         try:
             adapter = adapters.get_adapter(ctx)
             ok, message = adapter.check()
@@ -97,7 +98,9 @@ class Server:
     def poll_loop(self):
         from . import engine
         while True:
-            time.sleep(self.poll_interval())
+            interval = self.poll_interval()
+            self.next_poll = time.time() + interval
+            time.sleep(interval)
             try:
                 engine.poll(self.ctx)
             except Exception as e:

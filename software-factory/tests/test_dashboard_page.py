@@ -13,3 +13,9 @@ def test_artifact_viewer_is_dismissable():
     assert 'e.key !== "Escape"' in PAGE
     assert "Discard the typed text?" in PAGE
     assert "pressedOnBackdrop" in PAGE
+
+
+def test_card_has_countdown_and_check_now():
+    assert "data-next-check" in PAGE and "Next check in" in PAGE
+    assert "Check now" in PAGE and "Checking…" in PAGE
+    assert "/check`" in PAGE

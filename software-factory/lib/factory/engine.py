@@ -3,7 +3,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from . import config, events, keys, loops, render, repo, session, state
+from . import config, events, fsio, keys, loops, render, repo, session, state
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, Registry
 
@@ -11,6 +11,9 @@ DONE_CHECK_TIMEOUT = 300
 POLL_CHECK_TIMEOUT = 60
 APPROVAL_STEP = "user-validation"
 MAX_JUMPS = 3
+CHECK_BUSY = "A check is already running."
+NOT_WAITING = "The task does not wait on a done check."
+CHECK_OUTPUT_CHARS = 500
 
 
 def cmd(task, text):
@@ -423,30 +426,47 @@ def end_wait(ctx, tid, how):
     session.deliver(ctx, tid, f"The external event happened: {happened}. {then}")
 
 
-def poll_task(ctx, task):
+def check_result(tid, ended=False, output=None, error=None, busy=False):
+    return {"id": tid, "ended": ended, "output": output, "error": error, "busy": busy}
+
+
+def waiting_step(ctx, task):
+    if task["status"] != "waiting_external":
+        return None
     entry, step = load_step(ctx, task)
-    values, _ = config.resolve(ctx, step, entry.get("with"))
-    ok, output = run_check(ctx, task, step, step.done_check, POLL_CHECK_TIMEOUT, values)
-    row = {"id": task["id"], "ended": ok, "output": None if ok else output[-500:], "error": None}
-    if ok:
-        end_wait(ctx, task["id"], "check")
-    return row
+    return (entry, step) if step.done_check else None
+
+
+def check_task(ctx, tid):
+    state.load(ctx, tid)
+    with fsio.try_locked(state.task_dir(ctx, tid) / "check") as got:
+        if not got:
+            return check_result(tid, error=CHECK_BUSY, busy=True)
+        task = state.load(ctx, tid)
+        found = waiting_step(ctx, task)
+        if found is None:
+            return check_result(tid, error=NOT_WAITING)
+        entry, step = found
+        values, _ = config.resolve(ctx, step, entry.get("with"))
+        ok, output = run_check(ctx, task, step, step.done_check, POLL_CHECK_TIMEOUT, values)
+        tail = output[-CHECK_OUTPUT_CHARS:]
+        record = {"at": state.now(), "ended": ok, "output": tail}
+        state.update(ctx, tid, lambda t: t.__setitem__("last_check", record))
+        if ok:
+            end_wait(ctx, tid, "check")
+        return check_result(tid, ended=ok, output=None if ok else tail)
 
 
 def poll(ctx):
     results = []
     for task in state.list_tasks(ctx):
-        if task["status"] != "waiting_external":
-            continue
         try:
-            entry, step = load_step(ctx, task)
-            if not step.done_check:
+            if waiting_step(ctx, task) is None:
                 continue
-            results.append(poll_task(ctx, task))
+            results.append(check_task(ctx, task["id"]))
         except Exception as e:
-            results.append({"id": task["id"], "ended": False, "output": None, "error": str(e)})
+            results.append(check_result(task["id"], error=str(e)))
     return results
-
 
 
 def is_waiting_check(reg, task):

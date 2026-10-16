@@ -146,7 +146,7 @@ TASK = "([a-z][a-z0-9_-]{0,31})"
 @route("GET", "/api/tasks")
 def tasks(server, query, body):
     from . import board
-    return board.task_rows(server.ctx)
+    return board.task_rows(server.ctx, server.next_poll)
 
 
 @route("GET", f"/api/tasks/{TASK}/artifacts/([^/]+)")
@@ -194,6 +194,13 @@ def external_done(server, tid, query, body):
     from . import engine
     engine.external_done(server.ctx, tid)
     return {"ok": True}
+
+
+@route("POST", f"/api/tasks/{TASK}/check")
+def check_now(server, tid, query, body):
+    from . import engine, state
+    state.load(server.ctx, tid)
+    return {"job": server.start_job(lambda: engine.check_task(server.ctx, tid))}
 
 
 @route("POST", f"/api/tasks/{TASK}/pause")
