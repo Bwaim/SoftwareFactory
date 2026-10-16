@@ -580,7 +580,11 @@ def set_state(ctx, tid, key, value):
             problem = rename.on_ticket_set(ctx, tid, old, value)
         except Exception as e:
             problem = str(e)
-            events.log(ctx, tid, "rename_failed", state.step_path_str(state.load(ctx, tid)), reason=problem)
+            try:
+                task = state.update(ctx, tid, lambda t: t.__setitem__("rename_error", problem))
+                events.log(ctx, tid, "rename_failed", state.step_path_str(task), reason=problem)
+            except Exception:
+                pass
     return value, problem
 
 

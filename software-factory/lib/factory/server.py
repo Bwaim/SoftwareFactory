@@ -72,7 +72,7 @@ class Server:
         return (read_info(self.ctx) or {}).get("pid") != os.getpid()
 
     def watch_idle(self):
-        from . import engine, rename
+        from . import engine
         while True:
             time.sleep(min(30, IDLE_SECONDS))
             try:
@@ -96,7 +96,7 @@ class Server:
             return FALLBACK_POLL_SECONDS
 
     def poll_loop(self):
-        from . import engine
+        from . import engine, rename
         while True:
             interval = self.poll_interval()
             self.next_poll = time.time() + interval

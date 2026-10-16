@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from conftest import SF, events, fake_calls, fake_config, make_task, task_json, write_pipeline, write_step
-from factory import board, engine, launch, rename, repo, session
+from factory import engine, launch, rename, repo
 
 
 @pytest.fixture
@@ -219,3 +219,18 @@ def test_herdr_names_are_renamed_with_the_stub(tp, monkeypatch, tmp_path):
     task = task_json(tp.fdir, tid)
     assert task["id"] == tid and task["worktree"] == str(tp.repo) and task["terminal_handle"]["agent"] == "ht-4549"
     assert "rename_error" not in task or task["rename_error"] is None
+
+
+def test_unexpected_rename_error_is_saved_and_logged(tp, monkeypatch):
+    for key, value in tp.factory.env.items():
+        monkeypatch.setenv(key, value)
+    ctx, tid = ticket_task(tp)
+
+    def boom(*args):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(rename, "rename", boom)
+    value, problem = engine.set_state(ctx, tid, "ticket", "HT-4549")
+    assert value == "HT-4549" and problem == "boom"
+    assert task_json(tp.fdir, tid)["rename_error"] == "boom"
+    assert any(e["type"] == "rename_failed" and e["reason"] == "boom" for e in events(tp.fdir, tid))
