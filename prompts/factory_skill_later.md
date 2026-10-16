@@ -25,14 +25,4 @@ Ideas and requirements not in the current build. Move them to `factory_skill_cre
 
 - agents communication to have subagents
 
-- Step to change ticket owner
-- We need a new Step `nx-update-ticket-assigned` to change the ticket assigned
-- Add missing merge at the end when "Needs QA"
-- Add a missing merge step at the end when "Needs QA"
-- `nx-reproduce-bug` "Repro approved" no information on the dashboard that it's waiting me
-- `nx-review-mr` when Dobby let comments opened, no information on the dashboard that it's waiting me
-- `nx-reproduce-bug` and `nx-verify-fix` allow only one task at this step (because of emulator concurrency)
-- For your future run, ask me to prepare the emulator for you when needed, don't spend time trying to configure an account, you should go directly to the reproduction steps. Don't need to clear data neither
-- When capturing logcat, clear the logs before capturing
-- emulator, set timeout of 3 minutes if nothing change
-- `nx-wait-qa` check when ticket moved to "QA finished" to merge the branch if needed and update ticket state to done
+- Add `exclusive: android-emulator` for the steps `nx-verify-fix` and `nx-reproduce-bug`

@@ -58,7 +58,7 @@ A local dashboard shows all tasks as a Kanban board and the backlog, and lets me
 - `uv` can also install the Python version the scripts need, so the machine needs only `uv`.
 - The orchestrator is a Claude session started inside the configured terminal. At start, it runs `factory terminal check`. If the check fails, it says why and stops.
 - The `factory` command can be called by name in every Claude session the factory starts, in the main repository and in worktrees. Init makes this work, for example with a link in `~/.local/bin`.
-- Init writes `.factory/claude-settings.json` with allow rules for the `factory` commands. Every task session starts with `--settings <main repository>/.factory/claude-settings.json`, so it never asks for permission on a `factory` command.
+- Init writes `.factory/claude-settings.json` with allow rules for the `factory` commands, and the `Stop` and `UserPromptSubmit` hooks (see May wait for you). Every task session starts with `--settings <main repository>/.factory/claude-settings.json`, so it never asks for permission on a `factory` command.
 - The README lists the `git` and `factory` commands, and the commands of each adapter, so the user can add them to the Bash allowlist.
 
 ### General concept
@@ -167,6 +167,7 @@ steps:
   - `requires`: optional list of tools and skills the step needs, for example `[gh]` or `[/superpowers:writing-plans]`
   - `column`: optional board column. The task moves to it when the step starts.
   - `wait_external`: `true` if the step waits for an external event (see External waiting)
+  - `exclusive`: optional resource name, for example `android-emulator`. Only one task at a time runs a step with this name (see Exclusive steps).
 - The keys a step uses are computed, never written by hand:
   - `ai`: from the placeholders in its prompt
   - `command`: from the `$FACTORY_KEY_<KEY>` variables in its command
@@ -385,6 +386,8 @@ Save the plan in the artifacts folder, not in the repository.
   - The status as text and an icon, and the time in the current status, for example "blocked for 2 h"
   - A background color from the status: `active` green, `blocked` red, `awaiting_approval` amber, `waiting_external` blue, `paused` grey. Done cards are neutral.
   - A clear marker when the session state is `gone`
+  - "May wait for you", in the color of `blocked`, with the last message of the session, when the task has `attention` (see May wait for you)
+  - For an `exclusive` step: the resource, and the task that holds it when this task waits for it
   - The list of artifacts. Clicking one shows it in the page, as plain text. The viewer closes with Escape, a click outside it, or its Close button. Its title bar with the Close button always stays visible, and the text scrolls inside the viewer. A form, for example Request changes, never closes on a click outside, and asks before Escape closes it with typed text.
   - For a task `waiting_external` on a step with a `done_check`: "Next check in <m:ss>", counted down in the page, and the time and result of the last check.
 - Card buttons, shown only when they apply:
@@ -602,7 +605,7 @@ Save the plan in the artifacts folder, not in the repository.
   - Pipeline and current step path
   - Status, with the reason when blocked
   - Live session state from the terminal adapter, or `unknown` if the adapter does not support it
-- Tasks that need the user are listed first: `blocked`, then `awaiting_approval`.
+- Tasks that need the user are listed first: `blocked` and the tasks with `attention` (see May wait for you), then `awaiting_approval`.
 
 ##### Focus and send a prompt
 
@@ -624,11 +627,29 @@ Save the plan in the artifacts folder, not in the repository.
 - Merged tasks are selected by default. The user can change the selection.
 - Each selected task goes through `delete-task`, with all its checks.
 
+##### Exclusive steps
+
+- A task holds the resource of an `exclusive` step while that step is its current step and has started. It releases it when it leaves the step: done, skip, goto, a loop jump to a step without the name, the end of the pipeline, or delete. A paused task keeps it, and its card says so.
+- A step can run `factory exclusive release <name>` to free the resource early, for example before a long wait for the user, and `factory exclusive acquire <name>` to take it again. `acquire` waits like `factory next` when another task holds it. `factory exclusive release <name> --force`, from the CLI, the menu or a "Release" button on the waiting card, frees it whatever task holds it, after a confirmation, and logs `exclusive_forced` on both tasks. `factory exclusive status` lists the resources, their holders and the waiting tasks.
+- `factory next` on a step whose resource another task holds does not start the step. It sets the task to `waiting_external` with the reason "Waiting for <name>, used by <task>", tells the session to end its turn, and logs `exclusive_wait`.
+- When the resource is released, the factory gives it directly to the task that has waited the longest and is not paused, which becomes the holder at once. A paused waiting task keeps its place in the queue. A deleted one leaves it. It sets that task to `active`, logs `exclusive_start`, and sends "`<name>` is yours now. Run `factory next`.", or "`<name>` is yours now. Continue the step." when the task waited in the middle of a step, after a resume if the session is gone. `factory poll` also checks the waiting tasks.
+- The check and the start run under one lock per resource name that works across processes, so two tasks never get the same resource.
+- `factory status` and the cards show the resource and the task that holds it. A task that waits for a resource never shows "Mark done" or "Check now", and `factory external-done` refuses it.
+
 ##### Blocked status
 
 - `factory block <reason>` sets the task to `blocked`. `factory unblock` sets it back to `active`.
 - The agent runs `factory block` when it cannot continue without the user, and `factory unblock` when the user has answered.
 - When a task becomes blocked and the adapter supports `notify`, the user gets a notification.
+
+##### May wait for you
+
+- `factory block` is the way a step says what it waits for. "May wait for you" is the safety net for a session that asks in plain text and forgets `factory block`.
+- `.factory/claude-settings.json` has two Claude Code hooks: `Stop` runs `factory hook stop`, and `UserPromptSubmit` runs `factory hook prompt`. Init adds them to an existing file without removing its rules.
+- The hooks find the task from the `session_id` of the hook input. They always exit 0, quickly, with no output for Claude. Errors go to the event log.
+- When a session ends its turn and its task is `active`, the task gets `attention`: the time and the last message of the session. The user gets one notification "<task> may wait for you: <first line>", unless the task tab is focused in the terminal. When the adapter cannot tell the focus, the notification comes only when `attention` stays for more than 60 seconds with no new prompt: the hook starts a detached background process that checks again after 60 seconds. The factory logs `attention`. A turn end in any other status changes nothing.
+- `attention` is cleared, with the event `attention_cleared`, when a prompt arrives, when the task changes status, or when the user sends a prompt, approves or requests changes.
+- The card shows "May wait for you" in the color of `blocked`, with the time and the last message. The task list and the menu list it with the blocked tasks.
 
 ##### Board columns
 
