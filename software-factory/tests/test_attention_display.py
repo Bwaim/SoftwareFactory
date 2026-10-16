@@ -2,11 +2,10 @@ import json
 
 import pytest
 
-from conftest import events, make_task, task_json
+from conftest import events, hook, make_task, silent, task_json
 from factory import repo, state
 from serverutil import info, request
 
-from test_attention_hooks import att, hook, silent  # noqa: F401
 from test_dashboard_page import PAGE
 
 

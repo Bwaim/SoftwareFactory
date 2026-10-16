@@ -6,20 +6,8 @@ import time
 
 import pytest
 
-from conftest import BIN, events, fake_calls, fake_config, make_task, task_json
+from conftest import BIN, events, fake_calls, fake_config, hook, silent, task_json
 from factory import repo, state
-
-
-@pytest.fixture
-def att(inited):
-    ctx = repo.load_ctx(cwd=inited.repo)
-    make_task(ctx, "t1", session_id="sid-1", terminal_handle={"agent": "t1"})
-    return inited
-
-
-def hook(inited, kind, payload, delay="60", stdin=None, cwd=None):
-    text = stdin if stdin is not None else json.dumps(payload)
-    return inited.factory("hook", kind, input=text, cwd=cwd, check=False, env={"FACTORY_ATTENTION_DELAY": delay})
 
 
 def notifies(inited):
@@ -33,10 +21,6 @@ def wait_until(check, timeout):
             return True
         time.sleep(0.1)
     raise AssertionError("condition not met in time")
-
-
-def silent(r):
-    assert r.returncode == 0 and r.stdout == "" and r.stderr == ""
 
 
 def test_stop_on_active_sets_attention_and_notifies(att):

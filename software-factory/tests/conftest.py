@@ -193,3 +193,20 @@ def task_from_pipeline(inited, pid, tid="t1", worktree=None, **fields):
     position = 1 if snapshot and snapshot[0]["id"] == "create-worktree" else 0
     fields.setdefault("loops", loops.snapshot(reg, pipeline))
     return make_task(ctx, tid=tid, worktree=worktree, steps=snapshot, position=position, pipeline=pid, **fields)
+
+
+@pytest.fixture
+def att(inited):
+    from factory import repo
+    ctx = repo.load_ctx(cwd=inited.repo)
+    make_task(ctx, "t1", session_id="sid-1", terminal_handle={"agent": "t1"})
+    return inited
+
+
+def hook(inited, kind, payload, delay="60", stdin=None, cwd=None):
+    text = stdin if stdin is not None else json.dumps(payload)
+    return inited.factory("hook", kind, input=text, cwd=cwd, check=False, env={"FACTORY_ATTENTION_DELAY": delay})
+
+
+def silent(r):
+    assert r.returncode == 0 and r.stdout == "" and r.stderr == ""
