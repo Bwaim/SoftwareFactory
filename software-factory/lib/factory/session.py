@@ -1,9 +1,18 @@
+import subprocess
+import sys
 import uuid
 
-from . import adapters, events, state
+from . import adapters, config, events, state
 from .adapters.base import AdapterError
 from .errors import FactoryError
 
+TERMINAL_SECTION = "terminal"
+TERMINAL_APP_KEY = "terminal_app"
+OPEN_TIMEOUT = 10
+ASK_TERMINAL_APP = (
+    "Ask the user which terminal app shows Herdr, for example Ghostty or iTerm, then run "
+    "`factory config set terminal terminal_app '<app>'`. An empty value means never ask again."
+)
 ASK_IN_TEXT = (
     "Ask the user in plain text, never with the AskUserQuestion tool, then end your turn. "
     "The answer can come from this tab, the orchestrator or the dashboard."
@@ -182,6 +191,43 @@ def send_prompt(ctx, tid, text, wait=False):
     logged_delivery(ctx, task, text, send)
 
 
+def is_macos():
+    return sys.platform == "darwin"
+
+
+def front_failed(app, message):
+    return {"front": "failed", "app": app, "message": message}
+
+
+def bring_to_front(ctx):
+    app = config.get_value(ctx, TERMINAL_SECTION, TERMINAL_APP_KEY)
+    if app is None:
+        return {"front": "ask"}
+    app = str(app).strip()
+    if not app:
+        return {"front": "off"}
+    if not is_macos():
+        return front_failed(app, "Bringing the app to the front works only on macOS.")
+    try:
+        r = subprocess.run(["open", "-a", app], capture_output=True, text=True, timeout=OPEN_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return front_failed(app, str(e))
+    if r.returncode != 0:
+        return front_failed(app, (r.stderr or r.stdout).strip() or f"open exited with {r.returncode}.")
+    return {"front": "ok", "app": app}
+
+
+def front_text(result):
+    if result["front"] == "ok":
+        return f"Focused. {result['app']} is in front."
+    if result["front"] == "ask":
+        return "Focused in the terminal. " + ASK_TERMINAL_APP
+    if result["front"] == "failed":
+        return f"Focused in the terminal. Could not bring {result['app']} to the front: {result['message']}"
+    return "Focused in the terminal."
+
+
 def focus(ctx, tid):
     _, handle = live_handle(ctx, tid)
     adapter_of(ctx).focus(handle)
+    return bring_to_front(ctx)

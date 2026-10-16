@@ -208,7 +208,8 @@ def resume_cmd(args):
 @cli.command("terminal focus")
 def focus_cmd(args):
     from . import session
-    session.focus(ctx_of(args), args.id)
+    result = session.focus(ctx_of(args), args.id)
+    cli.emit(result, True) if args.json else print(session.front_text(result))
 
 
 @cli.command("terminal send-prompt")

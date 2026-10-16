@@ -19,3 +19,7 @@ def test_card_has_countdown_and_check_now():
     assert "data-next-check" in PAGE and "Next check in" in PAGE
     assert "Check now" in PAGE and "Checking…" in PAGE
     assert "/check`" in PAGE
+
+
+def test_focus_asks_terminal_app():
+    assert "terminal_app" in PAGE and "Which terminal app shows Herdr?" in PAGE

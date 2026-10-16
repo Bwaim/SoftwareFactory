@@ -162,8 +162,7 @@ def artifact(server, tid, name, query, body):
 @route("POST", f"/api/tasks/{TASK}/focus")
 def focus(server, tid, query, body):
     from . import session
-    session.focus(server.ctx, tid)
-    return {"ok": True}
+    return {"ok": True, **session.focus(server.ctx, tid)}
 
 
 @route("POST", f"/api/tasks/{TASK}/send-prompt")

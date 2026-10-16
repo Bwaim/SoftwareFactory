@@ -331,7 +331,7 @@ function taskButtons(t) {
   const live = t.session_state !== "gone";
   const paused = t.status === "paused";
   const finished = t.status === "finished";
-  if (live && can("focus") && !finished) row.append(button("Focus", () => api(`/api/tasks/${t.id}/focus`, {})));
+  if (live && can("focus") && !finished) row.append(button("Focus", () => focusTask(t)));
   if (t.mr_url && /^https?:/.test(t.mr_url)) row.append(el("a", { href: t.mr_url, target: "_blank", rel: "noopener" }, "Show MR"));
   if (t.status === "awaiting_approval") {
     row.append(button("Approve", action(async () => noteDelivery(t, await api(`/api/tasks/${t.id}/approve`, {}), "The approval"))), button("Request changes", () => openRequestChanges(t)));
@@ -347,6 +347,20 @@ function taskButtons(t) {
     if (paused || !live) row.append(button("Resume", action(() => api(`/api/tasks/${t.id}/resume`, {})), { disabled: down, hint: ADAPTER_BUTTONS }));
   }
   return row;
+}
+async function focusTask(t) {
+  const res = await api(`/api/tasks/${t.id}/focus`, {});
+  if (res.front === "ask") openTerminalApp(t);
+  if (res.front === "failed") { state.deliveryErrors.set(t.id, `Focused in Herdr. Could not bring ${res.app} to the front: ${res.message}`); state.lastKey = null; render(); }
+}
+function openTerminalApp(t) {
+  const name = el("input", { placeholder: "Ghostty" });
+  openModal("Terminal app", el("p", {}, "Which terminal app shows Herdr? Leave it empty to never ask again."), name,
+    el("div", { class: "footer" }, closeButton("Cancel"), button("Save", async () => {
+      await api("/api/config/set", { step: "terminal", key: "terminal_app", value: name.value.trim() });
+      closeModal();
+      await focusTask(t);
+    }, { cls: "primary" })));
 }
 async function openArtifact(tid, name) {
   const data = await api(`/api/tasks/${tid}/artifacts/${encodeURIComponent(name)}`);

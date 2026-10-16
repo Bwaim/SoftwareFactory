@@ -70,6 +70,7 @@ Herdr adapter:
 - `herdr workspace close`
 - `herdr agent start`, `herdr agent prompt`, `herdr agent get`, `herdr agent read`
 - `herdr agent focus`, `herdr agent wait`, `herdr agent send-keys`
+- `open -a <terminal app>`
 - `herdr notification show`
 
 ## Tutorial
@@ -114,7 +115,7 @@ Herdr adapter:
 - **Launch a new pipeline**: start a task, from scratch or from a backlog entry.
 - **Show tasks**: list the tasks with their status.
 - **Check waiting tasks**: poll the waiting tasks. Mark a manual external event as done.
-- **Focus a task**: switch the terminal to the task session.
+- **Focus a task**: switch the terminal to the task session. Then it brings the terminal app that shows Herdr to the front, with `open -a <terminal_app>` on macOS.
 - **Send a prompt to a task**: send text to a task session.
 - **Resume a task**: restart a paused task, or a task whose session is gone.
 - **Delete a task**: close its terminal, remove its worktree and archive its folder.
@@ -175,7 +176,7 @@ Task life:
 - `factory delete <id> [--dry-run] [--confirm-unpushed]`: delete a task.
 - `factory clean`: list finished tasks that can be deleted.
 - `factory open-ide`: open the task worktree in the IDE.
-- `factory terminal focus <id>`: focus the task session.
+- `factory terminal focus <id>`: focus the task session. Then it runs `open -a <terminal_app>`. `terminal_app` is asked on first use: `factory config set terminal terminal_app Ghostty`. An empty value means only the focus inside Herdr.
 - `factory terminal send-prompt <id> <text> [--wait]`: send a prompt to a task session.
 - `factory terminal start-session <name> <cwd> <prompt> -- <claude args>`: start a Claude session in the terminal. Prints the session handle as JSON. Herdr accepts names that match `^[a-z][a-z0-9_-]{0,31}$`, so the adapter turns any name into a valid one: lowercase, other characters become `-`, the prefix `t-` when it does not start with a letter, and a name longer than 32 characters ends with `-` and 4 characters of a hash. The `agent` field of the handle is the real Herdr name. Later calls use the handle.
 - `factory terminal close <handle-json>`: close a session.
@@ -313,7 +314,7 @@ Colors and icons:
 
 Card buttons:
 
-- **Focus**: switch the terminal to the task session. Shown when the session exists, the task is not finished and the terminal supports it.
+- **Focus**: switch the terminal to the task session. Shown when the session exists, the task is not finished and the terminal supports it. Then it brings the terminal app to the front. The first time, it asks for the app name. When it fails, the card says so.
 - **Show MR**: open the merge request. Shown when the task has an MR link.
 - **Approve** and **Request changes**: shown when the status is `awaiting_approval`. "Request changes" asks for a text.
 - **Mark done**: shown when the status is `waiting_external` and the wait has no done check.
