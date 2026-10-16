@@ -10,6 +10,12 @@ from .registry import CREATE_WORKTREE, Registry
 
 TASK_ID_RE = state.TASK_ID_RE
 ID_BASE_MAX = 29
+TICKET_KEY_RE = re.compile(r"[A-Z][A-Z0-9]+-[0-9]+")
+
+
+def ticket_key(value):
+    match = TICKET_KEY_RE.search(value or "")
+    return match.group(0).lower()[:ID_BASE_MAX].rstrip("-") if match else None
 
 
 def slugify(text):
@@ -151,7 +157,8 @@ def plan_launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlo
             report["errors"].append(f"The id `{task_id}` is already used.")
         report["task_id"] = task_id
     else:
-        report["task_id"] = unique_id(ctx, slugify(report["description"] or "task"))
+        base = ticket_key(str(inputs.get("ticket", ""))) or slugify(report["description"] or "task")
+        report["task_id"] = unique_id(ctx, base)
     plan_worktree(ctx, reg, pipeline, report, inputs)
     report["ok"] = not report["errors"] and not report["missing_inputs"] and not report["missing_config"]
     return report

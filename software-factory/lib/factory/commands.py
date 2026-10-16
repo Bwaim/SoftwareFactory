@@ -424,8 +424,10 @@ def state_get(args):
 def state_set(args):
     from . import engine
     ctx, tid = task_of(args)
-    engine.set_state(ctx, tid, args.key, args.value)
+    _, problem = engine.set_state(ctx, tid, args.key, args.value)
     print(f"Saved `{args.key}`.")
+    if problem:
+        print(f"Warning: the rename failed: {problem}")
 
 
 @cli.command("artifact path")

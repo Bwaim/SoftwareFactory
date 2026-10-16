@@ -54,6 +54,8 @@ def task_row(ctx, task, reg=None, next_poll=None):
         "worktree": task.get("worktree"),
         "branch": task["state"].get("branch"),
         "ticket": task["state"].get("ticket"),
+        "display_name": state.display_name(task),
+        "rename_error": "; ".join(e for e in (task.get("rename_error"), task.get("claude_rename_error")) if e) or None,
         "mr_url": task["state"].get("mr_url"),
         "artifacts": artifact_names(ctx, task["id"]),
         "approval": approval_info(task),
@@ -76,7 +78,8 @@ def render_rows(rows):
     lines = []
     for r in rows:
         reason = f" ({r['status_reason']})" if r["status_reason"] else ""
-        lines.append(f"{r['id']}: {r['description']}")
+        name = r["display_name"] if r["display_name"] == r["id"] else f"{r['display_name']} ({r['id']})"
+        lines.append(f"{name}: {r['description']}")
         lines.append(f"    {r['pipeline']} > {r['step']}")
         lines.append(f"    status: {r['status']}{reason}. session: {r['session_state']}")
     return "\n".join(lines)

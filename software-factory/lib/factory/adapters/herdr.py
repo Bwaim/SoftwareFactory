@@ -190,6 +190,19 @@ class HerdrAdapter(Adapter):
         self.require_owned(handle)
         run(["agent", "focus", handle["agent"]])
 
+    def rename(self, handle, name):
+        self.require_owned(handle)
+        run(["agent", "rename", handle["agent"], name])
+        handle = {**handle, "agent": name}
+        problems = []
+        for kind in ("tab", "workspace"):
+            if handle.get(kind):
+                try:
+                    run([kind, "rename", handle[kind], name])
+                except AdapterError as e:
+                    problems.append(str(e))
+        return handle, problems
+
     def state(self, handle):
         if not handle:
             return "gone"

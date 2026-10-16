@@ -145,7 +145,8 @@ TASK = "([a-z][a-z0-9_-]{0,31})"
 
 @route("GET", "/api/tasks")
 def tasks(server, query, body):
-    from . import board
+    from . import board, rename
+    rename.apply_all_pending(server.ctx)
     return board.task_rows(server.ctx, server.next_poll)
 
 

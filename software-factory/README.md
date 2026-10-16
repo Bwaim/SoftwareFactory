@@ -10,6 +10,7 @@ You start and manage tasks from one orchestrator session in the main repository.
 ## Concepts
 
 - **Task**: one run of a pipeline. It has a worktree, a Herdr tab and a Claude session.
+- **Display name**: the ticket key of a task, when the ticket is known only after the launch. Without it, the display name is the id.
 - **Pipeline**: a YAML file with an ordered list of steps.
 - **Step**: a markdown file. The frontmatter is the manifest. The body holds the instructions.
 - **Task keys**: values a task holds. A step uses them and sets them. A key name uses lowercase letters, digits and `_`, and starts with a letter.
@@ -70,6 +71,7 @@ Herdr adapter:
 - `herdr workspace close`
 - `herdr agent start`, `herdr agent prompt`, `herdr agent get`, `herdr agent read`
 - `herdr agent focus`, `herdr agent wait`, `herdr agent send-keys`
+- `herdr workspace rename`, `herdr tab rename`, `herdr agent rename`
 - `open -a <terminal app>`
 - `herdr notification show`
 
@@ -155,12 +157,12 @@ Step execution, inside a task session:
 - `factory config get <step> <key>`: read a step config value.
 - `factory config set <step> <key> <value>`: save a step config value.
 - `factory state get <key>`: read a task state value.
-- `factory state set <key> <value>`: save a task state value.
+- `factory state set <key> <value>`: save a task state value. The first time `ticket` gets a Jira key after the launch, the task gets a display name. The Herdr agent, tab and workspace are renamed. The Claude session is renamed with `/rename` when it is idle with no question box, or at the next resume with `--name`. The id and the worktree folder do not change. A failed rename only prints a warning.
 - `factory artifact path <name>`: print the path of an artifact.
 
 Task life:
 
-- `factory launch <pipeline> [--description <text>] [--input <name=value>] [--id <id>] [--from-backlog <id>] [--dry-run]`: start a task.
+- `factory launch <pipeline> [--description <text>] [--input <name=value>] [--id <id>] [--from-backlog <id>] [--dry-run]`: start a task. When the pipeline input `ticket` holds a Jira key (`HT-4549`, a URL or a text), the task id is that key in lowercase, for example `ht-4549`, plus `-2` when taken.
 - `factory tasks`: list the tasks.
 - `factory status`: show the status of the current task.
 - `factory block <reason>`: block the task.
@@ -292,7 +294,7 @@ The "Columns" buttons hide or show a column. The browser remembers your choice.
 
 Each card shows:
 
-- The ticket, then the task id. The ticket is a link when `ticket_url` is set.
+- The ticket, then the display name, then the id when it differs. A failed rename is shown in red. The ticket is a link when `ticket_url` is set.
 - The description.
 - The pipeline and the current step.
 - The status, with an icon and the time in this status. The reason is shown below when there is one.
@@ -432,6 +434,8 @@ Each task logs its events in `.factory/tasks/<id>/events.jsonl`, one JSON object
 
 - `loop_back`: the loop jumped back. It has `entry`, `to` (the target step), `round` (the jump number) and `max`.
 - `loop_limit`: the loop reached `max` with the key still set. It has `entry` and `key`.
+
+Renames add `task_renamed` (`name`), `rename_failed` (`name`, `reason`) and `claude_renamed` (`name`).
 
 ### `.factory/factory.yaml` fields
 

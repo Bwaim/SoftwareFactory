@@ -72,7 +72,7 @@ class Server:
         return (read_info(self.ctx) or {}).get("pid") != os.getpid()
 
     def watch_idle(self):
-        from . import engine
+        from . import engine, rename
         while True:
             time.sleep(min(30, IDLE_SECONDS))
             try:
@@ -103,6 +103,7 @@ class Server:
             time.sleep(interval)
             try:
                 engine.poll(self.ctx)
+                rename.apply_all_pending(self.ctx)
             except Exception as e:
                 print(f"poll failed: {e}", file=sys.stderr, flush=True)
 

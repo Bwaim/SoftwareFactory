@@ -39,6 +39,8 @@ class FakeAdapter(Adapter):
 
     def send_prompt(self, handle, text):
         self.require("send_prompt")
+        if self.cfg().get("send_prompt_fails"):
+            raise AdapterError("The fake adapter failed to send the prompt.")
         self.record("send_prompt", handle=handle, text=text)
 
     def question_box(self, handle):
@@ -47,6 +49,14 @@ class FakeAdapter(Adapter):
     def focus(self, handle):
         self.require("focus")
         self.record("focus", handle=handle)
+
+    def rename(self, handle, name):
+        self.require("rename")
+        self.record("rename", handle=handle, name=name)
+        cfg = self.cfg()
+        if cfg.get("fail_rename"):
+            raise AdapterError("The fake adapter failed to rename.")
+        return {**handle, "agent": name}, list(cfg.get("rename_problems", []))
 
     def state(self, handle):
         self.require("state")

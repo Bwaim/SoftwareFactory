@@ -23,6 +23,10 @@ def check_task_id(tid):
     return tid
 
 
+def display_name(task):
+    return task.get("display_name") or task["id"]
+
+
 def task_dir(ctx, tid):
     return tasks_dir(ctx) / check_task_id(tid)
 

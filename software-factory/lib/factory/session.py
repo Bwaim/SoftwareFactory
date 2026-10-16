@@ -41,7 +41,7 @@ def new_session_id():
 
 
 def claude_args(ctx, task, resume=False):
-    args = ["--name", task["id"]]
+    args = ["--name", state.display_name(task)]
     args += ["--resume", task["session_id"]] if resume else ["--session-id", task["session_id"]]
     args += ["--settings", str(ctx.fdir / "claude-settings.json")]
     args += ["--add-dir", str(state.task_dir(ctx, task["id"]) / "artifacts")]
@@ -56,7 +56,7 @@ def claude_args(ctx, task, resume=False):
 def start(ctx, task, prompt, resume=False):
     if not task.get("worktree"):
         raise FactoryError(f"Task {task['id']} has no worktree. Every task runs in its own worktree.")
-    return adapters.get_adapter(ctx).start_session(task["id"], task["worktree"], prompt, claude_args(ctx, task, resume))
+    return adapters.get_adapter(ctx).start_session(state.display_name(task), task["worktree"], prompt, claude_args(ctx, task, resume))
 
 
 def notify(ctx, text):
@@ -127,6 +127,7 @@ def resume(ctx, tid, extra=None):
     handle = start(ctx, task, resume_prompt(task, extra), resume=True)
 
     def change(t):
+        t.pop("claude_rename_pending", None)
         t["terminal_handle"] = handle
         if t["status"] == "paused":
             saved = t.get("saved_status") or {"status": "active", "reason": None}

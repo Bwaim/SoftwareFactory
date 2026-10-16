@@ -561,7 +561,9 @@ def output_problem(task, step):
 
 
 def set_state(ctx, tid, key, value):
+    from . import rename
     task = state.load(ctx, tid)
+    old = task["state"].get(key)
     entry = state.current_entry(task)
     if entry is not None and task["status"] != "finished":
         step = Registry.load(ctx).steps.get(entry["id"])
@@ -572,7 +574,14 @@ def set_state(ctx, tid, key, value):
                 raise FactoryError(f"The path does not exist: {path}. The output `{key}` is a file.")
             value = str(path)
     state.set_key(ctx, tid, key, value)
-    return value
+    problem = None
+    if key == "ticket":
+        try:
+            problem = rename.on_ticket_set(ctx, tid, old, value)
+        except Exception as e:
+            problem = str(e)
+            events.log(ctx, tid, "rename_failed", state.step_path_str(state.load(ctx, tid)), reason=problem)
+    return value, problem
 
 
 def loop_suffix(task):

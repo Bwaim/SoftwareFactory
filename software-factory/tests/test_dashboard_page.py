@@ -23,3 +23,7 @@ def test_card_has_countdown_and_check_now():
 
 def test_focus_asks_terminal_app():
     assert "terminal_app" in PAGE and "Which terminal app shows Herdr?" in PAGE
+
+
+def test_card_shows_display_name_and_rename_error():
+    assert "t.display_name" in PAGE and "Rename failed" in PAGE
