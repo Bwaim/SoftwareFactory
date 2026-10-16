@@ -1,9 +1,10 @@
 import os
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
-from . import config, events, fsio, keys, loops, render, repo, session, state
+from . import config, events, exclusive, fsio, keys, loops, render, repo, session, state
 from .errors import FactoryError
 from .registry import CREATE_WORKTREE, Registry
 
@@ -14,6 +15,11 @@ MAX_JUMPS = 3
 CHECK_BUSY = "A check is already running."
 NOT_WAITING = "The task does not wait on a done check."
 CHECK_OUTPUT_CHARS = 500
+EXCLUSIVE_WAIT = ("The step `{id}` needs `{name}`, now used by task `{holder}`. "
+                  "The factory starts this task when it is free. End your turn.")
+WAITS_FOR = "The step waits for `{name}`. End your turn. The factory sends you a message when it is free."
+NOT_EXTERNAL = ("Task {id} waits for `{name}`, not for an external event. "
+                "Release it with `factory exclusive release {name} --force` if the holder is stuck.")
 
 
 def cmd(task, text):
@@ -123,8 +129,21 @@ def next_step(ctx, tid):
             events.log(ctx, tid, "config_asked", state.step_path_str(task), key=key)
         return render_missing(task, step, missing)
     if task.get("started") != task["position"]:
+        if step.exclusive:
+            got, holder = exclusive.claim(ctx, tid, step.exclusive, "next")
+            if not got:
+                holder = holder or exclusive.read(ctx, step.exclusive)["holder"] or "another task"
+                return EXCLUSIVE_WAIT.format(id=step.id, name=step.exclusive, holder=holder)
         task = start(ctx, tid, entry, step)
+    elif step.exclusive and exclusive.read(ctx, step.exclusive)["holder"] != tid:
+        return render_step(task, entry, step, values) + "\n\n" + render.released_line(step.exclusive)
     return render_step(task, entry, step, values)
+
+
+def require_not_queued(task):
+    wait = task.get("exclusive_wait")
+    if wait:
+        raise FactoryError(WAITS_FOR.format(name=wait["name"]))
 
 
 def require_open(task):
@@ -233,6 +252,8 @@ def clear_step(t):
     t["started"] = None
     t["command_result"] = None
     t["approval"] = None
+    t.pop("exclusive_wait", None)
+    t.pop("exclusive_released", None)
 
 
 def forward(t, reason=None):
@@ -262,7 +283,9 @@ def move(ctx, tid, event_type, position, statuses, first_event, decide=None):
         if info["kind"] != "loop":
             forward(t, info.get("reason"))
 
-    return state.update(ctx, tid, change), info
+    task = state.update(ctx, tid, change)
+    exclusive.sync(ctx, tid)
+    return task, info
 
 
 def log_finished(ctx, tid, info):
@@ -289,6 +312,7 @@ def done(ctx, tid):
     if task["status"] == "finished":
         return "The pipeline is finished."
     require_running(task)
+    require_not_queued(task)
     entry, step = load_step(ctx, task)
     problem = output_problem(task, step)
     if problem:
@@ -390,6 +414,7 @@ def goto(ctx, tid, target, reason):
             state.set_status(t, "active")
 
     task = state.update(ctx, tid, change)
+    exclusive.sync(ctx, tid)
     events.log(ctx, tid, "step_goto", to_path, **{"from": from_path, "to": to_path, "reason": reason})
     if task["status"] == "blocked":
         events.log(ctx, tid, "task_blocked", to_path, reason=task["status_reason"])
@@ -432,7 +457,7 @@ def check_result(tid, ended=False, output=None, error=None, busy=False):
 
 
 def waiting_step(ctx, task):
-    if task["status"] != "waiting_external":
+    if task["status"] != "waiting_external" or task.get("exclusive_wait"):
         return None
     entry, step = load_step(ctx, task)
     return (entry, step) if step.done_check else None
@@ -459,6 +484,10 @@ def check_task(ctx, tid):
 
 
 def poll(ctx):
+    try:
+        exclusive.recheck(ctx)
+    except Exception as e:
+        print(f"exclusive recheck failed: {e}", file=sys.stderr, flush=True)
     results = []
     for task in state.list_tasks(ctx):
         try:
@@ -471,7 +500,7 @@ def poll(ctx):
 
 
 def is_waiting_check(reg, task):
-    if task["status"] != "waiting_external":
+    if task["status"] != "waiting_external" or task.get("exclusive_wait"):
         return False
     entry = state.current_entry(task)
     return entry is not None and bool(reg.step(entry["id"]).done_check)
@@ -497,6 +526,8 @@ def external_done(ctx, tid):
     task = state.load(ctx, tid)
     if task["status"] != "waiting_external":
         raise FactoryError(f"Task {tid} is not waiting for an external event.")
+    if task.get("exclusive_wait"):
+        raise FactoryError(NOT_EXTERNAL.format(id=tid, name=task["exclusive_wait"]["name"]))
     entry, step = load_step(ctx, task)
     if step.done_check:
         raise FactoryError("This step has a done check. The wait ends when the check passes. Run `factory poll`.")
@@ -518,6 +549,7 @@ def step_env(ctx, task, step, values):
 def run_command(ctx, tid):
     task = state.load(ctx, tid)
     require_running(task)
+    require_not_queued(task)
     entry, step = load_step(ctx, task)
     if step.type != "command":
         raise FactoryError(f"The step `{step.id}` is not a `command` step.")
@@ -603,4 +635,7 @@ def status_text(ctx, tid):
         f"Step: {state.step_path_str(task)} ({min(task['position'] + 1, len(task['steps']))} of {len(task['steps'])})" + loop_suffix(task),
         f"Status: {task['status']}" + (f" ({task['status_reason']})" if task.get("status_reason") else ""),
     ]
+    held = exclusive.holder_text(ctx, task)
+    if held:
+        lines.append(held)
     return "\n".join(lines)

@@ -2,7 +2,7 @@ import subprocess
 import sys
 import uuid
 
-from . import adapters, config, events, state
+from . import adapters, config, events, exclusive, state
 from .adapters.base import AdapterError
 from .errors import FactoryError
 
@@ -138,6 +138,8 @@ def resume(ctx, tid, extra=None):
 
     task = state.update(ctx, tid, change)
     events.log(ctx, tid, "task_resumed", state.step_path_str(task))
+    if task.get("exclusive_wait"):
+        exclusive.handover(ctx, task["exclusive_wait"]["name"])
     return task
 
 

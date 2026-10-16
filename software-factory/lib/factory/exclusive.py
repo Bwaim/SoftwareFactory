@@ -115,9 +115,13 @@ def claim(ctx, tid, name, mode):
             entry = {"task": tid, "since": state.now(), "mode": mode}
             data["queue"].append(entry)
 
+        want = {"name": name, "mode": entry["mode"]}
+
         def wait(t):
+            if t.get("exclusive_wait") == want and t["status"] == "waiting_external":
+                return
             state.set_status(t, "waiting_external", wait_reason(name, data["holder"]))
-            t["exclusive_wait"] = {"name": name, "mode": entry["mode"]}
+            t["exclusive_wait"] = want
 
         state.update(ctx, tid, wait)
         return False, data["holder"], joined

@@ -2,7 +2,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from . import adapters, events, repo, state
+from . import adapters, events, exclusive, repo, state
 from .adapters.base import AdapterError
 from .errors import FactoryError
 
@@ -172,4 +172,5 @@ def delete(ctx, tid, confirm_unpushed=False):
     target = archive_target(ctx, tid)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(state.task_dir(ctx, tid)), str(target))
+    exclusive.forget(ctx, tid)
     return plan

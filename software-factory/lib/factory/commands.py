@@ -77,6 +77,11 @@ def register(sub, common):
     sub.add_parser("wait", parents=[common])
     sub.add_parser("poll", parents=[common])
     p = sub.add_parser("external-done", parents=[common]); p.add_argument("id")
+    p = sub.add_parser("exclusive")
+    xs = p.add_subparsers(dest="action", required=True)
+    xs.add_parser("status", parents=[common])
+    xr = xs.add_parser("release", parents=[common]); xr.add_argument("name"); xr.add_argument("--force", action="store_true")
+    xs.add_parser("acquire", parents=[common]).add_argument("name")
     p = sub.add_parser("approve", parents=[common]); p.add_argument("--send", action="store_true")
     p = sub.add_parser("request-changes", parents=[common]); p.add_argument("text"); p.add_argument("--send", action="store_true")
     p = sub.add_parser("approval")
@@ -501,6 +506,79 @@ def external_done_cmd(args):
     from . import engine
     engine.external_done(ctx_of(args), args.id)
     print(f"Task {args.id}: the external event is marked done.")
+
+
+def queue_text(row):
+    if not row["queue"]:
+        return ""
+    return " Waiting: " + ", ".join(f"{q['task']} ({q['status']})" for q in row["queue"]) + "."
+
+
+@cli.command("exclusive status")
+def exclusive_status_cmd(args):
+    from . import exclusive
+    rows = exclusive.status_rows(ctx_of(args))
+    if args.json:
+        cli.emit(rows, True)
+        return
+    if not rows:
+        print("No shared resource.")
+    for r in rows:
+        held = f"held by {r['holder']} ({r['holder_status']})." if r["holder"] else "free."
+        print(f"{r['name']}: {held}{queue_text(r)}")
+
+
+def force_by(args, ctx):
+    from . import repo
+    if args.task:
+        return args.task
+    try:
+        return repo.current_task_id(ctx)
+    except FactoryError:
+        return None
+
+
+@cli.command("exclusive release")
+def exclusive_release_cmd(args):
+    from . import exclusive, state
+    if args.force:
+        ctx = ctx_of(args)
+        old = exclusive.force_release(ctx, args.name, force_by(args, ctx))
+        print(f"Released `{args.name}`. It was held by task {old}.")
+        return
+    ctx, tid = task_of(args)
+    if not exclusive.release(ctx, tid, args.name, "exclusive_release"):
+        raise FactoryError(f"Task {tid} does not hold `{args.name}`.")
+    state.update(ctx, tid, lambda t: t.__setitem__("exclusive_released", args.name))
+    print(f"Released `{args.name}`.")
+
+
+def acquire_step(ctx, task, name):
+    from . import engine
+    engine.require_running(task)
+    entry, step = engine.load_step(ctx, task)
+    if step.exclusive != name:
+        raise FactoryError(f"The current step does not use `{name}`.")
+    if task.get("started") != task["position"]:
+        raise FactoryError("Run `factory next` first.")
+
+
+@cli.command("exclusive acquire")
+def exclusive_acquire_cmd(args):
+    from . import events, exclusive, state
+    ctx, tid = task_of(args)
+    name = args.name
+    acquire_step(ctx, state.load(ctx, tid), name)
+    if exclusive.read(ctx, name)["holder"] == tid:
+        print(f"You hold `{name}`.")
+        return
+    got, holder = exclusive.claim(ctx, tid, name, "acquire")
+    if got:
+        events.log(ctx, tid, "exclusive_acquire", state.step_path_str(state.load(ctx, tid)), name=name)
+        print(f"`{name}` is yours. Continue the step.")
+        return
+    holder = holder or exclusive.read(ctx, name)["holder"] or "another task"
+    print(f"`{name}` is used by task `{holder}`. The factory sends you a message when it is free. End your turn.")
 
 
 def print_entries(entries, as_json):

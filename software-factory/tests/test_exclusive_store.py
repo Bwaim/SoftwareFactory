@@ -76,6 +76,16 @@ def test_claim_twice_queues_once(ctx3):
     assert len([e for e in events(ctx3.fdir, "t2") if e["type"] == "exclusive_wait"]) == 1
 
 
+def test_claim_again_keeps_wait_status(ctx3):
+    from factory import state
+    ex().claim(ctx3, "t1", "emu", "next")
+    ex().claim(ctx3, "t2", "emu", "next")
+    state.update(ctx3, "t2", lambda t: t.__setitem__("status_since", "2000-01-01T00:00:00Z"))
+    ex().claim(ctx3, "t2", "emu", "next")
+    t = task_json(ctx3.fdir, "t2")
+    assert t["status_since"] == "2000-01-01T00:00:00Z" and t["status"] == "waiting_external"
+
+
 def test_release_hands_over_in_order(ctx3):
     for tid in ("t1", "t2", "t3"):
         ex().claim(ctx3, tid, "emu", "next")
