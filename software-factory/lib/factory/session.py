@@ -162,6 +162,8 @@ def logged_delivery(ctx, task, text, send):
         events.log(ctx, task["id"], "prompt_failed", state.step_path_str(task), text=text, reason=str(e))
         raise
     events.log(ctx, task["id"], "prompt_sent", state.step_path_str(task), text=text)
+    from . import attention
+    attention.clear(ctx, task["id"], "prompt")
     return result
 
 

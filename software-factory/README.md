@@ -53,7 +53,7 @@ The first run creates the link `~/.local/bin/factory`. Make sure `~/.local/bin` 
 
 ### Bash allowlist
 
-Task sessions use `.factory/claude-settings.json`, which allows every `factory` command.
+Task sessions use `.factory/claude-settings.json`, which allows every `factory` command and runs two hooks (see "May wait for you"). `factory init` and `factory version check` add what is missing to this file. They keep your own rules and hooks.
 For the orchestrator, add these commands to your Bash allowlist.
 
 git:
@@ -146,6 +146,7 @@ Setup:
 - `factory menu`: show the orchestrator menu.
 - `factory terminal check`: check the terminal adapter.
 - `factory version check`: compare the data version with the plugin.
+- `factory hook stop`, `factory hook prompt`: used by the Claude hooks. They read the hook input on stdin, print nothing and always exit 0. `factory hook notify-later <id> <at>` is started by `hook stop`.
 - `factory migrate [--dry-run]`: migrate the repository data and the library to the current version.
 
 Step execution, inside a task session:
@@ -306,6 +307,7 @@ Each card shows:
 - The artifacts of the task. Click a name to read it. The viewer closes with Escape, a click outside it, or its Close button. Its title bar stays visible, and the text scrolls inside it. A form, for example "Request changes", never closes on a click outside. Escape on a form with typed text asks "Discard the typed text?".
 - For a task that is `waiting_external` on a step with a `done_check`: "Next check in m:ss", counted down in the page, and the last check with its time and result.
 - For a task that waits for an exclusive resource: "Waiting for <name>, used by <holder>". The holder shows "Uses <name>", or "Keeps <name> while paused".
+- For a task with `attention`: the card uses the red blocked color and shows "May wait for you", the time since the turn ended and the last lines of the message as plain text.
 - "To validate", when the step waits for your approval. It links to the artifact to read. If the step validates code, it has an "Open in IDE" button.
 
 Colors and icons:
@@ -444,6 +446,18 @@ A step with `exclusive: <name>` uses a resource that only one task at a time can
 - Force: `factory exclusive release <name> --force` frees a resource that a stuck task holds. The menu action "Release a shared resource" and the "Release" button do the same.
 - Scope: the name is per repository. The state is in `.factory/exclusive/<name>.json`.
 
+### May wait for you
+
+A task session may end its turn to ask you a question. The factory notices it with two Claude hooks.
+
+- Hooks: `.factory/claude-settings.json` has a `Stop` hook (`factory hook stop`) and a `UserPromptSubmit` hook (`factory hook prompt`). The command uses the absolute path of the `factory` link. `factory init` and `factory version check` add the hooks when they are missing, and keep your other rules and hooks.
+- When it is set: the `Stop` hook sets the task field `attention` (`at` and `message`) when the task is `active`. The message is the end of the last answer of the session (12 lines at most). Nothing is set for any other status, or when the session still has background work.
+- Notification: the terminal shows "<name> may wait for you: <first line>" when the adapter supports `notify`. If the pane of the task is not focused, you are notified at once. If it is focused, the 60 second rule applies: the factory waits 60 seconds and notifies only if `attention` is still the same. A focused pane does not always mean you look at it, so the card shows "May wait for you" at once in both cases.
+- Clearing: `attention` is cleared when you send a prompt (the hook, the dashboard or the menu) and when the task status changes (block, wait, approve, pause, finish and so on).
+- Display: `factory tasks` and the dashboard sort tasks with `attention` first, together with `blocked` tasks, then `awaiting_approval`. The text list adds ", may wait for you: <first line>".
+- Hooks never print anything and always exit 0. A hook error is logged as `hook_failed` on the task.
+- `FACTORY_ATTENTION_DELAY` changes the 60 seconds (for tests).
+
 ### Events
 
 Each task logs its events in `.factory/tasks/<id>/events.jsonl`, one JSON object per line. Loops add two events:
@@ -452,6 +466,8 @@ Each task logs its events in `.factory/tasks/<id>/events.jsonl`, one JSON object
 - `loop_limit`: the loop reached `max` with the key still set. It has `entry` and `key`.
 
 Exclusive steps add `exclusive_wait`, `exclusive_start`, `exclusive_release`, `exclusive_acquire` and `exclusive_forced`. Each has `name`.
+
+"May wait for you" adds `attention` (`message`: the first line), `attention_cleared` (`reason`: `prompt` or `status`) and `hook_failed` (`hook`, `error`).
 
 Renames add `task_renamed` (`name`), `rename_failed` (`name`, `reason`) and `claude_renamed` (`name`).
 

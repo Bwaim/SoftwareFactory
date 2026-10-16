@@ -8,7 +8,14 @@ from pathlib import Path
 
 from . import adapters, events, fsio, repo, state, version
 
-DELAY_SECONDS = float(os.environ.get("FACTORY_ATTENTION_DELAY", "60"))
+def read_delay():
+    try:
+        return float(os.environ.get("FACTORY_ATTENTION_DELAY", "60"))
+    except ValueError:
+        return 60.0
+
+
+DELAY_SECONDS = read_delay()
 MESSAGE_LINES = 12
 MESSAGE_CHARS = 2000
 

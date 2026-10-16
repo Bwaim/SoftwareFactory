@@ -46,12 +46,22 @@ def update(ctx, tid, fn):
     if not task_file(ctx, tid).exists():
         raise FactoryError(f"Unknown task {tid}.")
 
+    dropped = []
+
     def change(task):
+        before = task.get("status")
         fn(task)
+        if task.get("status") != before and task.get("attention") is not None:
+            task.pop("attention")
+            dropped.append(True)
         task["updated_at"] = now()
         return task
 
-    return fsio.update_json(task_file(ctx, tid), change)
+    result = fsio.update_json(task_file(ctx, tid), change)
+    if dropped:
+        from . import events
+        events.log(ctx, tid, "attention_cleared", reason="status")
+    return result
 
 
 def create(ctx, task):

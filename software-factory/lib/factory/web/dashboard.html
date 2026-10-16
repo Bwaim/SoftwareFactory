@@ -34,6 +34,7 @@ a, .link { color: var(--accent); cursor: pointer; }
 .card { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 6px 0; background: var(--panel); word-break: break-word; }
 .card.s-active { background: var(--active); }
 .card.s-blocked { background: var(--blocked); }
+.attention-message { white-space: pre-wrap; margin: 0.3rem 0; font: inherit; }
 .card.s-awaiting_approval { background: var(--awaiting_approval); }
 .card.s-waiting_external { background: var(--waiting_external); }
 .card.s-paused { background: var(--paused); }
@@ -294,7 +295,7 @@ async function checkNow(t) {
   }
 }
 function taskCard(t) {
-  const card = el("div", { class: "card s-" + t.status });
+  const card = el("div", { class: "card s-" + (t.attention ? "blocked" : t.status) });
   const top = el("div", { class: "row" });
   const ticket = ticketNode(t);
   if (ticket) top.append(ticket);
@@ -304,6 +305,10 @@ function taskCard(t) {
   const since = ago(t.status_since);
   const label = t.status.replace("_", " ");
   card.append(el("div", { class: "status" }, `${ICONS[t.status] || ""} ${label}${since && t.status !== "finished" ? " for " + since : ""}`));
+  if (t.attention) {
+    card.append(el("div", { class: "status" }, `May wait for you${ago(t.attention.at) ? " · " + ago(t.attention.at) + " ago" : ""}`));
+    if (t.attention.message) card.append(el("pre", { class: "attention-message" }, t.attention.message));
+  }
   const ex = t.exclusive;
   if (ex && ex.waiting) card.append(el("div", { class: "muted" }, `Waiting for ${ex.name}, used by ${ex.holder || "another task"}`));
   else if (t.status_reason) card.append(el("div", { class: "muted" }, t.status_reason));

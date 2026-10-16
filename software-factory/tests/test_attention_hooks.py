@@ -164,10 +164,10 @@ def test_not_focused_notifies_at_once(att):
 def test_focused_uses_delay(att):
     fake_config(att.fdir, focused=True)
     start = time.time()
-    silent(hook(att, "stop", {"session_id": "sid-1", "last_assistant_message": "Q?"}, delay="1"))
-    assert time.time() - start < 1 and notifies(att) == []
+    silent(hook(att, "stop", {"session_id": "sid-1", "last_assistant_message": "Q?"}, delay="5"))
+    assert time.time() - start < 3 and notifies(att) == []
     assert "attention" in task_json(att.fdir, "t1")
-    wait_until(lambda: notifies(att) == ["t1 may wait for you: Q?"], timeout=10)
+    wait_until(lambda: notifies(att) == ["t1 may wait for you: Q?"], timeout=15)
 
 
 def test_focused_prompt_during_delay_no_notify(att):
@@ -258,3 +258,11 @@ def test_archived_task_not_found(att):
     from factory import attention
     assert attention.find_task(ctx, "sid-2") is None
     assert attention.find_task(ctx, "sid-1")["id"] == "t1"
+
+
+def test_bad_delay_falls_back_to_60(monkeypatch):
+    from factory import attention
+    monkeypatch.setenv("FACTORY_ATTENTION_DELAY", "soon")
+    assert attention.read_delay() == 60.0
+    monkeypatch.setenv("FACTORY_ATTENTION_DELAY", "2.5")
+    assert attention.read_delay() == 2.5

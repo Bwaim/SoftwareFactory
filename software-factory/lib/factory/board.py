@@ -7,6 +7,12 @@ from .registry import Registry
 PRIORITY = {"blocked": 0, "awaiting_approval": 1}
 
 
+def priority(task):
+    if task.get("attention"):
+        return PRIORITY["blocked"]
+    return PRIORITY.get(task["status"], len(PRIORITY))
+
+
 def iso_time(epoch):
     return datetime.fromtimestamp(epoch, timezone.utc).isoformat(timespec="seconds") if epoch else None
 
@@ -65,13 +71,22 @@ def task_row(ctx, task, reg=None, next_poll=None):
         "next_check_at": iso_time(next_poll) if has_check else None,
         "last_check": task.get("last_check") if has_check else None,
         "loop": loops.current_loop(task),
+        "attention": task.get("attention"),
     }
 
 
 def task_rows(ctx, next_poll=None):
     reg = Registry.load(ctx)
-    tasks = sorted(state.list_tasks(ctx), key=lambda t: (PRIORITY.get(t["status"], len(PRIORITY)), t["created_at"]))
+    tasks = sorted(state.list_tasks(ctx), key=lambda t: (priority(t), t["created_at"]))
     return [task_row(ctx, t, reg, next_poll) for t in tasks]
+
+
+def may_wait(row):
+    attention = row.get("attention")
+    if not attention:
+        return ""
+    message = attention.get("message")
+    return f", may wait for you: {message.splitlines()[0]}" if message else ", may wait for you"
 
 
 def render_rows(rows):
@@ -83,5 +98,5 @@ def render_rows(rows):
         name = r["display_name"] if r["display_name"] == r["id"] else f"{r['display_name']} ({r['id']})"
         lines.append(f"{name}: {r['description']}")
         lines.append(f"    {r['pipeline']} > {r['step']}")
-        lines.append(f"    status: {r['status']}{reason}. session: {r['session_state']}")
+        lines.append(f"    status: {r['status']}{reason}. session: {r['session_state']}{may_wait(r)}")
     return "\n".join(lines)
