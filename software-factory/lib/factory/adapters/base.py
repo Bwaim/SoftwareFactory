@@ -3,7 +3,7 @@ import re
 
 from ..errors import FactoryError
 
-OPTIONAL = ("send_prompt", "focus", "state", "wait_idle", "notify", "rename")
+OPTIONAL = ("send_prompt", "focus", "state", "wait_idle", "notify", "rename", "focused")
 HERDR_NAME_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 HERDR_NAME_MAX = 32
 HASH_CHARS = 4
@@ -67,3 +67,6 @@ class Adapter:
 
     def notify(self, text):
         self.unsupported("notify")
+
+    def focused(self, handle):
+        self.unsupported("focused")

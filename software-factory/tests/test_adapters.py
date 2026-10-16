@@ -21,3 +21,13 @@ def test_capabilities_and_check(inited):
     assert a.check() == (False, "nope")
     r = inited.factory("terminal", "check", check=False)
     assert r.returncode == 1 and "nope" in r.stdout
+
+
+def test_fake_focused(inited):
+    ctx = repo.load_ctx(cwd=inited.repo)
+    a = adapters.get_adapter(ctx)
+    assert "focused" in a.capabilities()
+    assert a.focused({"agent": "t1"}) is False
+    fake_config(inited.fdir, focused=True)
+    assert a.focused({"agent": "t1"}) is True
+    assert fake_calls(inited.fdir) == []

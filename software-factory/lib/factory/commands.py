@@ -1,3 +1,4 @@
+import os
 import sys
 
 from . import cli
@@ -112,6 +113,11 @@ def register(sub, common):
     ci.add_argument("--with-steps", action="store_true")
     ci.add_argument("--replace", action="store_true")
     ci.add_argument("--dry-run", action="store_true")
+    p = sub.add_parser("hook")
+    hs = p.add_subparsers(dest="action", required=True)
+    hs.add_parser("stop", parents=[common])
+    hs.add_parser("prompt", parents=[common])
+    hn = hs.add_parser("notify-later", parents=[common]); hn.add_argument("id"); hn.add_argument("at")
     p = sub.add_parser("library")
     ls = p.add_subparsers(dest="action", required=True)
     lc = ls.add_parser("commit", parents=[common]); lc.add_argument("message"); lc.add_argument("paths", nargs="+")
@@ -820,3 +826,35 @@ def migrate_cmd(args):
         print(f"Warning: {w}")
     for b in result["backups"]:
         print(f"Backup: {b}")
+
+
+def quiet(fn):
+    try:
+        fn()
+    except BaseException:
+        pass
+    return 0
+
+
+def attention_module():
+    from . import attention
+    return attention
+
+
+def run_hook(kind):
+    return quiet(lambda: attention_module().run_hook(kind, sys.stdin.read(), os.getcwd()))
+
+
+@cli.command("hook stop")
+def hook_stop_cmd(args):
+    return run_hook("stop")
+
+
+@cli.command("hook prompt")
+def hook_prompt_cmd(args):
+    return run_hook("prompt")
+
+
+@cli.command("hook notify-later")
+def hook_notify_later_cmd(args):
+    return quiet(lambda: attention_module().run_notify_later(args.id, args.at, os.getcwd()))

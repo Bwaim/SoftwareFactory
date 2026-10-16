@@ -215,6 +215,9 @@ class HerdrAdapter(Adapter):
         self.require_owned(handle)
         run(["agent", "wait", handle["agent"], "--timeout", str(int(timeout_s * 1000))], timeout=timeout_s + 30)
 
+    def focused(self, handle):
+        return bool(self.require_owned(handle).get("focused"))
+
     def notify(self, text):
         run(["notification", "show", "Software factory", "--body", text, "--sound", "request"], check=False)
 

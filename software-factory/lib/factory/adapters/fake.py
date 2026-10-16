@@ -71,5 +71,9 @@ class FakeAdapter(Adapter):
         self.require("notify")
         self.record("notify", text=text)
 
+    def focused(self, handle):
+        self.require("focused")
+        return bool(self.cfg().get("focused", False))
+
 
 ADAPTER = FakeAdapter

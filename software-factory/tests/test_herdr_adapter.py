@@ -194,3 +194,23 @@ def test_actions_allowed_in_own_tab_or_workspace(herdr_env, monkeypatch):
     monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w9:t4")
     adapter.focus({"agent": "t1", "tab": "w9:t1", "workspace": "w9"})
     assert ["agent", "prompt", "t1", "hi"] in calls() and ["agent", "focus", "t1"] in calls()
+
+
+def test_herdr_focused_reads_agent_get(herdr_env, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    handle = {"agent": "t1", "tab": "w9:t1"}
+    assert "focused" in adapter.capabilities()
+    assert adapter.focused(handle) is False
+    monkeypatch.setenv("FAKE_HERDR_FOCUSED", "1")
+    assert adapter.focused(handle) is True
+    assert ["agent", "get", "t1"] in calls()
+
+
+def test_herdr_focused_refused_when_agent_in_other_tab(herdr_env, monkeypatch):
+    adapter, _ = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    monkeypatch.setenv("FAKE_HERDR_FOCUSED", "1")
+    monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w3:t4")
+    with pytest.raises(AdapterError, match="does not belong"):
+        adapter.focused({"agent": "t1", "tab": "w9:t1"})
