@@ -128,6 +128,8 @@ def resume(ctx, tid, extra=None):
 
     def change(t):
         t.pop("claude_rename_pending", None)
+        t.pop("rename_error", None)
+        t.pop("claude_rename_error", None)
         t["terminal_handle"] = handle
         if t["status"] == "paused":
             saved = t.get("saved_status") or {"status": "active", "reason": None}

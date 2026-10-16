@@ -29,7 +29,9 @@ def slugify(text):
 
 
 def id_taken(ctx, tid):
-    return (ctx.fdir / "tasks" / tid).exists() or (ctx.fdir / "tasks" / "archive" / tid).exists()
+    if (ctx.fdir / "tasks" / tid).exists() or (ctx.fdir / "tasks" / "archive" / tid).exists():
+        return True
+    return any(state.display_name(task) == tid for task in state.list_tasks(ctx))
 
 
 def unique_id(ctx, base):

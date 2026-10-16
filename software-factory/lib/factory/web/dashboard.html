@@ -286,7 +286,7 @@ async function checkNow(t) {
   try {
     const res = await api(`/api/tasks/${t.id}/check`, {});
     const job = await waitJob(res.job);
-    if (job.status === "done" && job.result.error) showError(job.result.error);
+    if (job.status === "done" && job.result.error && job.result.error !== "The task does not wait on a done check.") showError(job.result.error);
   } finally {
     state.checking.delete(t.id);
     state.lastKey = null;

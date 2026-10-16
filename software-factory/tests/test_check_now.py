@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 import threading
@@ -6,7 +7,7 @@ import time
 import pytest
 
 from conftest import BIN, events, task_from_pipeline, task_json, write_pipeline, write_step
-from factory import engine, repo
+from factory import engine, fsio, repo, state
 from serverutil import info, request
 
 
@@ -95,6 +96,22 @@ def test_cli_and_in_process_check_end_the_wait_once(waits, monkeypatch):
     cli.wait(timeout=60)
     assert ended_count(inited.fdir, "t1") == 1
     assert sent_count(inited.fdir, "t1") == 1
+
+
+def test_cli_check_is_refused_while_the_lock_is_held(waits):
+    inited, flag = waits
+    waiting_task(inited)
+    flag.write_text("ok")
+    ctx = repo.load_ctx(cwd=inited.repo)
+    with fsio.try_locked(state.task_dir(ctx, "t1") / "check") as got:
+        assert got
+        out = subprocess.run([sys.executable, str(BIN), "poll", "--task", "t1", "--json"], cwd=inited.repo,
+                             env=inited.factory.env, capture_output=True, text=True, timeout=60)
+    row = json.loads(out.stdout)[0]
+    assert row["busy"] is True and row["error"] == "A check is already running."
+    assert row["ended"] is False
+    assert task_json(inited.fdir, "t1")["status"] == "waiting_external"
+    assert "last_check" not in task_json(inited.fdir, "t1")
 
 
 @pytest.fixture

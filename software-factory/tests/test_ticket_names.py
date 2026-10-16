@@ -234,3 +234,26 @@ def test_unexpected_rename_error_is_saved_and_logged(tp, monkeypatch):
     assert value == "HT-4549" and problem == "boom"
     assert task_json(tp.fdir, tid)["rename_error"] == "boom"
     assert any(e["type"] == "rename_failed" and e["reason"] == "boom" for e in events(tp.fdir, tid))
+
+
+def test_launch_id_avoids_a_renamed_task_display_name(tp):
+    first = tp.factory.json("launch", "tp", "--description", "Fix the list", "--input", "ticket=none yet")["id"]
+    set_ticket(tp, first, "HT-4549")
+    assert task_json(tp.fdir, first)["display_name"] == "ht-4549"
+    assert launched_id(tp, "HT-4549") == "ht-4549-2"
+
+
+def test_resume_clears_rename_errors(tp):
+    ctx, tid = ticket_task(tp, rename_error="tab rename failed", claude_rename_error="rename failed")
+    tp.factory("pause", tid)
+    tp.factory("resume", tid)
+    task = task_json(tp.fdir, tid)
+    assert "rename_error" not in task and "claude_rename_error" not in task
+
+
+def test_apply_all_pending_skips_finished_and_gone(tp):
+    ctx, tid = ticket_task(tp, status="finished", claude_rename_pending="ht-1")
+    make_task(ctx, tid="other", worktree=str(tp.repo), claude_rename_pending="ht-2")
+    before = len(fake_calls(tp.fdir))
+    rename.apply_all_pending(ctx)
+    assert len(fake_calls(tp.fdir)) == before

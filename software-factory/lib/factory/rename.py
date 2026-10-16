@@ -109,7 +109,9 @@ def apply_pending(ctx, task):
 
 def apply_all_pending(ctx):
     for task in state.list_tasks(ctx):
-        if not task.get("claude_rename_pending"):
+        if not task.get("claude_rename_pending") or task["status"] == "finished":
+            continue
+        if session.live_state(ctx, task) == "gone":
             continue
         try:
             apply_pending(ctx, task)

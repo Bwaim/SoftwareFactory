@@ -450,6 +450,8 @@ When `factory.yaml` or `config.yaml` is not valid YAML, every command prints `Er
   - Older data: start the orchestrator. It runs the migration.
   - Newer data: update the plugin.
   - The migration to version 2 stops if a key name breaks the rule or a task uses the old step assistant. It lists what to fix.
+- **Rename failed.** The ticket rename did not work. It was the rename of the Herdr agent, tab or workspace, or the Claude `/rename`. The id and the worktree do not change. A resume applies the name with `--name`.
+- **Could not bring the app to the front.** Check the terminal app with `factory config get terminal terminal_app`. Set it with `factory config set terminal terminal_app '<app>'`. An empty value means only the focus inside Herdr. This works only on macOS.
 - **Session gone.** Choose "Resume a task" in the menu, or run `factory resume <id>`.
 - **Folder trust dialog.**
   - Worktrees of a repository you already trust in Claude show no trust dialog.
