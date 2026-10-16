@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from . import loops, session, state
+from . import exclusive, loops, session, state
 from .errors import FactoryError
 from .registry import Registry
 
@@ -40,7 +40,8 @@ def task_row(ctx, task, reg=None, next_poll=None):
     reg = reg or Registry.load(ctx)
     step = current_step(reg, task)
     waiting = task["status"] == "waiting_external"
-    has_check = bool(waiting and step and step.done_check)
+    info = exclusive.task_info(ctx, task, reg)
+    has_check = bool(waiting and step and step.done_check and not (info and info["waiting"]))
     return {
         "id": task["id"],
         "description": task["description"],
@@ -59,7 +60,8 @@ def task_row(ctx, task, reg=None, next_poll=None):
         "mr_url": task["state"].get("mr_url"),
         "artifacts": artifact_names(ctx, task["id"]),
         "approval": approval_info(task),
-        "wait_has_check": bool(step and step.done_check) if waiting else None,
+        "exclusive": info,
+        "wait_has_check": (None if info and info["waiting"] else bool(step and step.done_check)) if waiting else None,
         "next_check_at": iso_time(next_poll) if has_check else None,
         "last_check": task.get("last_check") if has_check else None,
         "loop": loops.current_loop(task),

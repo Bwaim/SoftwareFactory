@@ -249,8 +249,8 @@ def recheck(ctx):
     return out
 
 
-def task_info(ctx, task):
-    name = step_name(ctx, task)
+def task_info(ctx, task, reg=None):
+    name = name_of(reg or Registry.load(ctx), task)
     if name is None:
         return None
     data = read(ctx, name)

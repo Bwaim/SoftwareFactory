@@ -304,7 +304,10 @@ function taskCard(t) {
   const since = ago(t.status_since);
   const label = t.status.replace("_", " ");
   card.append(el("div", { class: "status" }, `${ICONS[t.status] || ""} ${label}${since && t.status !== "finished" ? " for " + since : ""}`));
-  if (t.status_reason) card.append(el("div", { class: "muted" }, t.status_reason));
+  const ex = t.exclusive;
+  if (ex && ex.waiting) card.append(el("div", { class: "muted" }, `Waiting for ${ex.name}, used by ${ex.holder || "another task"}`));
+  else if (t.status_reason) card.append(el("div", { class: "muted" }, t.status_reason));
+  if (ex && ex.holds) card.append(el("div", { class: "muted" }, ex.paused ? `Keeps ${ex.name} while paused` : `Uses ${ex.name}`));
   if (t.session_state === "gone" && t.status !== "paused" && t.status !== "finished") card.append(el("div", { class: "gone" }, "Session gone"));
   if (t.rename_error) card.append(el("div", { class: "rename-error" }, `Rename failed: ${t.rename_error}`));
   if (t.artifacts.length) {
@@ -339,6 +342,7 @@ function taskButtons(t) {
   if (t.status === "awaiting_approval") {
     row.append(button("Approve", action(async () => noteDelivery(t, await api(`/api/tasks/${t.id}/approve`, {}), "The approval"))), button("Request changes", () => openRequestChanges(t)));
   }
+  if (t.exclusive && t.exclusive.waiting) row.append(button("Release", () => openRelease(t)));
   if (t.status === "waiting_external" && t.wait_has_check === false) row.append(button("Mark done", action(() => api(`/api/tasks/${t.id}/external-done`, {}))));
   if (t.status === "waiting_external" && t.wait_has_check) {
     row.append(state.checking.has(t.id) ? button("Checking…", () => {}, { disabled: true }) : button("Check now", () => checkNow(t)));
@@ -403,6 +407,11 @@ function openPause(t) {
     await runJob(t.id, `/api/tasks/${t.id}/pause`, { wait: true });
   };
   choice(`Pause ${t.id}`, "Wait until the session is idle, or stop it now?", [["Wait until idle", post(true)], ["Stop now", post(false)]]);
+}
+function openRelease(t) {
+  const { name, holder } = t.exclusive;
+  const release = async () => { await api(`/api/exclusive/${name}/release`, { task: t.id }); closeModal(); await refresh(true); };
+  choice(`Release ${name}`, `Release ${name} from task ${holder}? Its session loses the resource.`, [["Release", release]]);
 }
 function openSendPrompt(t) {
   const text = el("textarea", { placeholder: "Prompt for the session" });

@@ -122,6 +122,7 @@ Herdr adapter:
 - **Resume a task**: restart a paused task, or a task whose session is gone.
 - **Delete a task**: close its terminal, remove its worktree and archive its folder.
 - **Clean finished tasks**: delete finished tasks whose work is merged. A squash-merged branch counts as merged.
+- **Release a shared resource**: free an exclusive resource that a stuck task holds. It shows the holder and the waiting tasks, and asks you to confirm.
 - **Create or edit a pipeline**: open the pipeline editor in the browser.
 - **Create a new step**: open the step form in the pipeline editor.
 - **Delete a step**: delete a local or generic step. It first shows what the delete does, then asks you to confirm.
@@ -177,6 +178,9 @@ Task life:
 - `factory resume <id>`: resume a task.
 - `factory delete <id> [--dry-run] [--confirm-unpushed]`: delete a task.
 - `factory clean`: list finished tasks that can be deleted.
+- `factory exclusive status [--json]`: list each exclusive resource with its holder and its queue.
+- `factory exclusive release <name> [--force]`: free a resource. Without `--force`, only the holder can do it. With `--force`, anyone can, and the holder loses it.
+- `factory exclusive acquire <name>`: take a resource again after a release. It waits in the queue when the resource is used.
 - `factory open-ide`: open the task worktree in the IDE.
 - `factory terminal focus <id>`: focus the task session. Then it runs `open -a <terminal_app>`. `terminal_app` is asked on first use: `factory config set terminal terminal_app Ghostty`. An empty value means only the focus inside Herdr.
 - `factory terminal send-prompt <id> <text> [--wait]`: send a prompt to a task session.
@@ -301,6 +305,7 @@ Each card shows:
 - A red "Session gone" tag when the terminal session is not there. Not shown for `paused` and `finished` tasks.
 - The artifacts of the task. Click a name to read it. The viewer closes with Escape, a click outside it, or its Close button. Its title bar stays visible, and the text scrolls inside it. A form, for example "Request changes", never closes on a click outside. Escape on a form with typed text asks "Discard the typed text?".
 - For a task that is `waiting_external` on a step with a `done_check`: "Next check in m:ss", counted down in the page, and the last check with its time and result.
+- For a task that waits for an exclusive resource: "Waiting for <name>, used by <holder>". The holder shows "Uses <name>", or "Keeps <name> while paused".
 - "To validate", when the step waits for your approval. It links to the artifact to read. If the step validates code, it has an "Open in IDE" button.
 
 Colors and icons:
@@ -321,6 +326,7 @@ Card buttons:
 - **Approve** and **Request changes**: shown when the status is `awaiting_approval`. "Request changes" asks for a text.
 - **Mark done**: shown when the status is `waiting_external` and the wait has no done check.
 - **Check now**: shown when the status is `waiting_external` and the wait has a done check. It runs `factory poll --task <id>` as a background job. The button shows "Checking…" until the result.
+- **Release**: shown on a task that waits for an exclusive resource. It asks "Release <name> from task <holder>? Its session loses the resource." in a dialog. The task has no "Mark done" or "Check now" button.
 - **Send prompt**: send text to the session. If the session is working, choose "Wait until idle" or "Send now".
 - **Pause**: shown when the session exists and the task is not paused. Choose "Wait until idle" or "Stop now". The card shows "Pausing..." until it ends.
 - **Resume**: shown when the task is paused or its session is gone.
@@ -428,12 +434,24 @@ Only `http` and `https` URLs are used.
 - A step inside the range that outputs the `while` key gets a footer line: "This step controls a loop. Set `<key>` to `none` when nothing is left." A clean round must reset the key, because task keys keep their values.
 - `factory status` and the dashboard card show "loop <n> of <max>".
 
+### Exclusive steps
+
+A step with `exclusive: <name>` uses a resource that only one task at a time can use, like an emulator.
+
+- Hold: the first task takes the resource when its step starts. Other tasks wait in a queue. They are `waiting_external`, but not for an external event: `factory poll` does not run their `done_check`, and `factory external-done` refuses them.
+- Release: the holder frees the resource when its step ends, when it is skipped or when the task is deleted. A session can free it earlier with `factory exclusive release <name>`, and take it again with `factory exclusive acquire <name>`. A paused task keeps it.
+- Handover: when the resource is free, the first waiting task gets it. The factory sends its session a message. A paused task is passed over.
+- Force: `factory exclusive release <name> --force` frees a resource that a stuck task holds. The menu action "Release a shared resource" and the "Release" button do the same.
+- Scope: the name is per repository. The state is in `.factory/exclusive/<name>.json`.
+
 ### Events
 
 Each task logs its events in `.factory/tasks/<id>/events.jsonl`, one JSON object per line. Loops add two events:
 
 - `loop_back`: the loop jumped back. It has `entry`, `to` (the target step), `round` (the jump number) and `max`.
 - `loop_limit`: the loop reached `max` with the key still set. It has `entry` and `key`.
+
+Exclusive steps add `exclusive_wait`, `exclusive_start`, `exclusive_release`, `exclusive_acquire` and `exclusive_forced`. Each has `name`.
 
 Renames add `task_renamed` (`name`), `rename_failed` (`name`, `reason`) and `claude_renamed` (`name`).
 

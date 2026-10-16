@@ -155,6 +155,15 @@ A step file is YAML frontmatter between two `---` lines, then the body.
 - No `outputs`. They come from the child steps.
 - No loop: a group cannot contain itself at any depth.
 
+### Exclusive steps
+
+- `exclusive: <name>` marks a step that uses a resource shared by all tasks, like an emulator. Only one task at a time runs a step with this name. Steps with the same name share the resource.
+- The first task takes the resource when its step starts. Other tasks wait in a queue. `factory next` tells them to end their turn. The factory starts them when the resource is free.
+- A task keeps the resource until its step ends, or until it is released. It also keeps it while it is paused.
+- Before a long wait for the user, the session frees it with `factory exclusive release <name>`. It takes it again with `factory exclusive acquire <name>`. The step footer says so.
+- A stuck holder can be freed with `factory exclusive release <name> --force`.
+- The name is per repository. Use it only for a resource that cannot be shared.
+
 ### Outputs and `factory done`
 
 - Each output has a `type`, a `description`, and `optional: true` when the step may leave it unset.
@@ -330,6 +339,26 @@ What the example shows:
 - The input `crash_log` is used by the script as `"$FACTORY_KEY_CRASH_LOG"`.
 - The output `crash_report` of `collect-crash` is used by `fix-crash` as `{{crash_report}}`.
 - The config value `lines` is set with `with` on the group entry. `test_hint` uses its default.
+
+## Exclusive example
+
+#### .factory/steps/run-on-emulator.md
+
+```markdown
+---
+id: run-on-emulator
+description: Run the app on the shared Android emulator and check the screen
+category: test
+type: ai
+exclusive: android-emulator
+outputs:
+  emulator_result:
+    type: text
+    description: What the app showed on the emulator
+---
+Install the app on the Android emulator and open the screen you changed.
+Describe what you see.
+```
 
 ## Loop examples
 

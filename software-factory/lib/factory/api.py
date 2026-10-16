@@ -241,6 +241,12 @@ def launch_task(server, query, body):
     return launch.launch(server.ctx, *launch_args(body))
 
 
+@route("POST", "/api/exclusive/([a-z][a-z0-9_-]*)/release")
+def exclusive_release(server, name, query, body):
+    from . import exclusive
+    return {"holder": exclusive.force_release(server.ctx, name, body.get("task"))}
+
+
 @route("GET", "/api/clean")
 def clean(server, query, body):
     from . import delete

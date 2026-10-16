@@ -9,6 +9,7 @@ ACTIONS = [
     ("Tasks", "resume", "Resume a task", None),
     ("Tasks", "delete", "Delete a task", None),
     ("Tasks", "clean", "Clean finished tasks", None),
+    ("Tasks", "exclusive-release", "Release a shared resource", None),
     ("Pipelines and steps", "pipeline-edit", "Create or edit a pipeline", None),
     ("Pipelines and steps", "new-step", "Create a new step", None),
     ("Pipelines and steps", "step-delete", "Delete a step", None),

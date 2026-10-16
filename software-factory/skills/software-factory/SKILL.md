@@ -50,6 +50,7 @@ Before any command that changes something, show what it will do and wait for the
 - **Resume a task** (`resume`): list `paused` tasks and tasks not `finished` whose `session_state` is `gone`. If the adapter has no `state` capability, warn that a second session could start if the first one still runs. Run `factory resume <id>`.
 - **Delete a task** (`delete`): list the tasks, ask which one, then follow the built-in step `delete-task`.
 - **Clean finished tasks** (`clean`): run `factory clean --json`. Show each finished task with merged or not. Merged tasks are selected by default. Ask the user to confirm the selection. For each selected task, follow `delete-task`.
+- **Release a shared resource** (`exclusive-release`): run `factory exclusive status --json`. List each resource that has a holder, with its holder, the status of the holder and the waiting tasks. Ask which one. Show the holder and its status. Tell the user that the session of the holder loses the resource. Release it only after the user confirms: `factory exclusive release <name> --force`. Then run `factory exclusive status --json` and report who holds it now.
 - **Create or edit a pipeline** (`pipeline-edit`): ask for an id to edit, or nothing for a new one. Run `factory pipeline edit [<id>]`. Tell the user the editor is open in the browser.
 - **Create a new step** (`new-step`): run `factory step edit`. Tell the user the step form is open in the pipeline editor in the browser. To change an existing step, run `factory step edit <id>`.
 - **Delete a step** (`step-delete`):
