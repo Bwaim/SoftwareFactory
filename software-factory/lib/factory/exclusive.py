@@ -74,18 +74,36 @@ def is_paused(tasks, tid):
 
 
 def grant(ctx, data, tid, mode, activate):
-    data["holder"] = tid
-    data["since"] = state.now()
-    data["queue"] = [q for q in data["queue"] if q["task"] != tid]
-
     def fn(t):
         waited = t.pop("exclusive_wait", None)
-        if activate or (waited and t["status"] == "waiting_external"):
+        if t["status"] != "blocked" and (activate or (waited and t["status"] == "waiting_external")):
             state.set_status(t, "active")
         if mode == "acquire":
             t.pop("exclusive_released", None)
 
     state.update(ctx, tid, fn)
+    data["holder"] = tid
+    data["since"] = state.now()
+    data["queue"] = [q for q in data["queue"] if q["task"] != tid]
+
+
+def refresh_reasons(ctx, tasks, data, name):
+    reason = wait_reason(name, data["holder"])
+    for q in data["queue"]:
+        t = tasks.get(q["task"])
+        if not t or t["status"] != "waiting_external" or (t.get("exclusive_wait") or {}).get("name") != name:
+            continue
+        if t.get("status_reason") == reason:
+            continue
+
+        def fn(task):
+            if task["status"] == "waiting_external" and (task.get("exclusive_wait") or {}).get("name") == name:
+                task["status_reason"] = reason
+
+        try:
+            state.update(ctx, q["task"], fn)
+        except FactoryError:
+            pass
 
 
 def free(data):
@@ -134,17 +152,29 @@ def claim(ctx, tid, name, mode):
     return ok, holder
 
 
+def pick_next(ctx, tasks, data):
+    for q in list(data["queue"]):
+        if is_paused(tasks, q["task"]):
+            continue
+        try:
+            grant(ctx, data, q["task"], q["mode"], True)
+        except FactoryError:
+            data["queue"] = [e for e in data["queue"] if e["task"] != q["task"]]
+            continue
+        return q
+    return None
+
+
 def handover(ctx, name):
     from . import engine
     reg = Registry.load(ctx)
 
     def fn(data):
         tasks = prune(ctx, reg, data, name)
-        if data["holder"] is not None:
-            return None
-        pick = next((q for q in data["queue"] if not is_paused(tasks, q["task"])), None)
-        if pick:
-            grant(ctx, data, pick["task"], pick["mode"], True)
+        pick = None
+        if data["holder"] is None:
+            pick = pick_next(ctx, tasks, data)
+        refresh_reasons(ctx, tasks, data, name)
         return pick
 
     pick = change(ctx, name, fn)
@@ -210,12 +240,26 @@ def leave(ctx, tid, name):
         handover(ctx, name)
 
 
+def drop_stale(ctx, tid, name):
+    if all(q["task"] != tid for q in read(ctx, name)["queue"]):
+        return
+
+    def fn(data):
+        task = load_task(ctx, tid)
+        if task and (task.get("exclusive_wait") or {}).get("name") != name:
+            data["queue"] = [q for q in data["queue"] if q["task"] != tid]
+
+    change(ctx, name, fn)
+
+
 def sync(ctx, tid):
     task = load_task(ctx, tid)
     current = name_of(Registry.load(ctx), task) if task else None
     for name in resource_names(ctx):
         if name != current:
             leave(ctx, tid, name)
+        else:
+            drop_stale(ctx, tid, name)
 
 
 def forget(ctx, tid):

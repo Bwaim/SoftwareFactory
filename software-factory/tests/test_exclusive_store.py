@@ -277,3 +277,45 @@ def test_delivery_error_keeps_handover(ctx3):
     ex().release(ctx3, "t1", "emu")
     assert ex().read(ctx3, "emu")["holder"] == "t2"
     assert any(e["type"] == "prompt_failed" for e in events(ctx3.fdir, "t2"))
+
+
+def test_handover_skips_task_removed_before_grant(ctx3, monkeypatch):
+    exclusive = ex()
+    for tid in ("t1", "t2", "t3"):
+        exclusive.claim(ctx3, tid, "emu", "next")
+    real_prune = exclusive.prune
+
+    def prune_then_remove(*a):
+        tasks = real_prune(*a)
+        if (ctx3.fdir / "tasks" / "t2").exists():
+            shutil.rmtree(ctx3.fdir / "tasks" / "t2")
+        return tasks
+
+    monkeypatch.setattr(exclusive, "prune", prune_then_remove)
+    assert exclusive.release(ctx3, "t1", "emu") is True
+    data = exclusive.read(ctx3, "emu")
+    assert data["holder"] == "t3" and data["queue"] == []
+    assert task_json(ctx3.fdir, "t3")["status"] == "active"
+
+
+def test_blocked_waiter_gets_resource_and_stays_blocked(ctx3):
+    from factory import state
+    ex().claim(ctx3, "t1", "emu", "next")
+    ex().claim(ctx3, "t2", "emu", "next")
+    state.update(ctx3, "t2", lambda t: state.set_status(t, "blocked", "question"))
+    ex().release(ctx3, "t1", "emu")
+    t2 = task_json(ctx3.fdir, "t2")
+    assert ex().read(ctx3, "emu")["holder"] == "t2"
+    assert t2["status"] == "blocked" and t2["status_reason"] == "question" and "exclusive_wait" not in t2
+    assert sent(ctx3) == ["`emu` is yours now. Run `factory next`."]
+
+
+def test_waiters_reason_names_new_holder(ctx3):
+    for tid in ("t1", "t2", "t3"):
+        ex().claim(ctx3, tid, "emu", "next")
+    since = task_json(ctx3.fdir, "t3")["status_since"]
+    ex().release(ctx3, "t1", "emu")
+    t3 = task_json(ctx3.fdir, "t3")
+    assert t3["status_reason"] == "Waiting for emu, used by t2" and t3["status_since"] == since
+    ex().force_release(ctx3, "emu")
+    assert ex().read(ctx3, "emu")["holder"] == "t3"

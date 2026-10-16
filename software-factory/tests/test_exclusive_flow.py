@@ -405,3 +405,24 @@ def test_two_processes_claim_once(flow):
     other = "t2" if started[0] == "t1" else "t1"
     assert tasks[other]["status"] == "waiting_external" and tasks[other]["started"] is None
     assert queue(flow) == [other]
+
+
+def test_waiter_reason_follows_handover(flow):
+    for tid in ("t1", "t2", "t3"):
+        run(flow, tid, "next")
+    run(flow, "t1", "done")
+    assert holder(flow) == "t2"
+    assert task_json(flow.fdir, "t3")["status_reason"] == "Waiting for emu, used by t2"
+
+
+def test_waiter_skip_to_same_name_leaves_queue(base):
+    flow = setup(base, ["emu", "emu2", "after"], ("t1", "t2"))
+    run(flow, "t1", "next")
+    run(flow, "t2", "next")
+    assert queue(flow) == ["t2"]
+    run(flow, "t2", "skip")
+    t2 = task_json(flow.fdir, "t2")
+    assert queue(flow) == [] and t2["status"] == "active" and "exclusive_wait" not in t2
+    run(flow, "t2", "next")
+    assert queue(flow) == ["t2"] and holder(flow) == "t1"
+    assert task_json(flow.fdir, "t2")["status"] == "waiting_external"
