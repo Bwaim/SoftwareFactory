@@ -306,7 +306,8 @@ function taskCard(t) {
   const label = t.status.replace("_", " ");
   card.append(el("div", { class: "status" }, `${ICONS[t.status] || ""} ${label}${since && t.status !== "finished" ? " for " + since : ""}`));
   if (t.attention) {
-    card.append(el("div", { class: "status" }, `May wait for you${ago(t.attention.at) ? " · " + ago(t.attention.at) + " ago" : ""}`));
+    const waited = ago(t.attention.at);
+    card.append(el("div", { class: "status" }, `May wait for you${waited ? " · " + waited + " ago" : ""}`));
     if (t.attention.message) card.append(el("pre", { class: "attention-message" }, t.attention.message));
   }
   const ex = t.exclusive;

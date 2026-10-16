@@ -1,12 +1,9 @@
 import json
-import os
-import subprocess
-import sys
 import time
 
 import pytest
 
-from conftest import BIN, events, fake_calls, fake_config, hook, silent, task_json
+from conftest import events, fake_calls, fake_config, hook, silent, task_json
 from factory import repo, state
 
 
@@ -31,6 +28,7 @@ def test_stop_on_active_sets_attention_and_notifies(att):
     assert notifies(att) == ["t1 may wait for you: Which API?"]
     logged = [e for e in events(att.fdir, "t1") if e["type"] == "attention"]
     assert logged and logged[0]["message"] == "Which API?"
+    assert logged[0]["step"] == state.step_path_str(task_json(att.fdir, "t1"))
 
 
 def test_stop_without_message_notifies_short_text(att):
@@ -83,6 +81,7 @@ def test_prompt_clears(att):
     assert "attention" not in task_json(att.fdir, "t1")
     cleared = [e for e in events(att.fdir, "t1") if e["type"] == "attention_cleared"]
     assert [e["reason"] for e in cleared] == ["prompt"]
+    assert cleared[0]["step"] == state.step_path_str(task_json(att.fdir, "t1"))
     silent(hook(att, "prompt", {"session_id": "sid-1", "prompt": "B"}))
     assert len([e for e in events(att.fdir, "t1") if e["type"] == "attention_cleared"]) == 1
 
@@ -96,6 +95,10 @@ def test_clear_returns_false_when_not_set(att):
     state.update(ctx, "t1", lambda t: t.__setitem__("attention", {"at": "x", "message": None}))
     assert attention.clear(ctx, "t1", "status") is True
     assert [e["reason"] for e in events(att.fdir, "t1") if e["type"] == "attention_cleared"] == ["status"]
+    state.update(ctx, "t1", lambda t: t.__setitem__("attention", {"at": "y", "message": None}))
+    state.update(ctx, "t1", lambda t: state.set_status(t, "blocked", "q"))
+    steps = [e["step"] for e in events(att.fdir, "t1") if e["type"] == "attention_cleared"]
+    assert steps == [state.step_path_str(task_json(att.fdir, "t1"))] * 2
 
 
 @pytest.mark.parametrize("stdin", ["", "not json", "[1, 2]", json.dumps({"session_id": "unknown"})])
@@ -130,6 +133,7 @@ def test_hook_error_logs_hook_failed(att):
     silent(hook(att, "stop", {"session_id": "sid-1", "last_assistant_message": "Q?"}))
     failed = [e for e in events(att.fdir, "t1") if e["type"] == "hook_failed"]
     assert len(failed) == 1 and failed[0]["hook"] == "stop" and failed[0]["error"]
+    assert failed[0]["step"] == state.step_path_str(task_json(att.fdir, "t1"))
 
 
 def test_notify_later_bad_args_is_silent(att):

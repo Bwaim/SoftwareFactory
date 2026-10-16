@@ -159,7 +159,7 @@ A step file is YAML frontmatter between two `---` lines, then the body.
 
 - `exclusive: <name>` marks a step that uses a resource shared by all tasks, like an emulator. Only one task at a time runs a step with this name. Steps with the same name share the resource.
 - The first task takes the resource when its step starts. Other tasks wait in a queue. `factory next` tells them to end their turn. The factory starts them when the resource is free.
-- A task keeps the resource until its step ends, or until it is released. It also keeps it while it is paused.
+- A task keeps the resource until it leaves the step, or until it is released. It leaves the step on `factory done`, `factory skip`, `factory goto`, a loop jump, the end of the pipeline and `factory delete`. If the next current step has the same exclusive name, the task keeps the resource. It also keeps it while it is paused.
 - Before a long wait for the user, the session frees it with `factory exclusive release <name>`. It takes it again with `factory exclusive acquire <name>`. The step footer says so.
 - A stuck holder can be freed with `factory exclusive release <name> --force`.
 - The name is per repository. Use it only for a resource that cannot be shared.

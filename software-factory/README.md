@@ -441,7 +441,7 @@ Only `http` and `https` URLs are used.
 A step with `exclusive: <name>` uses a resource that only one task at a time can use, like an emulator.
 
 - Hold: the first task takes the resource when its step starts. Other tasks wait in a queue. They are `waiting_external`, but not for an external event: `factory poll` does not run their `done_check`, and `factory external-done` refuses them.
-- Release: the holder frees the resource when its step ends, when it is skipped or when the task is deleted. A session can free it earlier with `factory exclusive release <name>`, and take it again with `factory exclusive acquire <name>`. A paused task keeps it.
+- Release: the holder frees the resource when it leaves the step. This happens on `factory done`, `factory skip`, `factory goto`, a loop jump, the end of the pipeline and `factory delete`. If the next current step has the same exclusive name, the task keeps the resource. A session can free it earlier with `factory exclusive release <name>`, and take it again with `factory exclusive acquire <name>`. A paused task keeps it.
 - Handover: when the resource is free, the first waiting task gets it. The factory sends its session a message. A paused task is passed over.
 - Force: `factory exclusive release <name> --force` frees a resource that a stuck task holds. The menu action "Release a shared resource" and the "Release" button do the same.
 - Scope: the name is per repository. The state is in `.factory/exclusive/<name>.json`.
@@ -452,7 +452,7 @@ A task session may end its turn to ask you a question. The factory notices it wi
 
 - Hooks: `.factory/claude-settings.json` has a `Stop` hook (`factory hook stop`) and a `UserPromptSubmit` hook (`factory hook prompt`). The command uses the absolute path of the `factory` link. `factory init` and `factory version check` add the hooks when they are missing, and keep your other rules and hooks.
 - When it is set: the `Stop` hook sets the task field `attention` (`at` and `message`) when the task is `active`. The message is the end of the last answer of the session (12 lines at most). Nothing is set for any other status, or when the session still has background work.
-- Notification: the terminal shows "<name> may wait for you: <first line>" when the adapter supports `notify`. If the pane of the task is not focused, you are notified at once. If it is focused, the 60 second rule applies: the factory waits 60 seconds and notifies only if `attention` is still the same. A focused pane does not always mean you look at it, so the card shows "May wait for you" at once in both cases.
+- Notification: the terminal shows "<name> may wait for you: <first line>" when the adapter supports `notify`. If the pane of the task is not focused, you are notified at once. If it is focused, the 60 second rule applies: the factory waits 60 seconds and notifies only if `attention` is still the same. An adapter without the `focused` check also uses the 60 second rule. A focused pane does not always mean you look at it, so the card shows "May wait for you" at once in both cases.
 - Clearing: `attention` is cleared when you send a prompt (the hook, the dashboard or the menu) and when the task status changes (block, wait, approve, pause, finish and so on).
 - Display: `factory tasks` and the dashboard sort tasks with `attention` first, together with `blocked` tasks, then `awaiting_approval`. The text list adds ", may wait for you: <first line>".
 - Hooks never print anything and always exit 0. A hook error is logged as `hook_failed` on the task.

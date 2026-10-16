@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from conftest import events, hook, make_task, silent, task_json

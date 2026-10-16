@@ -127,7 +127,7 @@ def on_stop(ctx, data):
     task = state.update(ctx, tid, mark)
     if (task.get("attention") or {}).get("at") != at:
         return
-    events.log(ctx, tid, "attention", message=first_line(message))
+    events.log(ctx, tid, "attention", state.step_path_str(task), message=first_line(message))
     alert(ctx, task, at)
 
 
@@ -146,9 +146,9 @@ def clear(ctx, tid, reason):
         if t.get("attention") is not None:
             found.append(t.pop("attention"))
 
-    state.update(ctx, tid, drop)
+    task = state.update(ctx, tid, drop)
     if found:
-        events.log(ctx, tid, "attention_cleared", reason=reason)
+        events.log(ctx, tid, "attention_cleared", state.step_path_str(task), reason=reason)
     return bool(found)
 
 
@@ -173,7 +173,9 @@ def ready_ctx(cwd):
 def report_failure(ctx, kind, tid, error):
     try:
         if tid and repo.task_exists(ctx, tid):
-            events.log(ctx, tid, "hook_failed", hook=kind, error=str(error) or type(error).__name__)
+            task = fsio.read_json(state.task_file(ctx, tid))
+            step = state.step_path_str(task) if task else None
+            events.log(ctx, tid, "hook_failed", step, hook=kind, error=str(error) or type(error).__name__)
     except Exception:
         pass
 

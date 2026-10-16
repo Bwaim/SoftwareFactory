@@ -60,7 +60,7 @@ def update(ctx, tid, fn):
     result = fsio.update_json(task_file(ctx, tid), change)
     if dropped:
         from . import events
-        events.log(ctx, tid, "attention_cleared", reason="status")
+        events.log(ctx, tid, "attention_cleared", step_path_str(result), reason="status")
     return result
 
 

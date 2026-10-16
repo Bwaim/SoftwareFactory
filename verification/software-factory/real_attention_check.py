@@ -13,7 +13,7 @@ import yaml
 HERE = Path(__file__).resolve().parent
 SF = HERE.parents[1] / "software-factory"
 BIN = SF / "bin" / "factory"
-CLAUDE = os.environ.get("CLAUDE_BIN") or "/Users/fabienboismoreau/.local/bin/claude"
+CLAUDE = os.environ.get("CLAUDE_BIN") or shutil.which("claude")
 PROMPT = "Ask me which color I prefer, in plain text. Do not use any tool. Then stop."
 REPORT = HERE / "real-attention-check.md"
 
@@ -195,6 +195,8 @@ def write_report(res, error):
 
 
 def main():
+    if not CLAUDE:
+        sys.exit("Cannot find the claude command. Put it on PATH or set CLAUDE_BIN.")
     work = HERE / "work" / f"real-attention-{uuid.uuid4().hex[:6]}"
     work.mkdir(parents=True)
     work = work.resolve()
@@ -211,4 +213,5 @@ def main():
     sys.exit(0 if ok else 1)
 
 
-main()
+if __name__ == "__main__":
+    main()
