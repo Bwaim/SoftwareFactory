@@ -340,6 +340,8 @@ def init_cmd(args):
     for check in report["checks"]:
         print(f"{'OK' if check['ok'] else 'FAILED'}: {check['name']}: {check['message']}")
     print(f"Created: {len(report['created'])} files. Kept: {len(report['kept'])} files.")
+    for w in report.get("warnings", []):
+        print(f"Warning: {w}")
     if not report["library_git"]:
         print("Warning: the library is not in a git repository. Library commits are disabled.")
 
@@ -369,7 +371,16 @@ def menu_cmd(args):
 @cli.command("version check")
 def version_check(args):
     from . import repo, version
-    cli.emit(version.report(repo.load_ctx(task_opt=args.task)), args.json)
+    ctx = repo.load_ctx(task_opt=args.task)
+    report = version.report(ctx)
+    if report["initialized"] and report["repo_state"] == "same":
+        from . import init
+        try:
+            report["settings_updated"] = init.ensure_settings(ctx)
+        except FactoryError as e:
+            report["settings_updated"] = False
+            report["settings_message"] = str(e)
+    cli.emit(report, args.json)
 
 
 @cli.command("pipeline check")

@@ -1,4 +1,7 @@
+import copy
+import json
 import os
+import shlex
 import shutil
 from pathlib import Path
 
@@ -9,6 +12,7 @@ from .errors import FactoryError
 from .version import DATA_VERSION
 
 SETTINGS = {"permissions": {"allow": ["Bash(factory:*)", "Bash(factory *)"]}}
+HOOK_EVENTS = {"Stop": "hook stop", "UserPromptSubmit": "hook prompt"}
 EXCLUDES = [".factory/", ".factory.backup-*/"]
 BACKLOG_HEADER = "# Backlog\n"
 
@@ -39,6 +43,58 @@ def ensure_link():
         link.symlink_to(target)
     on_path = str(d) in os.environ.get("PATH", "").split(os.pathsep)
     return {"path": str(link), "target": str(target), "changed": changed, "on_path": on_path}
+
+
+def hook_command(sub):
+    return shlex.quote(str(link_dir() / "factory")) + " " + sub
+
+
+def settings_path(ctx):
+    return ctx.fdir / "claude-settings.json"
+
+
+def read_settings(path):
+    try:
+        data = json.loads(path.read_text())
+    except (ValueError, UnicodeDecodeError) as e:
+        raise FactoryError(f"{path} is not valid JSON ({e}). Fix or remove it, then run again.")
+    if not isinstance(data, dict):
+        raise FactoryError(f"{path} must hold a JSON object. Fix or remove it, then run again.")
+    return data
+
+
+def merge_settings(data, path):
+    changed = False
+    perms = data.setdefault("permissions", {})
+    allow = perms.setdefault("allow", []) if isinstance(perms, dict) else None
+    hooks = data.setdefault("hooks", {})
+    if allow is None or not isinstance(allow, list) or not isinstance(hooks, dict):
+        raise FactoryError(f"{path} has an unexpected shape in `permissions` or `hooks`. Fix or remove it, then run again.")
+    for rule in SETTINGS["permissions"]["allow"]:
+        if rule not in allow:
+            allow.append(rule)
+            changed = True
+    for event, sub in HOOK_EVENTS.items():
+        groups = hooks.setdefault(event, [])
+        if not isinstance(groups, list):
+            raise FactoryError(f"{path} has an unexpected shape in `hooks.{event}`. Fix or remove it, then run again.")
+        handlers = [h for g in groups if isinstance(g, dict) and isinstance(g.get("hooks"), list) for h in g["hooks"] if isinstance(h, dict)]
+        if not any(str(h.get("command", "")).endswith("factory " + sub) for h in handlers):
+            groups.append({"hooks": [{"type": "command", "command": hook_command(sub), "timeout": 10}]})
+            changed = True
+    return changed
+
+
+def ensure_settings(ctx):
+    path = settings_path(ctx)
+    with fsio.locked(path):
+        existed = path.exists()
+        data = read_settings(path) if existed else {}
+        changed = merge_settings(data, path)
+        if changed or not existed:
+            fsio.write_json(path, data)
+            return True
+        return False
 
 
 def terminal_check(ctx):
@@ -124,7 +180,14 @@ def init(cwd, library, create_library=False):
     write_new(f / "factory.yaml", lambda p: fsio.write_yaml(p, factory_data), report)
     write_new(f / "config.yaml", lambda p: fsio.write_yaml(p, {}), report)
     write_new(f / "backlog.md", lambda p: fsio.atomic_write_text(p, BACKLOG_HEADER), report)
-    write_new(f / "claude-settings.json", lambda p: fsio.write_json(p, SETTINGS), report)
+    settings_file = settings_path(ctx)
+    existed = settings_file.exists()
+    try:
+        ensure_settings(ctx)
+        report["created" if not existed else "kept"].append(str(settings_file))
+    except FactoryError as e:
+        report["kept"].append(str(settings_file))
+        report.setdefault("warnings", []).append(str(e))
     add_excludes(ctx)
     report["link"] = ensure_link()
     return report

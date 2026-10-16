@@ -16,7 +16,7 @@ def test_init_creates_files_and_exclude(factory, origin_repo, library_path, work
     assert data["version"] == 2 and data["library"] == str(library_path) and data["terminal"] == "fake"
     for name in ("config.yaml", "backlog.md", "claude-settings.json", "steps", "pipelines", "tasks/archive"):
         assert (f / name).exists()
-    assert json.loads((f / "claude-settings.json").read_text()) == init.SETTINGS
+    assert json.loads((f / "claude-settings.json").read_text())["permissions"] == init.SETTINGS["permissions"]
     exclude = (origin_repo / ".git" / "info" / "exclude").read_text().splitlines()
     assert ".factory/" in exclude and ".factory.backup-*/" in exclude
     assert (origin_repo / ".gitignore").exists() == gitignore_before
