@@ -25,4 +25,9 @@ Ideas and requirements not in the current build. Move them to `factory_skill_cre
 
 - agents communication to have subagents
 
-- Add `exclusive: android-emulator` for the steps `nx-verify-fix` and `nx-reproduce-bug`
+- bug: when launching other task have to tape enter
+- separate claude code as an adpater
+- cancel a ticket with a reason that move it to done and reject
+
+- When no Needs QA, something is moving to Done? seems not
+- Remove label "dobby-needs-human" when finished
