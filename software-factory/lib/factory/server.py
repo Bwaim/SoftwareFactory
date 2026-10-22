@@ -193,7 +193,7 @@ def make_handler(server):
             except ExistsError as e:
                 self.reply(409, {"error": str(e)})
             except FactoryError as e:
-                self.reply(400, {"error": str(e)})
+                self.reply(400, {"error": str(e), **getattr(e, "details", {})})
             except Exception as e:
                 self.reply(500, {"error": f"Internal error: {e}"})
 

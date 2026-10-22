@@ -151,29 +151,58 @@ class HerdrAdapter(Adapter):
         if self.owned_agent(handle) is not None:
             run(["agent", "send-keys", handle["agent"], "ctrl+c", "ctrl+c"], check=False)
 
+    def target_state(self, handle):
+        workspace_id, tab_id = handle.get("workspace"), handle.get("tab")
+        try:
+            r = run(["workspace", "list"], check=False)
+            if r.returncode != 0:
+                return "unknown"
+            ids = [w.get("workspace_id") for w in parse(r).get("result", {}).get("workspaces", [])]
+            if workspace_id and workspace_id not in ids:
+                return "gone"
+            if not tab_id:
+                return "present"
+            for candidate in [workspace_id] if workspace_id else ids:
+                r = run(["tab", "list", "--workspace", candidate], check=False)
+                if r.returncode != 0:
+                    return "unknown"
+                if tab_id in {t.get("tab_id") for t in parse(r).get("result", {}).get("tabs", [])}:
+                    return "present"
+        except (AdapterError, AttributeError):
+            return "unknown"
+        return "gone"
+
     def close_own(self, handle):
         workspace_id, tab_id = handle.get("workspace"), handle.get("tab")
+        command = None
         if workspace_id:
             tabs = self.tabs(workspace_id, tab_id)
             if tabs is not None and (len(tabs) <= 1 if tab_id is None else all(t["tab_id"] == tab_id for t in tabs)):
-                run(["workspace", "close", workspace_id], check=False)
-                return
-        if tab_id:
-            run(["tab", "close", tab_id], check=False)
+                command = ["workspace", "close", workspace_id]
+        if command is None and tab_id:
+            command = ["tab", "close", tab_id]
+        if command is None:
+            return
+        r = run(command, check=False)
+        if r.returncode != 0 and self.target_state(handle) != "gone":
+            raise AdapterError(f"herdr {command[0]} close failed: {(r.stderr or r.stdout).strip()}")
 
     def close_extra(self, workspace_id):
         tabs = self.tabs(workspace_id)
         if tabs is not None and len(tabs) == 1 and tabs[0].get("agent_status", "unknown") == "unknown":
-            run(["workspace", "close", workspace_id], check=False)
+            r = run(["workspace", "close", workspace_id], check=False)
+            if r.returncode != 0:
+                return f"The workspace {workspace_id} was not closed: {(r.stderr or r.stdout).strip()}"
+        return None
 
     def close(self, handle, stop=True):
         if not handle:
-            return
+            return []
         if stop:
             self.stop_agent(handle)
         self.close_own(handle)
-        for workspace_id in handle.get("extra_workspaces", []):
-            self.close_extra(workspace_id)
+        problems = [self.close_extra(workspace_id) for workspace_id in handle.get("extra_workspaces", [])]
+        return [p for p in problems if p]
 
     def send_prompt(self, handle, text):
         self.require_owned(handle)

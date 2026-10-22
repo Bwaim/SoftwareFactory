@@ -41,7 +41,14 @@ def workspace_list():
     return workspaces
 
 
-if args[:2] == ["worktree", "open"]:
+if args[:2] in (["tab", "close"], ["workspace", "close"]) and (os.environ.get("FAKE_HERDR_CLOSE_FAILS") == "1" or os.environ.get("FAKE_HERDR_GONE") == "1" or os.environ.get("FAKE_HERDR_LIST_FAILS") == "1"):
+    print(json.dumps({"error": {"code": "close_failed"}}))
+    sys.exit(1)
+elif args[:2] in (["tab", "list"], ["workspace", "list"]) and os.environ.get("FAKE_HERDR_LIST_FAILS") == "1":
+    sys.exit(1)
+elif args[:2] in (["tab", "list"], ["workspace", "list"]) and os.environ.get("FAKE_HERDR_GONE") == "1":
+    print(json.dumps({"result": {"type": "tab_list" if args[0] == "tab" else "workspace_list", "tabs" if args[0] == "tab" else "workspaces": []}}))
+elif args[:2] == ["worktree", "open"]:
     if os.environ.get("FAKE_HERDR_NO_TAB_ID") == "1":
         del pane["tab_id"]
     already_open = os.environ.get("FAKE_HERDR_ALREADY_OPEN") == "1"

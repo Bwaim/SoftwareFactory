@@ -172,28 +172,40 @@ def archive_target(ctx, tid):
     return target
 
 
+class RemovalIncomplete(FactoryError):
+    def __init__(self, left):
+        super().__init__("\n".join(left))
+        self.details = {"archived": True, "left": list(left)}
+
+
 def close_terminal(ctx, handle):
     if not handle:
-        return
+        return []
     try:
-        adapters.get_adapter(ctx).close(handle)
-    except AdapterError:
-        pass
+        return adapters.get_adapter(ctx).close(handle) or []
+    except AdapterError as e:
+        raise FactoryError(f"The terminal failed to close, so nothing was changed: {e}")
 
 
 def delete(ctx, tid, confirm_unpushed=False):
     plan = plan_delete(ctx, tid)
     if plan["needs_confirm"] and not confirm_unpushed:
         raise FactoryError(render_plan(plan) + "\nRun again with --confirm-unpushed after the user approves.")
-    close_terminal(ctx, plan["terminal_handle"])
+    left = close_terminal(ctx, plan["terminal_handle"])
     if plan["worktree"] and Path(plan["worktree"]).exists():
-        repo.git(["worktree", "remove", "--force", plan["worktree"]], ctx.main)
+        r = repo.git(["worktree", "remove", "--force", plan["worktree"]], ctx.main, check=False)
+        if r.returncode != 0:
+            left.append(f"The worktree {plan['worktree']} was not removed: {(r.stderr or r.stdout).strip()}")
     repo.git(["worktree", "prune"], ctx.main, check=False)
     if plan["branch"] and plan["delete_branch"]:
-        repo.git(["branch", "-D", plan["branch"]], ctx.main, check=False)
+        r = repo.git(["branch", "-D", plan["branch"]], ctx.main, check=False)
+        if r.returncode != 0:
+            left.append(f"The branch {plan['branch']} was not deleted: {(r.stderr or r.stdout).strip()}")
     events.log(ctx, tid, "task_deleted", None)
     target = archive_target(ctx, tid)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(state.task_dir(ctx, tid)), str(target))
     exclusive.forget(ctx, tid)
+    if left:
+        raise RemovalIncomplete(left)
     return plan

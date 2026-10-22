@@ -214,3 +214,26 @@ def test_herdr_focused_refused_when_agent_in_other_tab(herdr_env, monkeypatch):
     monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w3:t4")
     with pytest.raises(AdapterError, match="does not belong"):
         adapter.focused({"agent": "t1", "tab": "w9:t1"})
+
+
+def test_close_fails_when_tab_stays(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    handle = adapter.start_session("t1", origin_repo / "wt", "p", [])
+    monkeypatch.setenv("FAKE_HERDR_CLOSE_FAILS", "1")
+    with pytest.raises(AdapterError):
+        adapter.close(handle)
+
+
+def test_close_of_gone_tab_is_success(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    handle = adapter.start_session("t1", origin_repo / "wt", "p", [])
+    monkeypatch.setenv("FAKE_HERDR_GONE", "1")
+    assert adapter.close(handle) == []
+
+
+def test_close_fails_when_list_fails(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    handle = adapter.start_session("t1", origin_repo / "wt", "p", [])
+    monkeypatch.setenv("FAKE_HERDR_LIST_FAILS", "1")
+    with pytest.raises(AdapterError):
+        adapter.close(handle)

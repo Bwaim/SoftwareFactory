@@ -1,3 +1,5 @@
+import subprocess
+
 from .. import fsio
 from .base import OPTIONAL, Adapter, AdapterError, herdr_name
 
@@ -31,7 +33,15 @@ class FakeAdapter(Adapter):
         return {"agent": real, "fake": True}
 
     def close(self, handle):
+        cfg = self.cfg()
+        on_close = cfg.get("on_close")
+        if on_close:
+            for argv in on_close["commands"]:
+                subprocess.run(argv, cwd=on_close["cwd"], check=True, capture_output=True)
         self.record("close", handle=handle)
+        if cfg.get("fail_close"):
+            raise AdapterError("The fake adapter failed to close the terminal.")
+        return []
 
     def require(self, action):
         if action not in self.capabilities():
