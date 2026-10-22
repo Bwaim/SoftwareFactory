@@ -1,4 +1,5 @@
 import sys
+from contextlib import ExitStack
 
 from . import adapters, events, fsio, launch, session, state
 from .adapters.base import AdapterError, herdr_name
@@ -87,7 +88,11 @@ def apply_pending(ctx, task):
     if not task.get("claude_rename_pending") or not task.get("terminal_handle"):
         return False
     tid = task["id"]
-    with fsio.try_locked(state.task_dir(ctx, tid) / "rename") as got:
+    with ExitStack() as stack:
+        try:
+            got = stack.enter_context(fsio.try_locked(state.task_dir(ctx, tid) / "rename"))
+        except FileNotFoundError:
+            return False
         if not got:
             return False
         task = state.load(ctx, tid)

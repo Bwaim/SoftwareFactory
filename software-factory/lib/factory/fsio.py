@@ -10,9 +10,10 @@ import yaml
 from .errors import FactoryError
 
 
-def atomic_write_text(path, text):
+def atomic_write_text(path, text, create=True):
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if create:
+        path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as f:
@@ -26,10 +27,11 @@ def atomic_write_text(path, text):
 
 
 @contextmanager
-def locked(path):
+def locked(path, create=True):
     path = Path(path)
     lock = path.with_name(path.name + ".lock")
-    lock.parent.mkdir(parents=True, exist_ok=True)
+    if create:
+        lock.parent.mkdir(parents=True, exist_ok=True)
     with open(lock, "a") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
         try:
@@ -98,16 +100,16 @@ def read_json(path, default=None):
     return json.loads(path.read_text())
 
 
-def write_json(path, data):
-    atomic_write_text(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+def write_json(path, data, create=True):
+    atomic_write_text(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n", create=create)
 
 
-def update_json(path, fn, default_factory=dict):
-    with locked(path):
+def update_json(path, fn, default_factory=dict, create=True):
+    with locked(path, create=create):
         data = read_json(path)
         data = default_factory() if data is None else data
         result = fn(data)
-        write_json(path, data)
+        write_json(path, data, create=create)
         return result
 
 
@@ -129,9 +131,10 @@ def update_text(path, fn):
         return new
 
 
-def append_line(path, line):
+def append_line(path, line, create=True):
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with locked(path):
+    if create:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    with locked(path, create=create):
         with open(path, "a") as f:
             f.write(line.rstrip("\n") + "\n")

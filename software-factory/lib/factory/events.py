@@ -6,7 +6,10 @@ from .state import now, task_dir
 
 def log(ctx, tid, type, step=None, **details):
     line = json.dumps({"ts": now(), "type": type, "step": step, **details}, ensure_ascii=False)
-    fsio.append_line(task_dir(ctx, tid) / "events.jsonl", line)
+    try:
+        fsio.append_line(task_dir(ctx, tid) / "events.jsonl", line, create=False)
+    except FileNotFoundError:
+        pass
 
 
 def read(ctx, tid):

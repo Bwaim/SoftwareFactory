@@ -57,7 +57,10 @@ def update(ctx, tid, fn):
         task["updated_at"] = now()
         return task
 
-    result = fsio.update_json(task_file(ctx, tid), change)
+    try:
+        result = fsio.update_json(task_file(ctx, tid), change, create=False)
+    except FileNotFoundError:
+        raise FactoryError(f"Unknown task {tid}.")
     if dropped:
         from . import events
         events.log(ctx, tid, "attention_cleared", step_path_str(result), reason="status")

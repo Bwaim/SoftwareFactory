@@ -2,6 +2,7 @@ import os
 import shlex
 import subprocess
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 
 from . import config, events, exclusive, fsio, keys, loops, render, repo, session, state
@@ -465,7 +466,11 @@ def waiting_step(ctx, task):
 
 def check_task(ctx, tid):
     state.load(ctx, tid)
-    with fsio.try_locked(state.task_dir(ctx, tid) / "check") as got:
+    with ExitStack() as stack:
+        try:
+            got = stack.enter_context(fsio.try_locked(state.task_dir(ctx, tid) / "check"))
+        except FileNotFoundError:
+            raise FactoryError(f"Unknown task {tid}.")
         if not got:
             return check_result(tid, error=CHECK_BUSY, busy=True)
         task = state.load(ctx, tid)
