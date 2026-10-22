@@ -69,6 +69,13 @@ def notify(ctx, text):
         pass
 
 
+def close_quietly(ctx, handle):
+    try:
+        adapters.get_adapter(ctx).close(handle)
+    except (AdapterError, FactoryError):
+        pass
+
+
 def live_state(ctx, task):
     handle = task.get("terminal_handle")
     if not handle:
@@ -136,7 +143,12 @@ def resume(ctx, tid, extra=None):
             state.set_status(t, saved["status"], saved.get("reason"))
             t["saved_status"] = None
 
-    task = state.update(ctx, tid, change)
+    try:
+        task = state.update(ctx, tid, change)
+    except FactoryError:
+        if not state.task_file(ctx, tid).exists():
+            close_quietly(ctx, handle)
+        raise
     events.log(ctx, tid, "task_resumed", state.step_path_str(task))
     if task.get("exclusive_wait"):
         exclusive.handover(ctx, task["exclusive_wait"]["name"])

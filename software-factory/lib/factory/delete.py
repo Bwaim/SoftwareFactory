@@ -1,8 +1,9 @@
 import shutil
+from contextlib import ExitStack
 from datetime import datetime
 from pathlib import Path
 
-from . import adapters, events, exclusive, repo, state
+from . import adapters, events, exclusive, fsio, repo, state
 from .adapters.base import AdapterError
 from .errors import FactoryError
 
@@ -329,7 +330,12 @@ def remove_cancel(ctx, tid):
 def remove(ctx, tid, mode, confirm_unpushed=False):
     if mode not in ("delete", "cancel"):
         raise FactoryError(f"Unknown removal mode {mode}.")
-    result, left, extra, lines = remove_cancel(ctx, tid) if mode == "cancel" else remove_delete(ctx, tid, confirm_unpushed)
+    with ExitStack() as stack:
+        try:
+            stack.enter_context(fsio.locked(state.task_dir(ctx, tid) / "check", create=False))
+        except FileNotFoundError:
+            raise FactoryError(f"Unknown task {tid}.")
+        result, left, extra, lines = remove_cancel(ctx, tid) if mode == "cancel" else remove_delete(ctx, tid, confirm_unpushed)
     exclusive.forget(ctx, tid)
     if left:
         raise RemovalIncomplete(left, extra, lines)
