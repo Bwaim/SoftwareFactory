@@ -31,7 +31,7 @@ A local dashboard shows all tasks as a Kanban board and the backlog, and lets me
 1. Brainstorm. Use the `/superpowers:brainstorming` skill to create a specification file from these requirements. Save the specification file in `SPEC_DIR/` before writing the plan.
 2. Ask validation. Ask the user to validate the specification file.
 3. Plan. After specification validation, use the `/superpowers:writing-plans` skill to create an implementation plan from the specification file. Save the plan file in `PLAN_DIR/` before writing implementation code. Split the plan into these milestones, in this order:
-    1. Core: the `factory` CLI, task state, step execution, config, worktree creation, the terminal adapter with the Herdr adapter, task launch and delete with their dry runs, Init and the orchestrator menu.
+    1. Core: the `factory` CLI, task state, step execution, config, worktree creation, the terminal adapter with the Herdr adapter, task launch, delete and cancel with their dry runs, Init and the orchestrator menu.
     2. Task life: statuses, blocked, approval, board columns, external waiting, pause and resume, goto, artifacts, focus and send prompt, clean, backlog, event log.
     3. Authoring: pipeline editor with its step editor and its local server, catalog, library commits.
     4. Lifecycle and docs: versioning, migration, README without the dashboard parts.
@@ -399,6 +399,7 @@ Save the plan in the artifacts folder, not in the repository.
   - Send prompt: free text, sent with `factory terminal send-prompt`
   - Pause: asks to wait until the session is idle, or to stop now. Waiting runs in the background on the server with the adapter `wait-idle`, so the page never freezes.
   - Resume, when the task is `paused` or its session is `gone`
+  - Cancel, in red, on every card that is not in the Done column: `factory cancel` (see Task cancel)
 - A "Launch" button opens a form: pipeline, description and inputs. A `long-text` input is a text area. The form shows the `factory launch --dry-run` result, and launches after the user confirms.
 - The Done column has a "Clean" button. It shows the `factory clean` result, and deletes the selected tasks with `delete-task`.
 
@@ -540,10 +541,39 @@ Save the plan in the artifacts folder, not in the repository.
   - Uncommitted changes
   - Commits not pushed to `origin`
 - If there are any, the dry run shows them, and the delete runs only with `--confirm-unpushed`, after explicit user approval.
-- A branch counts as merged when its content is already in `origin/<base_ref>`: `git merge-tree --write-tree origin/<base_ref> refs/heads/<branch>`, run in the main repository, succeeds and prints the tree of `origin/<base_ref>`. This covers squash merges. A later change of the same lines on `origin/<base_ref>` makes the check report "not merged", the safe side. Then its commits are not listed as lost, and the dry run says "merged (squash)".
+- A branch counts as merged when its content is already in `origin/<base_ref>`: `git merge-tree --write-tree origin/<base_ref> refs/heads/<branch>`, run in the main repository, succeeds and prints the tree of `origin/<base_ref>`. This covers squash merges. Then its commits are not listed as lost, and the dry run says "merged (squash)".
+- A branch also counts as merged (squash) when one commit of `origin/<base_ref>` has the same patch id as the whole branch diff:
+  - Branch patch id: `git diff <merge-base> refs/heads/<branch> | git patch-id --stable`, with `<merge-base>` from `git merge-base refs/heads/<branch> origin/<base_ref>`.
+  - Patch ids of `origin/<base_ref>`: `git log -p --no-merges <merge-base>..origin/<base_ref> -- <files>`, piped to `git patch-id --stable`. `<files>` are the files the branch changes, from `git diff --name-only -z <merge-base> refs/heads/<branch>`. The squash commit changes exactly these files, so the filter keeps the result and reads far less history.
+  - An empty branch diff gives no patch id. It never counts as merged by patch id.
+  - This finds a squash merge also after a later change of the same lines. A local commit added after the squash changes the branch patch id, so its work is never lost.
+- Clean, delete and cancel use one function to decide if a branch is merged. When the branch is merged by content (ancestor, `git merge-tree` or patch id), the delete needs no `--confirm-unpushed`. "Pushed, and its remote branch was deleted" alone does not prove that the work is merged: the delete still lists its commits and asks for approval. After the approval, it removes the worktree and keeps the branch.
+- The branch comes from the task state `branch` when the worktree folder is gone or in detached HEAD.
 - It deletes the local branch only if it is pushed or merged. It never deletes a remote branch.
 - It closes the task terminal with `factory terminal close`, then removes the worktree with `git worktree remove`.
 - It moves the task folder to `.factory/tasks/archive/<id>/`. It does not delete it.
+- When the terminal close fails, the delete stops before any change and reports the error. The task stays, and the user can run it again. A close of a tab or session that is already gone counts as a success, for example for a paused task or a task whose session is gone.
+- When a later part fails (worktree remove, branch delete), the delete goes on with the other parts and still archives the task. At the end it fails with the list of what is left, for example "The branch <branch> was not deleted: <git error>", so the user removes it by hand. It never ignores an error.
+- After the archive, no `factory` command recreates the task folder. A hook for a task that is not found exits 0 and writes nothing. A command for it fails with "Unknown task <id>." and writes nothing. Writes inside a task folder, for example the event log and its lock, never create the folder.
+
+##### Task cancel
+
+- A task that is not `finished` is cancelled with `factory cancel <id> [--dry-run]`. It does not use Claude. The dashboard Cancel button uses it.
+- It reuses `delete-task`, with these differences:
+  - It always deletes the local branch, also when it is not pushed or merged. It never deletes a remote branch.
+  - It needs no `--confirm-unpushed`. The user confirms the cancel once, after seeing the lost work.
+  - It logs `task_cancelled`. The archived task state has the status `cancelled`.
+- It refuses a `finished` task with: "The task is finished. Use Clean or `factory delete <id>`."
+- It works in every other status, also when the task is paused, its session is gone, or its worktree folder no longer exists.
+- The dry run shows what it removes, the lost work (uncommitted changes and commits not on `origin`, none for a branch merged by content), and a warning when the branch exists on `origin` or `mr_url` is set: "The remote branch and the merge request stay open. Close them by hand."
+- After the cancel, it prints the deleted branch and its last commit, so the user can restore it with `git branch <branch> <commit>`.
+- Before it removes the worktree, it saves the uncommitted changes, new files included, as a commit that no branch points to: `git add -A`, then `git stash create "factory cancel <id>"`, in the worktree. This does not change the stash list. It prints the commit, so the user can get the changes back with `git stash apply <commit>`. This covers the edits the session makes between the dry run and the cancel.
+- The save and the branch commit in the restore line are read after the terminal close, never from the plan made before it. The session can still edit and commit until it is closed.
+- When this save fails, the cancel stops and reports the error. The worktree and the branch stay, and the task stays on the board. The terminal is already closed, so a new cancel works.
+- It runs its checks again when it runs, and does not trust the dry run result. It handles failures like the delete: a failed terminal close stops it before any change, a later failure is reported after the archive.
+- It waits for the lock that `factory poll` uses for one task as its first action, before the terminal close, and holds it until the folder is moved, so no check runs during or after the cancel. A check that starts after the move stops on "task not found" before it opens the lock. A background job of the task that ends after the cancel changes nothing.
+- It releases the exclusive resource of the task, and the task leaves every waiting queue.
+- In the dashboard, the Cancel button opens a dialog in the page. It shows "Loading…" while the dry run runs, then the dry run. "Cancel task" is disabled until then. Its buttons are "Cancel task", in red, and "Keep task". Escape and a click outside do the same as "Keep task". After the cancel, the card is removed at once. When the cancel fails before the archive, the dialog shows the error and the card stays. When some parts are left after the archive, the dialog lists them.
 
 ##### Event log
 
@@ -558,6 +588,7 @@ Save the plan in the artifacts folder, not in the repository.
   - `config_asked`, with the key
   - `migrated`, with the versions
   - `task_deleted`
+  - `task_cancelled`
   - `task_blocked`, with the reason
   - `task_unblocked`
   - `task_paused`
@@ -622,17 +653,17 @@ Save the plan in the artifacts folder, not in the repository.
 - It lists the `finished` tasks. For each one, it shows if its work is merged:
   - The branch is merged into `origin/<base_ref>`, or
   - The branch was pushed and its remote branch no longer exists, as after a merge request with "delete source branch".
-  - The branch content is already in `origin/<base_ref>`, as after a squash merge (see Task delete).
+  - The branch content is already in `origin/<base_ref>`, or its patch id matches a commit of `origin/<base_ref>`, as after a squash merge (see Task delete). These come before the remote branch reason.
 - A finished task without a branch counts as merged.
 - Merged tasks are selected by default. The user can change the selection.
 - Each selected task goes through `delete-task`, with all its checks.
 
 ##### Exclusive steps
 
-- A task holds the resource of an `exclusive` step while that step is its current step and has started. It releases it when it leaves the step: done, skip, goto, a loop jump to a step without the name, the end of the pipeline, or delete. A paused task keeps it, and its card says so.
+- A task holds the resource of an `exclusive` step while that step is its current step and has started. It releases it when it leaves the step: done, skip, goto, a loop jump to a step without the name, the end of the pipeline, delete or cancel. A paused task keeps it, and its card says so.
 - A step can run `factory exclusive release <name>` to free the resource early, for example before a long wait for the user, and `factory exclusive acquire <name>` to take it again. `acquire` waits like `factory next` when another task holds it. `factory exclusive release <name> --force`, from the CLI, the menu or a "Release" button on the waiting card, frees it whatever task holds it, after a confirmation, and logs `exclusive_forced` on both tasks. `factory exclusive status` lists the resources, their holders and the waiting tasks.
 - `factory next` on a step whose resource another task holds does not start the step. It sets the task to `waiting_external` with the reason "Waiting for <name>, used by <task>", tells the session to end its turn, and logs `exclusive_wait`.
-- When the resource is released, the factory gives it directly to the task that has waited the longest and is not paused, which becomes the holder at once. A paused waiting task keeps its place in the queue. A deleted one leaves it. It sets that task to `active`, logs `exclusive_start`, and sends "`<name>` is yours now. Run `factory next`.", or "`<name>` is yours now. Continue the step." when the task waited in the middle of a step, after a resume if the session is gone. `factory poll` also checks the waiting tasks.
+- When the resource is released, the factory gives it directly to the task that has waited the longest and is not paused, which becomes the holder at once. A paused waiting task keeps its place in the queue. A deleted or cancelled one leaves it. It sets that task to `active`, logs `exclusive_start`, and sends "`<name>` is yours now. Run `factory next`.", or "`<name>` is yours now. Continue the step." when the task waited in the middle of a step, after a resume if the session is gone. `factory poll` also checks the waiting tasks.
 - The check and the start run under one lock per resource name that works across processes, so two tasks never get the same resource.
 - `factory status` and the cards show the resource and the task that holds it. A task that waits for a resource never shows "Mark done" or "Check now", and `factory external-done` refuses it.
 
@@ -778,6 +809,7 @@ Users ask for a dark theme. Start with the settings screen only.
   - `factory dashboard`: starts the local server if needed and opens the dashboard.
   - `factory launch <pipeline> ...` and `factory launch --dry-run ...`: create a task, or show what the launch would do.
   - `factory delete <id>` and `factory delete --dry-run <id>`: delete a task, or show what the delete would do.
+  - `factory cancel <id>` and `factory cancel --dry-run <id>`: cancel a task that is not finished, or show what the cancel would do.
   - `factory next`: prints the current step: the prompt of an `ai` step with its placeholders replaced and the factory footer, or the instruction to run `factory run-command`.
   - `factory run-command`: runs the command of the current `command` step and prints its output and its exit code.
   - `factory done`: runs the step checks (see Steps). If they pass, it saves the step end and prints the next step. If it fails, it prints why and stays on the step.
@@ -975,11 +1007,16 @@ The library, a folder in any git repository:
   - `factory launch --dry-run` reports the id, the worktree path and the branch case, and changes nothing. A taken id gets a suffix.
   - When the fake adapter fails to start the session, `factory launch` removes the worktree, the branch and the task folder it created.
   - `factory delete --dry-run` shows uncommitted changes and unpushed commits, and changes nothing. `factory delete` refuses them without `--confirm-unpushed`.
+  - `factory cancel` closes the terminal with the fake adapter, removes the worktree, deletes a local branch with unpushed commits, never deletes a remote branch, archives the task with the status `cancelled` and logs `task_cancelled`. It works on a paused task and on a task whose worktree folder is gone, and refuses a finished task. Its dry run changes nothing. The task is missing from `factory tasks` and the dashboard task list after the cancel.
+  - A cancelled task that holds an exclusive resource gives it to the next waiting task. The `Stop` hook and `factory poll`, run for a cancelled or deleted task, do not recreate its task folder.
   - Two processes writing `config.yaml` and `backlog.md` at the same time lose no write.
   - A command run outside a task worktree without `--task` fails with a message that says to add it.
   - `factory done` on the last step sets the task to `finished` and logs `task_finished`.
   - With the fake test adapter, focus and send prompt call the adapter, and are hidden when the adapter does not support them.
   - `factory clean` detects a branch merged into `origin/<base_ref>`, a pushed branch whose remote branch was deleted, and a branch not merged.
+  - A branch squash merged, with its remote branch deleted and a later change of the same lines on `origin/<base_ref>`, shows "merged (squash)" in Clean, and the delete removes it with no `--confirm-unpushed`. A local commit added after the squash is listed as lost. A squash merged branch whose worktree folder is gone is deleted. An empty branch diff is never merged by patch id.
+  - With the fake adapter failing to close the terminal, the delete and the cancel change nothing, report the error, and the task stays. A close of a terminal that is already gone counts as a success.
+  - With `git branch -D` failing, the delete and the cancel still archive the task and report the branch that is left.
   - `factory library commit` commits only the given library files. Another staged file in the test library repository stays staged and is not committed.
   - `factory step delete`: a local step file is removed, a local override makes the generic step used again, a `command` step also loses its script file unless another step names it, a built-in step is refused, a step with users and no replacement is refused with the list of users, `--dry-run` changes nothing, and a generic delete commits only the removed files.
   - `factory step hide` and `unhide` change `hidden_steps`. A hidden step is missing from `factory step list` and from the editor step API, shown with `--all`, and a pipeline that uses it still runs to the end with the fake adapter. `factory pipeline check` warns about it. Data without `hidden_steps` works.
