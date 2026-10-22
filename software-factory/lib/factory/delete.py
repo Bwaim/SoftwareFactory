@@ -131,8 +131,11 @@ def plan_delete(ctx, tid):
     errors = plan["check_errors"]
     if worktree and Path(worktree).exists():
         plan["uncommitted"] = git_lines(["status", "--porcelain"], worktree, "Cannot check uncommitted changes", errors)
+    detached = bool(worktree) and Path(worktree).exists() and current_branch(worktree) is None
     if by_content:
         plan["delete_branch"] = bool(branch)
+        if detached:
+            plan["unpushed"] = lost_commits(ctx, worktree, branch, base_ref, errors)
     else:
         plan["unpushed"] = lost_commits(ctx, worktree, branch, base_ref, errors)
         pushed = bool(branch) and ref_exists(ctx.main, f"refs/remotes/origin/{branch}") and is_ancestor(ctx.main, f"refs/heads/{branch}", f"refs/remotes/origin/{branch}")

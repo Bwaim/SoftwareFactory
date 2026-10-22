@@ -151,5 +151,17 @@ def test_detached_worktree_commits_are_listed(env):
     (wt / "d.txt").write_text("d\n")
     commit_all(wt, "detached work")
     plan = delete.plan_delete(ctx, task["id"])
-    assert plan["needs_confirm"]
+    assert plan["needs_confirm"] and not plan["by_content"] and not plan["delete_branch"]
+    assert any("detached work" in line for line in plan["unpushed"])
+
+
+def test_detached_commits_listed_even_when_state_branch_merged(env):
+    inited, ctx, other = env
+    task, wt = task_with_commit(inited, ctx, "feat/d")
+    squash_into_main(other, "feat/d")
+    git("checkout", "--detach", cwd=wt)
+    (wt / "d.txt").write_text("d\n")
+    commit_all(wt, "detached work")
+    plan = delete.plan_delete(ctx, task["id"])
+    assert plan["by_content"] and plan["needs_confirm"]
     assert any("detached work" in line for line in plan["unpushed"])
