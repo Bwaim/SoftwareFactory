@@ -77,3 +77,10 @@ def test_readme_describes_step_editor():
         assert needle in text, needle
     assert "run-script" not in text and "new-step-assistant" not in text and "Answer the questions of the assistant" not in text
     assert "composite" not in text and "--worktree" not in text
+
+
+def test_readme_describes_cancel():
+    text = (SF / "README.md").read_text()
+    for needle in ("factory cancel <id> [--dry-run]", "**Cancel**", "Cancel task", "Keep task", "patch id", "git stash apply"):
+        assert needle in text, needle
+    assert "the task counts as not merged" not in text

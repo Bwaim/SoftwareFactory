@@ -121,6 +121,7 @@ Herdr adapter:
 - **Send a prompt to a task**: send text to a task session.
 - **Resume a task**: restart a paused task, or a task whose session is gone.
 - **Delete a task**: close its terminal, remove its worktree and archive its folder.
+- **Cancel a task**: drop an unfinished task fully. It shows what is lost and asks once.
 - **Clean finished tasks**: delete finished tasks whose work is merged. A squash-merged branch counts as merged.
 - **Release a shared resource**: free an exclusive resource that a stuck task holds. It shows the holder and the waiting tasks, and asks you to confirm.
 - **Create or edit a pipeline**: open the pipeline editor in the browser.
@@ -178,6 +179,7 @@ Task life:
 - `factory pause [<id>] [--all] [--wait]`: pause a task or all tasks.
 - `factory resume <id>`: resume a task.
 - `factory delete <id> [--dry-run] [--confirm-unpushed]`: delete a task.
+- `factory cancel <id> [--dry-run]`: drop an unfinished task. It closes the Claude session and its terminal, removes the worktree, deletes the local branch and moves the task folder to the archive. It always deletes the local branch, even when the work is not merged or not pushed. It never deletes a remote branch and never closes a merge request. It refuses a finished task: use Clean or `factory delete <id>`. `--dry-run` changes nothing. It lists the uncommitted changes, the commits that are not on `origin` and the open remote branch. Without `--dry-run`, it asks for no second approval. After the cancel, it prints the restore lines: `git branch <branch> <commit>` for the branch, and `git stash apply <commit>` for the uncommitted changes. When the worktree was in detached HEAD, it also prints the commit where it was. The commit of the uncommitted changes is not on any branch, so `git gc` can remove it after about 2 weeks.
 - `factory clean`: list finished tasks that can be deleted.
 - `factory exclusive status [--json]`: list each exclusive resource with its holder and its queue.
 - `factory exclusive release <name> [--force]`: free a resource. Without `--force`, only the holder can do it. With `--force`, anyone can, and the holder loses it.
@@ -332,6 +334,7 @@ Card buttons:
 - **Send prompt**: send text to the session. If the session is working, choose "Wait until idle" or "Send now".
 - **Pause**: shown when the session exists and the task is not paused. Choose "Wait until idle" or "Stop now". The card shows "Pausing..." until it ends.
 - **Resume**: shown when the task is paused or its session is gone.
+- **Cancel**: red button, shown on every card that is not in `Done`. It opens a dialog that shows "Loading…" while the dry run runs, then what the cancel removes and what is lost. Click "Cancel task" (red) to cancel, or "Keep task" to stay. Escape and a click outside the dialog do the same as "Keep task". While it runs, the button shows "Cancelling…", and Escape and a click outside do nothing. The card is removed at once. When a part is left, for example a branch that git could not delete, the dialog stays open with the list.
 - A finished task has no Focus, Send prompt, Pause or Resume button.
 
 "Send prompt", "Pause", "Resume", "Launch", "Check" and the backlog "Start" are disabled when the terminal check fails.
@@ -356,7 +359,16 @@ The "Clean" button of the `Done` column lists the finished tasks that can be del
 3. If something would be lost, tick "I accept losing these changes" for that task.
 4. Click "Delete selected". A task you did not accept is skipped.
 
-A branch merged with a squash merge counts as merged when its content is already in `origin/<base_ref>`: `git merge-tree --write-tree` gives the tree of `origin/<base_ref>`. Its commits are not listed as lost, the reason is "merged (squash)", and the delete removes the local branch. When `origin/<base_ref>` later changed the same lines, the task counts as not merged, and the delete asks for `--confirm-unpushed`.
+Clean, delete and cancel use the same check. The reason of a task is one of these, in this order:
+
+1. `no branch`: the task has no local branch. A worktree in detached HEAD can still hold commits that were never pushed. They are listed, and the delete asks for approval.
+2. `merged into origin/<base_ref>`: the branch is an ancestor of `origin/<base_ref>`.
+3. `merged (squash)`: `git merge-tree --write-tree` gives the tree of `origin/<base_ref>`. The content of the branch is already there.
+4. `merged (squash)`, by patch id: the changes of the branch have the same patch id as a commit of `origin/<base_ref>`. This also works when a later commit changed the same lines. A commit added to the branch after the squash changes its patch id, so it is listed as lost.
+5. `pushed, and its remote branch was deleted`: the branch tracks its own remote branch, and that branch is gone. The commits are listed, the delete asks for approval, and it keeps the local branch.
+6. `not merged`: none of the above.
+
+For reasons 2 to 4, the commits are not listed as lost, and the delete removes the local branch with no approval.
 
 #### Backlog view
 
