@@ -1,6 +1,6 @@
 # Task cancel verification report
 
-Date: 2026-10-22 16:34
+Date: 2026-10-22 16:50
 
 ## Milestone 1. Merged branch check
 
@@ -66,7 +66,7 @@ Date: 2026-10-22 16:34
 
 ## Milestone 2. Cancel in the CLI
 
-25 of 25 tests pass.
+27 of 27 tests pass.
 
 | Test | Result |
 |---|---|
@@ -85,6 +85,8 @@ Date: 2026-10-22 16:34
 | `test_cancel::test_stash_failure_stops` | PASS |
 | `test_cancel::test_cancelled_task_missing_from_lists` | PASS |
 | `test_cancel::test_detached_commits_are_lost_work_and_restorable` | PASS |
+| `test_cancel::test_failed_release_keeps_restore_lines` | PASS |
+| `test_cancel::test_cancel_plan_without_session_has_no_none` | PASS |
 | `test_cancel_races::test_cancel_waits_for_running_check` | PASS |
 | `test_cancel_races::test_cancelled_holder_hands_resource_to_next` | PASS |
 | `test_cancel_races::test_cancelled_waiting_task_leaves_queue` | PASS |
@@ -122,7 +124,7 @@ Date: 2026-10-22 16:34
 
 ## Full test suite
 
-670 of 670 tests pass.
+672 of 672 tests pass.
 
 ## Updated tests
 
