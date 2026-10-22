@@ -27,3 +27,9 @@ def test_focus_asks_terminal_app():
 
 def test_card_shows_display_name_and_rename_error():
     assert "t.display_name" in PAGE and "Rename failed" in PAGE
+
+
+def test_cancel_button_and_dialog():
+    for text in ["Cancel task", "Keep task", "Cancelling…", "Loading…", "/cancel/dry-run", "openCancel", "state.removed"]:
+        assert text in PAGE
+    assert "confirm(" not in PAGE

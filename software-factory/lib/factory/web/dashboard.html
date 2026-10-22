@@ -85,7 +85,7 @@ const JOB_POLL_MS = 1000;
 const HIDDEN_KEY = "factory.hiddenColumns";
 const ICONS = { active: "▶", blocked: "⛔", awaiting_approval: "✋", waiting_external: "⏳", paused: "⏸", finished: "✓" };
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
-const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false };
+const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set() };
 const byId = (id) => document.getElementById(id);
 
 async function api(path, body, quiet) {
@@ -95,7 +95,7 @@ async function api(path, body, quiet) {
   try {
     const r = await fetch(path, opts);
     data = await r.json();
-    if (!r.ok) throw new Error(data.error || r.statusText);
+    if (!r.ok) throw Object.assign(new Error(data.error || r.statusText), { data });
   } catch (e) {
     showError(e.message);
     throw e;
@@ -122,7 +122,7 @@ function saveHidden() {
   try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(state.hidden)); } catch (e) {}
 }
 function modalOpen() { return !byId("modal").hidden; }
-function closeModal() { const m = byId("modal"); m.hidden = true; clear(m); m.dataset.dismissable = ""; state.lastKey = null; state.modalStart = new WeakMap(); }
+function closeModal() { const m = byId("modal"); m.hidden = true; clear(m); m.dataset.dismissable = ""; m.dataset.busy = ""; state.lastKey = null; state.modalStart = new WeakMap(); }
 function textFields(m) { return [...m.querySelectorAll("textarea, input:not([type]), input[type=text]")]; }
 function showModal({ title, content, dismissable = false, headButtons = [] }) {
   const m = clear(byId("modal"));
@@ -150,13 +150,14 @@ let pressedOnBackdrop = false;
 byId("modal").addEventListener("mousedown", (e) => { pressedOnBackdrop = e.target === byId("modal"); });
 byId("modal").addEventListener("click", (e) => {
   const m = byId("modal");
-  if (e.target === m && pressedOnBackdrop && m.dataset.dismissable) closeModal();
+  if (e.target === m && pressedOnBackdrop && m.dataset.dismissable && !m.dataset.busy) closeModal();
   pressedOnBackdrop = false;
 });
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape" || !modalOpen()) return;
   e.preventDefault();
   const m = byId("modal");
+  if (m.dataset.busy) return;
   const discard = m.querySelector(".discard");
   if (discard) { discard.remove(); return; }
   if (m.dataset.dismissable || !typedText()) closeModal(); else askDiscard();
@@ -200,7 +201,8 @@ async function refresh(force) {
     if (state.pollFailed) { hideError(); state.pollFailed = false; }
     const key = JSON.stringify([info, tasks, backlog, Math.floor(Date.now() / 60000)]);
     const changed = key !== state.lastKey;
-    Object.assign(state, { info, tasks, backlog, lastKey: key });
+    for (const id of [...state.removed]) if (!tasks.some((x) => x.id === id)) state.removed.delete(id);
+    Object.assign(state, { info, tasks: tasks.filter((x) => !state.removed.has(x.id)), backlog, lastKey: key });
     if (!changed || modalOpen() || state.dragging) return;
   } catch (e) { state.pollFailed = true; return; }
   render();
@@ -241,7 +243,7 @@ function tasksView() {
     const head = el("h3", {}, el("span", {}, name));
     if (name === "Done") head.append(button("Clean", openClean));
     const col = el("div", { class: "column" }, head);
-    for (const t of state.tasks.filter((x) => columnOf(x) === name)) col.append(taskCard(t));
+    for (const t of state.tasks.filter((x) => !state.removed.has(x.id) && columnOf(x) === name)) col.append(taskCard(t));
     board.append(col);
   }
   root.append(toolbar, board);
@@ -359,7 +361,43 @@ function taskButtons(t) {
     else if (!paused && live) row.append(button("Pause", () => openPause(t), { disabled: down, hint: ADAPTER_BUTTONS }));
     if (paused || !live) row.append(button("Resume", action(() => api(`/api/tasks/${t.id}/resume`, {})), { disabled: down, hint: ADAPTER_BUTTONS }));
   }
+  if (!finished) row.append(button("Cancel", () => openCancel(t), { cls: "danger" }));
   return row;
+}
+async function openCancel(t) {
+  const out = el("div", {}, "Loading…");
+  const keep = closeButton("Keep task");
+  const go = el("button", { class: "danger", disabled: true }, "Cancel task");
+  const m = showModal({ title: `Cancel task ${t.display_name}`, content: [out, el("div", { class: "footer" }, keep, go)], dismissable: true });
+  const busy = (on) => { keep.disabled = on; go.disabled = on; go.textContent = on ? "Cancelling…" : "Cancel task"; m.dataset.busy = on ? "1" : ""; };
+  const failure = (text) => out.replaceChildren(el("div", { class: "report" }, el("pre", { class: "bad" }, text)));
+  try {
+    const plan = await api(`/api/tasks/${t.id}/cancel/dry-run`, {});
+    out.replaceChildren(el("pre", {}, plan.text));
+    go.disabled = false;
+  } catch (e) { failure(e.message); }
+  go.addEventListener("click", async () => {
+    busy(true);
+    try {
+      await api(`/api/tasks/${t.id}/cancel`, {});
+      state.removed.add(t.id);
+      closeModal();
+      render();
+    } catch (e) {
+      if (e.data && e.data.archived) {
+        state.removed.add(t.id);
+        failure(e.message);
+        busy(false);
+        keep.disabled = false;
+        keep.textContent = "Close";
+        go.remove();
+        render();
+      } else {
+        failure(e.message);
+        busy(false);
+      }
+    }
+  });
 }
 async function focusTask(t) {
   const res = await api(`/api/tasks/${t.id}/focus`, {});
