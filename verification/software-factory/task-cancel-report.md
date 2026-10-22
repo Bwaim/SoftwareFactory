@@ -1,10 +1,10 @@
 # Task cancel verification report
 
-Date: 2026-10-22 16:50
+Date: 2026-10-22 18:45
 
 ## Milestone 1. Merged branch check
 
-55 of 55 tests pass.
+59 of 59 tests pass.
 
 | Test | Result |
 |---|---|
@@ -39,6 +39,10 @@ Date: 2026-10-22 16:50
 | `test_herdr_adapter::test_close_fails_when_tab_stays` | PASS |
 | `test_herdr_adapter::test_close_of_gone_tab_is_success` | PASS |
 | `test_herdr_adapter::test_close_fails_when_list_fails` | PASS |
+| `test_herdr_adapter::test_close_first_task_while_others_run_has_no_problem[FAKE_HERDR_LINKED_WS]` | PASS |
+| `test_herdr_adapter::test_close_first_task_while_others_run_has_no_problem[FAKE_HERDR_GROUP_CLOSE]` | PASS |
+| `test_herdr_adapter::test_close_last_task_closes_main_workspace` | PASS |
+| `test_herdr_adapter::test_existing_main_workspace_is_never_closed` | PASS |
 | `test_merge_check::test_patch_id_finds_squash_after_later_change` | PASS |
 | `test_merge_check::test_empty_branch_diff_is_not_patch_merged` | PASS |
 | `test_merge_check::test_commit_on_other_files_is_ignored` | PASS |
@@ -124,7 +128,7 @@ Date: 2026-10-22 16:50
 
 ## Full test suite
 
-672 of 672 tests pass.
+676 of 676 tests pass.
 
 ## Updated tests
 
