@@ -123,5 +123,8 @@ def artifact_file(ctx, tid, name):
 
 def artifact_path(ctx, tid, name):
     path = artifact_file(ctx, tid, name)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.parent.mkdir(exist_ok=True)
+    except FileNotFoundError:
+        raise FactoryError(f"Unknown task {tid}.")
     return path
