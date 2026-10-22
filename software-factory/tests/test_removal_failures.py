@@ -42,6 +42,7 @@ def test_branch_delete_failure_still_archives(started):
             delete.delete(ctx, task["id"])
     finally:
         lock.unlink()
+    assert str(e.value).startswith(f"Task {task['id']} deleted and archived, but some parts are left:")
     assert e.value.details["archived"] is True
     assert any(item.startswith("The branch feat/del was not deleted:") for item in e.value.details["left"])
     assert (inited.fdir / "tasks" / "archive" / task["id"] / "task.json").exists()

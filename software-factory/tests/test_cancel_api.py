@@ -51,6 +51,7 @@ def test_parts_left_reply(dash):
     finally:
         lock.unlink()
     assert status == 400 and rep["archived"] is True
+    assert f"Task {task['id']} cancelled and archived, but some parts are left:" in rep["error"]
     assert any(item.startswith("The branch feat/c was not deleted:") for item in rep["left"])
 
 

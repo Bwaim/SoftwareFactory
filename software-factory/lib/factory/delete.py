@@ -145,8 +145,14 @@ def plan_delete(ctx, tid):
     return plan
 
 
+def session_line(plan):
+    if plan["session_id"] is None:
+        return "- Claude session and its terminal: none"
+    return f"- Claude session {plan['session_id']} and its terminal"
+
+
 def render_plan(plan):
-    lines = [f"Delete task {plan['task_id']}:", f"- Claude session {plan['session_id']} and its terminal"]
+    lines = [f"Delete task {plan['task_id']}:", session_line(plan)]
     if plan["worktree"]:
         lines.append(f"- Worktree {plan['worktree']}")
     if plan["branch"]:
@@ -174,8 +180,8 @@ def archive_target(ctx, tid):
 
 
 class RemovalIncomplete(FactoryError):
-    def __init__(self, left, extra=None, lines=()):
-        super().__init__("\n".join([*lines, *left]))
+    def __init__(self, left, extra=None, lines=(), head=None):
+        super().__init__("\n".join([*([head] if head else []), *lines, *left]))
         self.details = {"archived": True, "left": list(left), **(extra or {})}
 
 
@@ -227,7 +233,7 @@ def plan_cancel(ctx, tid):
 
 
 def render_cancel_plan(plan):
-    lines = [f"Cancel task {plan['task_id']}:", f"- Claude session {plan['session_id']} and its terminal"]
+    lines = [f"Cancel task {plan['task_id']}:", session_line(plan)]
     if plan["worktree"]:
         lines.append(f"- Worktree {plan['worktree']}")
     if plan["branch"]:
@@ -336,9 +342,13 @@ def remove(ctx, tid, mode, confirm_unpushed=False):
         except FileNotFoundError:
             raise FactoryError(f"Unknown task {tid}.")
         result, left, extra, lines = remove_cancel(ctx, tid) if mode == "cancel" else remove_delete(ctx, tid, confirm_unpushed)
-    exclusive.forget(ctx, tid)
+    try:
+        exclusive.forget(ctx, tid)
+    except Exception as e:
+        left.append(f"The exclusive resources of {tid} were not released: {e}")
     if left:
-        raise RemovalIncomplete(left, extra, lines)
+        verb = "cancelled" if mode == "cancel" else "deleted"
+        raise RemovalIncomplete(left, extra, lines, f"Task {tid} {verb} and archived, but some parts are left:")
     return result
 
 

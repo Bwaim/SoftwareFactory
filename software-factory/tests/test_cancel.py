@@ -5,7 +5,7 @@ import shutil
 import pytest
 
 from conftest import fake_calls, fake_config, git, make_task, write_pipeline, write_step
-from factory import launch, repo, session, state
+from factory import delete, exclusive, launch, repo, session, state
 from test_squash_merge import squash_into_main, task_with_commit
 
 REFUSAL = "The task is finished. Use Clean or `factory delete <id>`."
@@ -160,6 +160,7 @@ def test_cancel_branch_delete_failure_still_archives(started):
     finally:
         lock.unlink()
     assert r.returncode == 1
+    assert f"Task {task['id']} cancelled and archived, but some parts are left:" in r.stderr
     commit = saved_commit(r.stderr)
     assert f"Uncommitted changes saved in {commit}: `git stash apply {commit}`." in r.stderr
     assert f"Restore it with `git branch feat/c {head}`." in r.stderr
@@ -228,3 +229,28 @@ def test_detached_commits_are_lost_work_and_restorable(inited):
     out = inited.factory("cancel", task["id"]).stdout
     assert f"Restore it with `git branch feat/d {branch_sha}`." in out
     assert f"The detached HEAD was at {sha}: `git branch <name> {sha}` restores it." in out
+
+
+def test_failed_release_keeps_restore_lines(started, monkeypatch):
+    inited, ctx, task = started
+    wt = inited.worktrees / task["id"]
+    commit_in(wt, "w.txt", "work")
+
+    def boom(c, tid):
+        raise RuntimeError("broken pipeline")
+
+    monkeypatch.setattr(exclusive, "forget", boom)
+    with pytest.raises(delete.RemovalIncomplete) as e:
+        delete.cancel(ctx, task["id"])
+    assert "Restore it with `git branch" in str(e.value)
+    assert "were not released" in str(e.value)
+    assert str(e.value).startswith(f"Task {task['id']} cancelled and archived, but some parts are left:")
+    assert archived(inited, task["id"])["status"] == "cancelled"
+
+
+def test_cancel_plan_without_session_has_no_none(inited):
+    ctx = repo.load_ctx(cwd=inited.repo)
+    make_task(ctx, "nosess", session_id=None)
+    plan = delete.plan_cancel(ctx, "nosess")
+    assert "None" not in delete.render_cancel_plan(plan)
+    assert "None" not in delete.render_plan(delete.plan_delete(ctx, "nosess"))

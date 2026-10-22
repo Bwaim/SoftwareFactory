@@ -121,7 +121,6 @@ Herdr adapter:
 - **Send a prompt to a task**: send text to a task session.
 - **Resume a task**: restart a paused task, or a task whose session is gone.
 - **Delete a task**: close its terminal, remove its worktree and archive its folder.
-- **Cancel a task**: drop an unfinished task fully. It shows what is lost and asks once.
 - **Clean finished tasks**: delete finished tasks whose work is merged. A squash-merged branch counts as merged.
 - **Release a shared resource**: free an exclusive resource that a stuck task holds. It shows the holder and the waiting tasks, and asks you to confirm.
 - **Create or edit a pipeline**: open the pipeline editor in the browser.
@@ -365,10 +364,10 @@ Clean, delete and cancel use the same check. The reason of a task is one of thes
 2. `merged into origin/<base_ref>`: the branch is an ancestor of `origin/<base_ref>`.
 3. `merged (squash)`: `git merge-tree --write-tree` gives the tree of `origin/<base_ref>`. The content of the branch is already there.
 4. `merged (squash)`, by patch id: the changes of the branch have the same patch id as a commit of `origin/<base_ref>`. This also works when a later commit changed the same lines. A commit added to the branch after the squash changes its patch id, so it is listed as lost.
-5. `pushed, and its remote branch was deleted`: the branch tracks its own remote branch, and that branch is gone. The commits are listed, the delete asks for approval, and it keeps the local branch.
+5. `pushed, and its remote branch was deleted`: the branch tracks its own remote branch, and that branch is gone. The delete asks for approval only when something would be lost: commits, uncommitted changes or failed checks. It always keeps the local branch.
 6. `not merged`: none of the above.
 
-For reasons 2 to 4, the commits are not listed as lost, and the delete removes the local branch with no approval.
+For reasons 2 to 4, the commits are not listed as lost, and the delete removes the local branch. Uncommitted changes still need approval. So do commits on a detached HEAD.
 
 #### Backlog view
 
