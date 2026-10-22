@@ -34,20 +34,6 @@ def content_merged(ctx, rev, base_ref):
     return r.stdout.splitlines()[0].strip() == base_tree
 
 
-def head_commit(worktree):
-    return repo.git(["rev-parse", "HEAD"], worktree, check=False).stdout.strip()
-
-
-def branch_merged_or_pushed(ctx, branch, base_ref):
-    local = f"refs/heads/{branch}"
-    if not ref_exists(ctx.main, local):
-        return False
-    for target in (f"refs/remotes/origin/{branch}", f"refs/remotes/origin/{base_ref}"):
-        if ref_exists(ctx.main, target) and is_ancestor(ctx.main, local, target):
-            return True
-    return False
-
-
 def current_branch(worktree):
     return repo.git(["symbolic-ref", "--short", "-q", "HEAD"], worktree, check=False).stdout.strip() or None
 
@@ -119,31 +105,38 @@ def clean_report(ctx):
     return rows
 
 
+def lost_commits(ctx, worktree, branch, base_ref, errors):
+    if worktree and Path(worktree).exists():
+        upstream = f"origin/{branch}" if branch and ref_exists(worktree, f"refs/remotes/origin/{branch}") else f"origin/{base_ref}"
+        return git_lines(["log", "--oneline", f"{upstream}..HEAD"], worktree, "Cannot check unpushed commits", errors)
+    if branch:
+        upstream = f"origin/{branch}" if ref_exists(ctx.main, f"refs/remotes/origin/{branch}") else f"origin/{base_ref}"
+        return git_lines(["log", "--oneline", f"{upstream}..refs/heads/{branch}"], ctx.main, "Cannot check unpushed commits", errors)
+    return []
+
+
 def plan_delete(ctx, tid):
     task = state.load(ctx, tid)
     worktree = task.get("worktree")
     base_ref = task.get("base_ref") or "main"
+    repo.git(["fetch", "origin", "--prune"], ctx.main, check=False)
+    branch = task_branch(ctx, task)
+    merged, reason, by_content = merge_state(ctx, branch, base_ref)
     plan = {
         "task_id": tid, "session_id": task.get("session_id"), "terminal_handle": task.get("terminal_handle"),
-        "worktree": worktree, "branch": None, "base_ref": base_ref, "uncommitted": [], "unpushed": [],
-        "squash_merged": False, "delete_branch": False, "needs_confirm": False, "check_errors": [],
+        "worktree": worktree, "branch": branch, "base_ref": base_ref, "uncommitted": [], "unpushed": [],
+        "squash_merged": by_content and reason == "merged (squash)", "delete_branch": False, "needs_confirm": False,
+        "check_errors": [], "reason": reason, "by_content": by_content,
     }
     errors = plan["check_errors"]
     if worktree and Path(worktree).exists():
-        repo.git(["fetch", "origin", "--prune"], ctx.main, check=False)
         plan["uncommitted"] = git_lines(["status", "--porcelain"], worktree, "Cannot check uncommitted changes", errors)
-        branch = current_branch(worktree)
-        plan["branch"] = branch
-        upstream = f"origin/{branch}" if branch and ref_exists(worktree, f"refs/remotes/origin/{branch}") else f"origin/{base_ref}"
-        plan["unpushed"] = git_lines(["log", "--oneline", f"{upstream}..HEAD"], worktree, "Cannot check unpushed commits", errors)
-        if plan["unpushed"] and not errors:
-            rev = f"refs/heads/{branch}" if branch else head_commit(worktree)
-            if rev and content_merged(ctx, rev, base_ref):
-                plan["squash_merged"] = True
-                plan["unpushed"] = []
-        if branch:
-            merged = plan["squash_merged"] or branch_merged_or_pushed(ctx, branch, base_ref)
-            plan["delete_branch"] = not errors and not plan["unpushed"] and merged
+    if by_content:
+        plan["delete_branch"] = bool(branch)
+    else:
+        plan["unpushed"] = lost_commits(ctx, worktree, branch, base_ref, errors)
+        pushed = bool(branch) and ref_exists(ctx.main, f"refs/remotes/origin/{branch}") and is_ancestor(ctx.main, f"refs/heads/{branch}", f"refs/remotes/origin/{branch}")
+        plan["delete_branch"] = not errors and not plan["unpushed"] and pushed
     plan["needs_confirm"] = bool(plan["uncommitted"] or plan["unpushed"] or errors)
     return plan
 

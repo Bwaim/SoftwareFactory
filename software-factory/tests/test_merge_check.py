@@ -1,5 +1,8 @@
+import pytest
+
 from conftest import commit_all, git
 from factory import delete, launch, state
+from factory.errors import FactoryError
 from test_squash_merge import env, finish, squash_into_main, task_with_commit
 
 
@@ -87,3 +90,66 @@ def test_remote_deleted_without_merge_is_not_by_content(env):
     git("push", "origin", "--delete", "feat/p", cwd=other)
     git("fetch", "origin", "--prune", cwd=inited.repo)
     assert delete.merge_state(ctx, "feat/p", "main") == (True, "pushed, and its remote branch was deleted", False)
+
+
+def squashed_task_with_later_change(inited, ctx, other):
+    task, wt = task_with_commit(inited, ctx, "feat/x", name="README.md", text="branch\n")
+    squash_into_main(other, "feat/x")
+    main_change(other, "README.md", "main later\n")
+    return task, wt
+
+
+def test_delete_removes_squash_merged_branch_after_later_change(env):
+    inited, ctx, other = env
+    task, _ = squashed_task_with_later_change(inited, ctx, other)
+    plan = delete.plan_delete(ctx, task["id"])
+    assert plan["unpushed"] == [] and not plan["needs_confirm"] and plan["delete_branch"]
+    assert plan["reason"] == "merged (squash)" and plan["by_content"] and plan["squash_merged"]
+    delete.delete(ctx, task["id"])
+    assert git("branch", "--list", "feat/x", cwd=inited.repo) == ""
+
+
+def test_local_commit_after_squash_is_lost_work(env):
+    inited, ctx, other = env
+    task, wt = squashed_task_with_later_change(inited, ctx, other)
+    (wt / "late.txt").write_text("late\n")
+    commit_all(wt, "late work")
+    plan = delete.plan_delete(ctx, task["id"])
+    assert plan["needs_confirm"] and not plan["delete_branch"]
+    assert any("late work" in line for line in plan["unpushed"])
+    with pytest.raises(FactoryError, match="--confirm-unpushed"):
+        delete.delete(ctx, task["id"])
+
+
+def test_worktree_removed_by_hand_squash_branch_is_deleted(env):
+    inited, ctx, other = env
+    task, wt = task_with_commit(inited, ctx, "feat/h")
+    squash_into_main(other, "feat/h")
+    git("worktree", "remove", "--force", str(wt), cwd=inited.repo)
+    delete.delete(ctx, task["id"])
+    assert git("branch", "--list", "feat/h", cwd=inited.repo) == ""
+
+
+def test_remote_deleted_without_merge_asks_and_keeps_branch(env):
+    inited, ctx, other = env
+    task, wt = task_with_commit(inited, ctx, "feat/p")
+    git("push", "origin", "--delete", "feat/p", cwd=other)
+    finish(ctx, task["id"])
+    rows = {r["id"]: r for r in inited.factory.json("clean")}
+    assert rows[task["id"]]["selected"] is True
+    plan = delete.plan_delete(ctx, task["id"])
+    assert plan["needs_confirm"] and plan["unpushed"] and not plan["by_content"]
+    delete.delete(ctx, task["id"], confirm_unpushed=True)
+    assert not wt.exists()
+    assert git("branch", "--list", "feat/p", cwd=inited.repo) != ""
+
+
+def test_detached_worktree_commits_are_listed(env):
+    inited, ctx, _ = env
+    task = launch.launch(ctx, "nb", "Detached", {})
+    wt = inited.worktrees / task["id"]
+    (wt / "d.txt").write_text("d\n")
+    commit_all(wt, "detached work")
+    plan = delete.plan_delete(ctx, task["id"])
+    assert plan["needs_confirm"]
+    assert any("detached work" in line for line in plan["unpushed"])
