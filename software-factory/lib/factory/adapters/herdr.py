@@ -3,12 +3,14 @@ import os
 import shutil
 import subprocess
 
+from .. import fsio
 from .base import OPTIONAL, Adapter, AdapterError, herdr_name
 
 TRUST_MARKERS = ("is this a project you created or one you trust", "yes, i trust this folder")
 START_TIMEOUT_MS = 60000
 QUESTION_BOX_MARKERS = ("enter to select", "↑/↓ to navigate", "esc to cancel")
 SCREEN_BOTTOM_LINES = 15
+GROUP_CLOSE_REQUIRED = "workspace_group_close_required"
 
 
 def run(args, timeout=60, check=True):
@@ -87,6 +89,19 @@ class HerdrAdapter(Adapter):
         after = self.main_repo_workspace_ids(self.workspaces(check=False))
         return [w for w in after if w not in before and w != handle.get("workspace")]
 
+    def shared_record(self):
+        return self.ctx.fdir / "herdr-workspaces.json"
+
+    def record_shared(self, ids):
+        fsio.update_json(self.shared_record(), lambda record: record.extend(w for w in ids if w not in record), default_factory=list)
+
+    def has_linked_workspaces(self, workspaces):
+        for workspace in workspaces:
+            info = workspace.get("worktree") or {}
+            if info.get("is_linked_worktree") and info.get("repo_root") and same_folder(info["repo_root"], self.ctx.main):
+                return True
+        return False
+
     def screen(self, name):
         r = run(["agent", "read", name, "--source", "recent-unwrapped", "--lines", "60"], check=False)
         return r.stdout
@@ -104,6 +119,7 @@ class HerdrAdapter(Adapter):
                 extra = self.find_extra_workspaces(before, handle)
                 if extra:
                     handle["extra_workspaces"] = extra
+                    self.record_shared(extra)
             run(["agent", "start", name, "--kind", "claude", "--pane", pane, "--timeout", str(START_TIMEOUT_MS), "--", *claude_args],
                 timeout=START_TIMEOUT_MS // 1000 + 30)
             agent_started = True
@@ -191,9 +207,44 @@ class HerdrAdapter(Adapter):
         tabs = self.tabs(workspace_id)
         if tabs is not None and len(tabs) == 1 and tabs[0].get("agent_status", "unknown") == "unknown":
             r = run(["workspace", "close", workspace_id], check=False)
-            if r.returncode != 0:
-                return f"The workspace {workspace_id} was not closed: {(r.stderr or r.stdout).strip()}"
-        return None
+            if r.returncode == 0:
+                return True, None
+            output = (r.stderr or r.stdout).strip()
+            if GROUP_CLOSE_REQUIRED in f"{r.stdout}{r.stderr}":
+                return False, None
+            return False, f"The workspace {workspace_id} was not closed: {output}"
+        return False, None
+
+    def close_recorded(self, record, old_ids):
+        record.extend(w for w in old_ids if w not in record)
+        if not record:
+            return []
+        r = run(["workspace", "list"], check=False)
+        workspaces = parse(r).get("result", {}).get("workspaces") if r.returncode == 0 else None
+        if not isinstance(workspaces, list):
+            workspaces = None
+        listed = None if workspaces is None else {w.get("workspace_id") for w in workspaces}
+        linked = workspaces is not None and self.has_linked_workspaces(workspaces)
+        problems, kept = [], []
+        for workspace_id in record:
+            if listed is not None and workspace_id not in listed:
+                continue
+            if linked:
+                kept.append(workspace_id)
+                continue
+            done, problem = self.close_extra(workspace_id)
+            if not done:
+                kept.append(workspace_id)
+            if problem:
+                problems.append(problem)
+        record[:] = kept
+        return problems
+
+    def close_shared(self, old_ids):
+        path = self.shared_record()
+        if not old_ids and not path.exists():
+            return []
+        return fsio.update_json(path, lambda record: self.close_recorded(record, old_ids), default_factory=list)
 
     def close(self, handle, stop=True):
         if not handle:
@@ -201,8 +252,7 @@ class HerdrAdapter(Adapter):
         if stop:
             self.stop_agent(handle)
         self.close_own(handle)
-        problems = [self.close_extra(workspace_id) for workspace_id in handle.get("extra_workspaces", [])]
-        return [p for p in problems if p]
+        return self.close_shared(handle.get("extra_workspaces", []))
 
     def send_prompt(self, handle, text):
         self.require_owned(handle)

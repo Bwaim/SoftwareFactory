@@ -9,6 +9,7 @@ with open(log, "a") as f:
 args = sys.argv[1:]
 mode = os.environ.get("FAKE_HERDR_MODE", "ok")
 main = os.environ.get("FAKE_HERDR_MAIN", "")
+closed_log = log + ".closed"
 pane = {"pane_id": "w9:p1", "workspace_id": "w9", "tab_id": "w9:t1"}
 
 
@@ -19,6 +20,13 @@ def option(name):
 def logged():
     with open(log) as f:
         return [json.loads(line) for line in f]
+
+
+def closed_workspaces():
+    if not os.path.exists(closed_log):
+        return set()
+    with open(closed_log) as f:
+        return set(f.read().split())
 
 
 def main_workspace(workspace_id, linked=False):
@@ -38,11 +46,17 @@ def workspace_list():
         workspaces.append({"workspace_id": "w9", "label": "wt", "worktree": {"checkout_path": "/wt", "is_linked_worktree": True, "repo_root": main}})
         if os.environ.get("FAKE_HERDR_EXTRA_WS") == "1":
             workspaces.append(main_workspace("w8"))
-    return workspaces
+    if os.environ.get("FAKE_HERDR_LINKED_WS") == "1":
+        workspaces.append({"workspace_id": "w6", "label": "wt2", "worktree": {"checkout_path": "/wt2", "is_linked_worktree": True, "repo_root": main}})
+    gone = closed_workspaces()
+    return [w for w in workspaces if w["workspace_id"] not in gone]
 
 
 if args[:2] in (["tab", "close"], ["workspace", "close"]) and (os.environ.get("FAKE_HERDR_CLOSE_FAILS") == "1" or os.environ.get("FAKE_HERDR_GONE") == "1" or os.environ.get("FAKE_HERDR_LIST_FAILS") == "1"):
     print(json.dumps({"error": {"code": "close_failed"}}))
+    sys.exit(1)
+elif args[:2] == ["workspace", "close"] and os.environ.get("FAKE_HERDR_GROUP_CLOSE") == "1" and args[2] in ("w5", "w8"):
+    print(json.dumps({"error": {"code": "workspace_group_close_required", "message": "workspace has linked worktree workspaces; use --group"}}))
     sys.exit(1)
 elif args[:2] in (["tab", "list"], ["workspace", "list"]) and os.environ.get("FAKE_HERDR_LIST_FAILS") == "1":
     sys.exit(1)
@@ -95,4 +109,7 @@ elif args[:2] == ["agent", "get"]:
         tab_id = pane_id.replace(":p", ":t")
     print(json.dumps({"result": {"agent": {"name": name, "agent_status": "idle", "tab_id": tab_id, "workspace_id": tab_id.split(":")[0], "focused": os.environ.get("FAKE_HERDR_FOCUSED") == "1"}}}))
 else:
+    if args[:2] == ["workspace", "close"]:
+        with open(closed_log, "a") as f:
+            f.write(args[2] + "\n")
     print(json.dumps({"result": {"type": "ok"}}))

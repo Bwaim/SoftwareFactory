@@ -237,3 +237,43 @@ def test_close_fails_when_list_fails(herdr_env, origin_repo, monkeypatch):
     monkeypatch.setenv("FAKE_HERDR_LIST_FAILS", "1")
     with pytest.raises(AdapterError):
         adapter.close(handle)
+
+
+def recorded(origin_repo):
+    path = origin_repo / ".factory" / "herdr-workspaces.json"
+    return json.loads(path.read_text()) if path.exists() else []
+
+
+@pytest.mark.parametrize("signal", ["FAKE_HERDR_LINKED_WS", "FAKE_HERDR_GROUP_CLOSE"])
+def test_close_first_task_while_others_run_has_no_problem(herdr_env, origin_repo, monkeypatch, signal):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_EXTRA_WS", "1")
+    handle = adapter.start_session("t1", origin_repo / "wt", "p", [])
+    assert recorded(origin_repo) == ["w8"]
+    monkeypatch.setenv(signal, "1")
+    assert adapter.close(handle) == []
+    assert recorded(origin_repo) == ["w8"]
+    assert not any("--group" in c for c in calls())
+
+
+def test_close_last_task_closes_main_workspace(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_EXTRA_WS", "1")
+    first = adapter.start_session("t1", origin_repo / "wt", "p", [])
+    monkeypatch.setenv("FAKE_HERDR_LINKED_WS", "1")
+    assert adapter.close(first) == []
+    assert "w8" not in closed(calls())
+    monkeypatch.delenv("FAKE_HERDR_LINKED_WS")
+    assert adapter.close({"agent": "t2", "tab": "w9:t2"}) == []
+    assert ["workspace", "close", "w8"] in calls()
+    assert not any("--group" in c for c in calls())
+    assert recorded(origin_repo) == []
+
+
+def test_existing_main_workspace_is_never_closed(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_EXISTING_WS", "1")
+    handle = adapter.start_session("t1", origin_repo / "wt", "p", [])
+    assert adapter.close(handle) == []
+    assert "w5" not in closed(calls())
+    assert "w5" not in recorded(origin_repo)
