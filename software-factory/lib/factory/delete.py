@@ -236,10 +236,10 @@ def render_cancel_plan(plan):
         lines += ["Uncommitted changes (saved as a commit you can restore):"] + [f"  {line}" for line in plan["uncommitted"]]
     if plan["unpushed"]:
         lines += ["Lost work:"] + [f"  {line}" for line in plan["unpushed"]]
+        if plan["branch"] and plan["branch_commit"]:
+            lines.append(f"Restore the branch with `git branch {plan['branch']} {plan['branch_commit']}`.")
         if plan["detached_commit"]:
             lines.append(detached_line(plan["detached_commit"]))
-        elif plan["branch"] and plan["branch_commit"]:
-            lines.append(f"Restore the branch with `git branch {plan['branch']} {plan['branch_commit']}`.")
     if plan["check_errors"]:
         lines += ["Checks that failed, so the work may not be safe to cancel:"] + [f"  {error}" for error in plan["check_errors"]]
     if plan["remote_branch"] or plan["mr_url"]:

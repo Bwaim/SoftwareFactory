@@ -219,9 +219,12 @@ def test_detached_commits_are_lost_work_and_restorable(inited):
     git("config", "user.email", "test@example.com", cwd=other)
     task, wt = task_with_commit(inited, ctx, "feat/d")
     squash_into_main(other, "feat/d")
+    branch_sha = git("rev-parse", "refs/heads/feat/d", cwd=inited.repo)
     git("checkout", "--detach", cwd=wt)
     sha = commit_in(wt, "d.txt", "detached work")
     out = inited.factory("cancel", task["id"], "--dry-run").stdout
     assert "Lost work:" in out and "detached work" in out
+    assert f"Restore the branch with `git branch feat/d {branch_sha}`." in out
     out = inited.factory("cancel", task["id"]).stdout
+    assert f"Restore it with `git branch feat/d {branch_sha}`." in out
     assert f"The detached HEAD was at {sha}: `git branch <name> {sha}` restores it." in out
