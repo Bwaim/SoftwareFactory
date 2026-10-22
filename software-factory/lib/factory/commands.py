@@ -69,6 +69,9 @@ def register(sub, common):
     p.add_argument("id")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--confirm-unpushed", action="store_true")
+    p = sub.add_parser("cancel", parents=[common])
+    p.add_argument("id")
+    p.add_argument("--dry-run", action="store_true")
     sub.add_parser("clean", parents=[common])
     p = sub.add_parser("init", parents=[common])
     p.add_argument("--library", required=True)
@@ -320,6 +323,21 @@ def delete_cmd(args):
         return
     delete.delete(ctx, args.id, args.confirm_unpushed)
     print(f"Task {args.id} deleted and archived.")
+
+
+@cli.command("cancel")
+def cancel_cmd(args):
+    from . import delete
+    ctx = ctx_of(args)
+    if args.dry_run:
+        plan = delete.plan_cancel(ctx, args.id)
+        if args.json:
+            cli.emit(plan, True)
+        else:
+            print(delete.render_cancel_plan(plan))
+        return
+    result = delete.cancel(ctx, args.id)
+    cli.emit(result, True) if args.json else print(delete.render_cancel_result(result))
 
 
 @cli.command("clean")

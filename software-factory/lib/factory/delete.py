@@ -173,9 +173,9 @@ def archive_target(ctx, tid):
 
 
 class RemovalIncomplete(FactoryError):
-    def __init__(self, left):
+    def __init__(self, left, extra=None):
         super().__init__("\n".join(left))
-        self.details = {"archived": True, "left": list(left)}
+        self.details = {"archived": True, "left": list(left), **(extra or {})}
 
 
 def close_terminal(ctx, handle):
@@ -187,25 +187,139 @@ def close_terminal(ctx, handle):
         raise FactoryError(f"The terminal failed to close, so nothing was changed: {e}")
 
 
-def delete(ctx, tid, confirm_unpushed=False):
-    plan = plan_delete(ctx, tid)
-    if plan["needs_confirm"] and not confirm_unpushed:
-        raise FactoryError(render_plan(plan) + "\nRun again with --confirm-unpushed after the user approves.")
-    left = close_terminal(ctx, plan["terminal_handle"])
-    if plan["worktree"] and Path(plan["worktree"]).exists():
+REFUSAL = "The task is finished. Use Clean or `factory delete <id>`."
+REMOTE_WARNING = "The remote branch and the merge request stay open. Close them by hand."
+
+
+def branch_head(ctx, branch):
+    if not branch:
+        return None
+    r = repo.git(["rev-parse", f"refs/heads/{branch}"], ctx.main, check=False)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def plan_cancel(ctx, tid):
+    task = state.load(ctx, tid)
+    if task["status"] == "finished":
+        raise FactoryError(REFUSAL)
+    base = plan_delete(ctx, tid)
+    keys = ("task_id", "session_id", "terminal_handle", "worktree", "branch", "base_ref", "uncommitted",
+            "unpushed", "check_errors", "by_content", "reason")
+    plan = {k: base[k] for k in keys}
+    branch = plan["branch"]
+    plan["branch_commit"] = branch_head(ctx, branch)
+    if plan["by_content"]:
+        plan["unpushed"] = []
+    plan["remote_branch"] = bool(branch) and ref_exists(ctx.main, f"refs/remotes/origin/{branch}")
+    plan["mr_url"] = task["state"].get("mr_url")
+    return plan
+
+
+def render_cancel_plan(plan):
+    lines = [f"Cancel task {plan['task_id']}:", f"- Claude session {plan['session_id']} and its terminal"]
+    if plan["worktree"]:
+        lines.append(f"- Worktree {plan['worktree']}")
+    if plan["branch"]:
+        lines.append(f"- Local branch {plan['branch']}")
+    lines.append("- The task folder moves to .factory/tasks/archive/")
+    if plan["uncommitted"]:
+        lines += ["Uncommitted changes (saved as a commit you can restore):"] + [f"  {line}" for line in plan["uncommitted"]]
+    if plan["unpushed"]:
+        lines += ["Lost work:"] + [f"  {line}" for line in plan["unpushed"]]
+        if plan["branch"] and plan["branch_commit"]:
+            lines.append(f"Restore the branch with `git branch {plan['branch']} {plan['branch_commit']}`.")
+    if plan["check_errors"]:
+        lines += ["Checks that failed, so the work may not be safe to cancel:"] + [f"  {error}" for error in plan["check_errors"]]
+    if plan["remote_branch"] or plan["mr_url"]:
+        lines.append(REMOTE_WARNING)
+        if plan["mr_url"]:
+            lines.append(f"  {plan['mr_url']}")
+    return "\n".join(lines)
+
+
+def render_cancel_result(result):
+    lines = [f"Task {result['task_id']} cancelled and archived."]
+    if result["branch"] and result["branch_commit"]:
+        lines.append(f"Restore it with `git branch {result['branch']} {result['branch_commit']}`.")
+    if result["saved_commit"]:
+        c = result["saved_commit"]
+        lines.append(f"Uncommitted changes saved in {c}: `git stash apply {c}`.")
+    return "\n".join(lines)
+
+
+def worktree_exists(plan):
+    return bool(plan["worktree"]) and Path(plan["worktree"]).exists()
+
+
+def save_changes(tid, worktree):
+    for args in (["add", "-A"], ["stash", "create", f"factory cancel {tid}"]):
+        r = repo.git(args, worktree, check=False)
+        if r.returncode != 0:
+            raise FactoryError(f"The uncommitted changes were not saved, so the worktree, the branch and the task are kept: {(r.stderr or r.stdout).strip()}")
+    return r.stdout.strip() or None
+
+
+def remove_worktree(ctx, plan, left):
+    if worktree_exists(plan):
         r = repo.git(["worktree", "remove", "--force", plan["worktree"]], ctx.main, check=False)
         if r.returncode != 0:
             left.append(f"The worktree {plan['worktree']} was not removed: {(r.stderr or r.stdout).strip()}")
     repo.git(["worktree", "prune"], ctx.main, check=False)
-    if plan["branch"] and plan["delete_branch"]:
-        r = repo.git(["branch", "-D", plan["branch"]], ctx.main, check=False)
-        if r.returncode != 0:
-            left.append(f"The branch {plan['branch']} was not deleted: {(r.stderr or r.stdout).strip()}")
-    events.log(ctx, tid, "task_deleted", None)
+
+
+def delete_branch(ctx, branch, left):
+    r = repo.git(["branch", "-D", branch], ctx.main, check=False)
+    if r.returncode != 0:
+        left.append(f"The branch {branch} was not deleted: {(r.stderr or r.stdout).strip()}")
+
+
+def archive(ctx, tid):
     target = archive_target(ctx, tid)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(state.task_dir(ctx, tid)), str(target))
+
+
+def remove_delete(ctx, tid, confirm_unpushed):
+    plan = plan_delete(ctx, tid)
+    if plan["needs_confirm"] and not confirm_unpushed:
+        raise FactoryError(render_plan(plan) + "\nRun again with --confirm-unpushed after the user approves.")
+    left = close_terminal(ctx, plan["terminal_handle"])
+    remove_worktree(ctx, plan, left)
+    if plan["branch"] and plan["delete_branch"]:
+        delete_branch(ctx, plan["branch"], left)
+    events.log(ctx, tid, "task_deleted", None)
+    archive(ctx, tid)
+    return plan, left, {}
+
+
+def remove_cancel(ctx, tid):
+    plan = plan_cancel(ctx, tid)
+    left = close_terminal(ctx, plan["terminal_handle"])
+    saved = save_changes(tid, plan["worktree"]) if worktree_exists(plan) else None
+    remove_worktree(ctx, plan, left)
+    branch_commit = branch_head(ctx, plan["branch"])
+    if plan["branch"]:
+        delete_branch(ctx, plan["branch"], left)
+    state.update(ctx, tid, lambda t: state.set_status(t, "cancelled"))
+    events.log(ctx, tid, "task_cancelled", None)
+    archive(ctx, tid)
+    extra = {"branch": plan["branch"], "branch_commit": branch_commit, "saved_commit": saved}
+    return {"task_id": tid, **extra, "left": list(left)}, left, extra
+
+
+def remove(ctx, tid, mode, confirm_unpushed=False):
+    if mode not in ("delete", "cancel"):
+        raise FactoryError(f"Unknown removal mode {mode}.")
+    result, left, extra = remove_cancel(ctx, tid) if mode == "cancel" else remove_delete(ctx, tid, confirm_unpushed)
     exclusive.forget(ctx, tid)
     if left:
-        raise RemovalIncomplete(left)
-    return plan
+        raise RemovalIncomplete(left, extra)
+    return result
+
+
+def delete(ctx, tid, confirm_unpushed=False):
+    return remove(ctx, tid, "delete", confirm_unpushed)
+
+
+def cancel(ctx, tid):
+    return remove(ctx, tid, "cancel")
