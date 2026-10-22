@@ -253,6 +253,20 @@ def clean(server, query, body):
     return delete.clean_report(server.ctx)
 
 
+@route("POST", f"/api/tasks/{TASK}/cancel/dry-run")
+def cancel_dry_run(server, tid, query, body):
+    from . import delete
+    plan = delete.plan_cancel(server.ctx, tid)
+    return {**plan, "text": delete.render_cancel_plan(plan)}
+
+
+@route("POST", f"/api/tasks/{TASK}/cancel")
+def cancel_task(server, tid, query, body):
+    from . import delete
+    result = delete.cancel(server.ctx, tid)
+    return {**result, "text": delete.render_cancel_result(result)}
+
+
 @route("POST", "/api/delete/dry-run")
 def delete_dry_run(server, query, body):
     from . import delete
