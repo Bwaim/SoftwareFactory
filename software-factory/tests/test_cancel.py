@@ -6,6 +6,7 @@ import pytest
 
 from conftest import fake_calls, fake_config, git, make_task, write_pipeline, write_step
 from factory import launch, repo, session, state
+from test_squash_merge import squash_into_main, task_with_commit
 
 REFUSAL = "The task is finished. Use Clean or `factory delete <id>`."
 WARNING = "The remote branch and the merge request stay open. Close them by hand."
@@ -149,6 +150,9 @@ def test_cancel_close_failure_changes_nothing(started):
 
 def test_cancel_branch_delete_failure_still_archives(started):
     inited, ctx, task = started
+    wt = inited.worktrees / task["id"]
+    head = git("rev-parse", "HEAD", cwd=wt)
+    (wt / "dirty.txt").write_text("d")
     lock = inited.repo / ".git" / "refs" / "heads" / "feat" / "c.lock"
     lock.write_text("")
     try:
@@ -156,7 +160,10 @@ def test_cancel_branch_delete_failure_still_archives(started):
     finally:
         lock.unlink()
     assert r.returncode == 1
-    assert "The branch feat/c was not deleted:" in r.stdout + r.stderr
+    commit = saved_commit(r.stderr)
+    assert f"Uncommitted changes saved in {commit}: `git stash apply {commit}`." in r.stderr
+    assert f"Restore it with `git branch feat/c {head}`." in r.stderr
+    assert "The branch feat/c was not deleted:" in r.stderr
     assert archived(inited, task["id"])["status"] == "cancelled"
     assert not (inited.fdir / "tasks" / task["id"]).exists()
 
@@ -200,3 +207,21 @@ def test_cancelled_task_missing_from_lists(started):
     inited, ctx, task = started
     inited.factory("cancel", task["id"])
     assert not any(row.get("id") == task["id"] for row in inited.factory.json("tasks"))
+
+
+def test_detached_commits_are_lost_work_and_restorable(inited):
+    write_step(inited.fdir, "w", {})
+    write_pipeline(inited.fdir, {"id": "b", "inputs": {"branch": {"description": "b"}}, "steps": ["w"]})
+    ctx = repo.load_ctx(cwd=inited.repo)
+    other = inited.work / "other"
+    git("clone", str(inited.work / "origin.git"), str(other), cwd=inited.work)
+    git("config", "user.name", "Test", cwd=other)
+    git("config", "user.email", "test@example.com", cwd=other)
+    task, wt = task_with_commit(inited, ctx, "feat/d")
+    squash_into_main(other, "feat/d")
+    git("checkout", "--detach", cwd=wt)
+    sha = commit_in(wt, "d.txt", "detached work")
+    out = inited.factory("cancel", task["id"], "--dry-run").stdout
+    assert "Lost work:" in out and "detached work" in out
+    out = inited.factory("cancel", task["id"]).stdout
+    assert f"The detached HEAD was at {sha}: `git branch <name> {sha}` restores it." in out

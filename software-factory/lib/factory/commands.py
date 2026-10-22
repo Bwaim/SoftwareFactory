@@ -337,7 +337,10 @@ def cancel_cmd(args):
             print(delete.render_cancel_plan(plan))
         return
     result = delete.cancel(ctx, args.id)
-    cli.emit(result, True) if args.json else print(delete.render_cancel_result(result))
+    if args.json:
+        cli.emit(result, True)
+    else:
+        print(delete.render_cancel_result(result))
 
 
 @cli.command("clean")

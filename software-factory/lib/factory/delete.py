@@ -173,8 +173,8 @@ def archive_target(ctx, tid):
 
 
 class RemovalIncomplete(FactoryError):
-    def __init__(self, left, extra=None):
-        super().__init__("\n".join(left))
+    def __init__(self, left, extra=None, lines=()):
+        super().__init__("\n".join([*lines, *left]))
         self.details = {"archived": True, "left": list(left), **(extra or {})}
 
 
@@ -198,6 +198,17 @@ def branch_head(ctx, branch):
     return r.stdout.strip() if r.returncode == 0 else None
 
 
+def detached_head(worktree):
+    if not worktree or not Path(worktree).exists() or current_branch(worktree) is not None:
+        return None
+    r = repo.git(["rev-parse", "HEAD"], worktree, check=False)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def detached_line(commit):
+    return f"The detached HEAD was at {commit}: `git branch <name> {commit}` restores it."
+
+
 def plan_cancel(ctx, tid):
     task = state.load(ctx, tid)
     if task["status"] == "finished":
@@ -208,8 +219,7 @@ def plan_cancel(ctx, tid):
     plan = {k: base[k] for k in keys}
     branch = plan["branch"]
     plan["branch_commit"] = branch_head(ctx, branch)
-    if plan["by_content"]:
-        plan["unpushed"] = []
+    plan["detached_commit"] = detached_head(plan["worktree"])
     plan["remote_branch"] = bool(branch) and ref_exists(ctx.main, f"refs/remotes/origin/{branch}")
     plan["mr_url"] = task["state"].get("mr_url")
     return plan
@@ -226,7 +236,9 @@ def render_cancel_plan(plan):
         lines += ["Uncommitted changes (saved as a commit you can restore):"] + [f"  {line}" for line in plan["uncommitted"]]
     if plan["unpushed"]:
         lines += ["Lost work:"] + [f"  {line}" for line in plan["unpushed"]]
-        if plan["branch"] and plan["branch_commit"]:
+        if plan["detached_commit"]:
+            lines.append(detached_line(plan["detached_commit"]))
+        elif plan["branch"] and plan["branch_commit"]:
             lines.append(f"Restore the branch with `git branch {plan['branch']} {plan['branch_commit']}`.")
     if plan["check_errors"]:
         lines += ["Checks that failed, so the work may not be safe to cancel:"] + [f"  {error}" for error in plan["check_errors"]]
@@ -237,14 +249,20 @@ def render_cancel_plan(plan):
     return "\n".join(lines)
 
 
-def render_cancel_result(result):
-    lines = [f"Task {result['task_id']} cancelled and archived."]
+def restore_lines(result):
+    lines = []
     if result["branch"] and result["branch_commit"]:
         lines.append(f"Restore it with `git branch {result['branch']} {result['branch_commit']}`.")
+    if result["detached_commit"]:
+        lines.append(detached_line(result["detached_commit"]))
     if result["saved_commit"]:
         c = result["saved_commit"]
         lines.append(f"Uncommitted changes saved in {c}: `git stash apply {c}`.")
-    return "\n".join(lines)
+    return lines
+
+
+def render_cancel_result(result):
+    return "\n".join([f"Task {result['task_id']} cancelled and archived.", *restore_lines(result)])
 
 
 def worktree_exists(plan):
@@ -289,12 +307,13 @@ def remove_delete(ctx, tid, confirm_unpushed):
         delete_branch(ctx, plan["branch"], left)
     events.log(ctx, tid, "task_deleted", None)
     archive(ctx, tid)
-    return plan, left, {}
+    return plan, left, {}, []
 
 
 def remove_cancel(ctx, tid):
     plan = plan_cancel(ctx, tid)
     left = close_terminal(ctx, plan["terminal_handle"])
+    detached_commit = detached_head(plan["worktree"])
     saved = save_changes(tid, plan["worktree"]) if worktree_exists(plan) else None
     remove_worktree(ctx, plan, left)
     branch_commit = branch_head(ctx, plan["branch"])
@@ -303,17 +322,17 @@ def remove_cancel(ctx, tid):
     state.update(ctx, tid, lambda t: state.set_status(t, "cancelled"))
     events.log(ctx, tid, "task_cancelled", None)
     archive(ctx, tid)
-    extra = {"branch": plan["branch"], "branch_commit": branch_commit, "saved_commit": saved}
-    return {"task_id": tid, **extra, "left": list(left)}, left, extra
+    extra = {"branch": plan["branch"], "branch_commit": branch_commit, "detached_commit": detached_commit, "saved_commit": saved}
+    return {"task_id": tid, **extra, "left": list(left)}, left, extra, restore_lines(extra)
 
 
 def remove(ctx, tid, mode, confirm_unpushed=False):
     if mode not in ("delete", "cancel"):
         raise FactoryError(f"Unknown removal mode {mode}.")
-    result, left, extra = remove_cancel(ctx, tid) if mode == "cancel" else remove_delete(ctx, tid, confirm_unpushed)
+    result, left, extra, lines = remove_cancel(ctx, tid) if mode == "cancel" else remove_delete(ctx, tid, confirm_unpushed)
     exclusive.forget(ctx, tid)
     if left:
-        raise RemovalIncomplete(left, extra)
+        raise RemovalIncomplete(left, extra, lines)
     return result
 
 
