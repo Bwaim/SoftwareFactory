@@ -52,12 +52,13 @@ def current_branch(worktree):
     return repo.git(["symbolic-ref", "--short", "-q", "HEAD"], worktree, check=False).stdout.strip() or None
 
 
-def task_branch(task):
-    branch = task["state"].get("branch")
+def task_branch(ctx, task):
     worktree = task.get("worktree")
-    if not branch and worktree and Path(worktree).exists():
-        branch = current_branch(worktree)
-    return branch
+    branch = current_branch(worktree) if worktree and Path(worktree).exists() else None
+    branch = branch or task["state"].get("branch")
+    if branch and ref_exists(ctx.main, f"refs/heads/{branch}"):
+        return branch
+    return None
 
 
 def tracks_own_branch(ctx, branch):
@@ -65,18 +66,44 @@ def tracks_own_branch(ctx, branch):
     return r.returncode == 0 and r.stdout.strip() == f"refs/heads/{branch}"
 
 
-def merge_state(ctx, branch, base_ref):
-    if not branch:
-        return True, "no branch"
+def patch_id_merged(ctx, branch, base_ref):
     local = f"refs/heads/{branch}"
     base = f"refs/remotes/origin/{base_ref}"
-    if ref_exists(ctx.main, local) and ref_exists(ctx.main, base) and is_ancestor(ctx.main, local, base):
-        return True, f"merged into origin/{base_ref}"
-    if ref_exists(ctx.main, local) and content_merged(ctx, local, base_ref):
-        return True, "merged (squash)"
+    mb = repo.git(["merge-base", local, base], ctx.main, check=False)
+    if mb.returncode != 0 or not mb.stdout.strip():
+        return False
+    mb = mb.stdout.strip()
+    names = repo.git(["diff", "--name-only", "-z", mb, local], ctx.main, check=False)
+    files = [f for f in names.stdout.split("\0") if f] if names.returncode == 0 else []
+    if not files:
+        return False
+    d = repo.git(["diff", mb, local], ctx.main, check=False)
+    if d.returncode != 0 or not d.stdout.strip():
+        return False
+    p = repo.git(["patch-id", "--stable"], ctx.main, check=False, input=d.stdout)
+    ids = p.stdout.split()
+    if p.returncode != 0 or not ids:
+        return False
+    log = repo.git(["log", "-p", "--no-merges", f"{mb}..{base}", "--", *files], ctx.main, check=False)
+    if log.returncode != 0 or not log.stdout.strip():
+        return False
+    q = repo.git(["patch-id", "--stable"], ctx.main, check=False, input=log.stdout)
+    return q.returncode == 0 and ids[0] in {line.split()[0] for line in q.stdout.splitlines() if line.strip()}
+
+
+def merge_state(ctx, branch, base_ref):
+    if not branch:
+        return True, "no branch", False
+    local = f"refs/heads/{branch}"
+    base = f"refs/remotes/origin/{base_ref}"
+    if ref_exists(ctx.main, local) and ref_exists(ctx.main, base):
+        if is_ancestor(ctx.main, local, base):
+            return True, f"merged into origin/{base_ref}", True
+        if content_merged(ctx, local, base_ref) or patch_id_merged(ctx, branch, base_ref):
+            return True, "merged (squash)", True
     if tracks_own_branch(ctx, branch) and not ref_exists(ctx.main, f"refs/remotes/origin/{branch}"):
-        return True, "pushed, and its remote branch was deleted"
-    return False, "not merged"
+        return True, "pushed, and its remote branch was deleted", False
+    return False, "not merged", False
 
 
 def clean_report(ctx):
@@ -85,8 +112,8 @@ def clean_report(ctx):
     for task in state.list_tasks(ctx):
         if task["status"] != "finished":
             continue
-        branch = task_branch(task)
-        merged, reason = merge_state(ctx, branch, task.get("base_ref") or "main")
+        branch = task_branch(ctx, task)
+        merged, reason, _ = merge_state(ctx, branch, task.get("base_ref") or "main")
         rows.append({"id": task["id"], "description": task["description"], "branch": branch,
                      "merged": merged, "reason": reason, "selected": merged})
     return rows

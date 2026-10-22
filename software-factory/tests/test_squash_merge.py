@@ -98,7 +98,7 @@ def test_clean_reports_squash_when_worktree_is_gone(env):
     assert rows[task["id"]]["merged"] and rows[task["id"]]["reason"] == "merged (squash)"
 
 
-def test_later_change_of_same_lines_is_not_merged(env):
+def test_later_change_of_same_lines_is_merged_by_patch_id(env):
     inited, ctx, other = env
     task, _ = task_with_commit(inited, ctx, "feat/conf", name="README.md", text="branch\n")
     squash_into_main(other, "feat/conf", delete_remote=False)
@@ -107,4 +107,4 @@ def test_later_change_of_same_lines_is_not_merged(env):
     git("push", "origin", "main", cwd=other)
     finish(ctx, task["id"])
     rows = {r["id"]: r for r in inited.factory.json("clean")}
-    assert not rows[task["id"]]["merged"] and rows[task["id"]]["reason"] == "not merged"
+    assert rows[task["id"]]["merged"] and rows[task["id"]]["reason"] == "merged (squash)"

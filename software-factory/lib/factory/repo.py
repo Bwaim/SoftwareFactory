@@ -11,8 +11,8 @@ DEFAULT_COLUMNS = ["Discovery", "Specification", "Plan", "Implementation", "Revi
 DONE_COLUMN = "Done"
 
 
-def git(args, cwd, check=True):
-    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+def git(args, cwd, check=True, input=None):
+    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, input=input)
     if check and r.returncode != 0:
         raise FactoryError(f"git {' '.join(args)} failed: {(r.stderr or r.stdout).strip()}")
     return r
