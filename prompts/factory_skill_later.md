@@ -27,7 +27,4 @@ Ideas and requirements not in the current build. Move them to `factory_skill_cre
 
 - bug: when launching other task have to tape enter
 - separate claude code as an adpater
-- cancel a ticket with a reason that move it to done and reject
-
-- When no Needs QA, something is moving to Done? seems not
-- Remove label "dobby-needs-human" when finished
+- close the workspace on clean
