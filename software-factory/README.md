@@ -322,7 +322,7 @@ If there is no workspace, the sidebar shows "No workspace. Click + to add a fact
 - Click `⋯` on a workspace, then "Rename", to change its name in the sidebar.
 - Click `⋯` on a workspace, then "Delete", to remove it from the dashboard. The repository and its tasks stay on disk. Done checks of this workspace stop.
 
-A workspace comes back when you run `factory init` or `factory dashboard` in the repository. It also comes back when a task in the repository waits for a done check, or when you resume a task in it. `factory tasks`, `factory resume` and `factory wait` add the repository in these cases. `factory launch` does not add it.
+A workspace comes back when you run `factory init` or `factory dashboard` in the repository. It also comes back when `factory tasks`, `factory resume` or `factory wait` finds a task in the repository that waits for a done check. `factory launch` does not add it.
 
 The commands `factory pipeline edit` and `factory step edit` need the repository in the dashboard list. If it is not, they print "This repository is not in the dashboard. Run `factory dashboard` in it first."
 
