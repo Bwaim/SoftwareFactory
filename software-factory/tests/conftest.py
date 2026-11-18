@@ -46,6 +46,11 @@ def work(request):
 
 @pytest.fixture
 def origin_repo(work):
+    return make_repo(work)
+
+
+def make_repo(work):
+    work.mkdir(parents=True, exist_ok=True)
     origin = work / "origin.git"
     git("init", "--bare", "-b", "main", str(origin), cwd=work)
     seed = work / "seed"
@@ -136,7 +141,7 @@ def inited(factory, origin_repo, library_path, work, factory_home):
     factory("init", "--library", library_path, "--create-library")
     factory("config", "set", "create-worktree", "worktree_root", work / "worktrees")
     yield Inited(origin_repo, library_path, factory, work, factory_home)
-    if (origin_repo / ".factory" / "server.json").exists():
+    if (factory_home / "server.json").exists():
         factory("server", "stop", check=False)
 
 

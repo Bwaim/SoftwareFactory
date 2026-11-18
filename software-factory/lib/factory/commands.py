@@ -678,27 +678,36 @@ def backlog_import(args):
 @cli.command("serve")
 def serve_cmd(args):
     from . import server
-    server.Server(ctx_of(args)).run()
+    server.Server().run()
+
+
+def current_workspace():
+    from . import repo, workspaces
+    try:
+        ctx = repo.load_ctx()
+    except FactoryError:
+        return {}
+    return {"ws": workspaces.register(ctx.main)["id"]} if ctx.initialized() else {}
 
 
 @cli.command("dashboard")
 def dashboard_cmd(args):
     from . import server
-    info = server.ensure_server(ctx_of(args))
-    url = server.page_url(info, "dashboard")
+    ws = current_workspace()
+    info = server.ensure_server()
+    url = server.page_url(info, "dashboard", **ws)
     server.open_page(url)
     print(f"Dashboard: {url}")
 
 
 @cli.command("server stop")
 def server_stop_cmd(args):
-    from . import engine, server
-    ctx = ctx_of(args)
-    ids = engine.waiting_checks(ctx) if args.unless_waiting else []
-    if ids and server.running(ctx):
+    from . import server
+    ids = server.waiting_checks() if args.unless_waiting else []
+    if ids and server.running():
         print(f"The server keeps running for the done checks of tasks {', '.join(ids)}.")
         return
-    print("Server stopped." if server.stop_server(ctx) else "The server was not running.")
+    print("Server stopped." if server.stop_server() else "The server was not running.")
 
 
 @cli.command("pipeline keys")
@@ -726,11 +735,16 @@ def pipeline_list_cmd(args):
         print(f"{r['id']} ({r['level']}): {r['description']}")
 
 
+def editor_url(ctx, **params):
+    from . import server, workspaces
+    ws = workspaces.register(ctx.main)["id"]
+    return server.page_url(server.ensure_server(), "editor", ws=ws, **params)
+
+
 @cli.command("pipeline edit")
 def pipeline_edit_cmd(args):
     from . import server
-    info = server.ensure_server(ctx_of(args))
-    url = server.page_url(info, "editor", **({"id": args.id} if args.id else {}))
+    url = editor_url(ctx_of(args), **({"id": args.id} if args.id else {}))
     server.open_page(url)
     print(f"Pipeline editor: {url}")
 
@@ -742,8 +756,7 @@ def step_edit_cmd(args):
     ctx = ctx_of(args)
     if args.id:
         Registry.load(ctx).step(args.id)
-    info = server.ensure_server(ctx)
-    url = server.page_url(info, "editor", **({"step": args.id} if args.id else {"new_step": "1"}))
+    url = editor_url(ctx, **({"step": args.id} if args.id else {"new_step": "1"}))
     server.open_page(url)
     print(f"Step editor: {url}")
 

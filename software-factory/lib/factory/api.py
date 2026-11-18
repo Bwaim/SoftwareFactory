@@ -1,32 +1,47 @@
 import os
 import re
 
-ROUTES = []
+from .errors import FactoryError
+
+ROUTES = {"global": [], "workspace": []}
+WORKSPACE_PATH = re.compile(r"^/api/w/([a-z0-9-]{1,40})(/.*)$")
 
 
 class NotFound(Exception):
     pass
 
 
-def route(method, pattern):
+def route(method, pattern, scope="workspace"):
     regex = re.compile("^" + pattern + "$")
 
     def register(fn):
-        ROUTES.append((method, regex, fn))
+        ROUTES[scope].append((method, regex, fn))
         return fn
 
     return register
 
 
-def dispatch(server, method, path, query, body):
-    for m, regex, fn in ROUTES:
+def run(routes, target, method, path, query, body):
+    for m, regex, fn in routes:
         match = regex.match(path)
         if m == method and match:
-            return fn(server, *match.groups(), query=query, body=body or {})
+            return fn(target, *match.groups(), query=query, body=body or {})
     raise NotFound(path)
 
 
-@route("GET", "/api/ping")
+def dispatch(server, method, path, query, body):
+    match = WORKSPACE_PATH.match(path)
+    if not match:
+        return run(ROUTES["global"], server, method, path, query, body)
+    ws = server.fresh(match.group(1))
+    if ws is None:
+        raise NotFound(path)
+    if ws.error:
+        raise FactoryError(ws.error)
+    return run(ROUTES["workspace"], ws, method, "/api" + match.group(2), query, body)
+
+
+@route("GET", "/api/ping", scope="global")
 def ping(server, query, body):
     return {"ok": True, "pid": os.getpid()}
 
@@ -35,6 +50,7 @@ def ping(server, query, body):
 def info(server, query, body):
     ctx = server.ctx
     return {
+        "workspace": {"id": server.id, "name": server.name},
         "columns": ctx.columns(),
         "ticket_url": ctx.factory_yaml().get("ticket_url") or "",
         "adapter": server.adapter,
@@ -42,13 +58,13 @@ def info(server, query, body):
     }
 
 
-@route("POST", "/api/shutdown")
+@route("POST", "/api/shutdown", scope="global")
 def shutdown(server, query, body):
     server.stop()
     return {"ok": True}
 
 
-@route("GET", "/api/jobs/([a-f0-9]+)")
+@route("GET", "/api/jobs/([a-f0-9]+)", scope="global")
 def job(server, job_id, query, body):
     if job_id not in server.jobs:
         raise NotFound(job_id)

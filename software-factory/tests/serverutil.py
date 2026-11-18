@@ -2,13 +2,30 @@ import http.client
 import json
 import os
 import time
+from pathlib import Path
+
+GLOBAL = ("/api/ping", "/api/shutdown", "/api/jobs/", "/api/workspaces", "/api/host")
 
 
-def info(fdir):
-    return json.loads((fdir / "server.json").read_text())
+def home():
+    return Path(os.environ["FACTORY_HOME"])
+
+
+def info(fdir=None):
+    from factory import workspaces
+    data = json.loads((home() / "server.json").read_text())
+    entry = workspaces.find_by_path(Path(fdir).parent) if fdir is not None else None
+    return {**data, "ws": entry["id"]} if entry else data
+
+
+def api_path(info, path):
+    if info.get("ws") and path.startswith("/api/") and not path.startswith(GLOBAL):
+        return f"/api/w/{info['ws']}/{path[len('/api/'):]}"
+    return path
 
 
 def request(info, method, path, body=None, token=True, origin=None, host=None):
+    path = api_path(info, path)
     conn = http.client.HTTPConnection("127.0.0.1", info["port"], timeout=30)
     headers = {"Host": host or f"127.0.0.1:{info['port']}"}
     if token:
