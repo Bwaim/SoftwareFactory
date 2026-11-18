@@ -320,26 +320,29 @@ Each card shows:
 - The ticket, then the display name, then the id when it differs. A failed rename is shown in red. The ticket is a link when `ticket_url` is set.
 - The description.
 - The pipeline and the current step.
-- The status, with an icon and the time in this status. The reason is shown below when there is one.
+- The status, as a coloured pill with the time in this status. The reason is shown below when there is one.
 - A red "Session gone" tag when the terminal session is not there. Not shown for `paused` and `finished` tasks.
 - The artifacts of the task. Click a name to read it. The viewer closes with Escape, a click outside it, or its Close button. Its title bar stays visible, and the text scrolls inside it. A form, for example "Request changes", never closes on a click outside. Escape on a form with typed text asks "Discard the typed text?".
 - For a task that is `waiting_external` on a step with a `done_check`: "Next check in m:ss", counted down in the page, and the last check with its time and result.
 - For a task that waits for an exclusive resource: "Waiting for <name>, used by <holder>". The holder shows "Uses <name>", or "Keeps <name> while paused".
-- For a task with `attention`: the card uses the red blocked color and shows "May wait for you", the time since the turn ended and the last lines of the message as plain text.
-- "To validate", when the step waits for your approval. It links to the artifact to read. If the step validates code, it has an "Open in IDE" button.
+- For a task with `attention`: a pink "May wait for you" pill with the time since the turn ended, and the last lines of the message as plain text. An `active` task then shows only this pill.
+- "To validate", when the step waits for your approval. The artifact to read has a "to validate" tag in the artifact list. If the step validates code, the card has an "Open in IDE" button.
 
-Colors and icons:
+Status pill colors:
 
-| Status | Color | Icon |
-| --- | --- | --- |
-| `active` | green | ▶ |
-| `blocked` | red | ⛔ |
-| `awaiting_approval` | amber | ✋ |
-| `waiting_external` | blue | ⏳ |
-| `paused` | grey | ⏸ |
-| `finished` | light grey | ✓ |
+| Status | Color |
+| --- | --- |
+| `active` | green |
+| `blocked` | pink |
+| `awaiting_approval` | yellow |
+| `waiting_external` | purple |
+| `paused` | grey |
+| `finished` | grey, green dot |
 
-Card buttons:
+The header has a light and dark mode button. The browser remembers your choice, for the dashboard and the pipeline editor.
+The browser tab title shows how many tasks need you, for example "(2) CAPTN". An "Offline" tag shows when the page cannot reach the server.
+
+Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
 
 - **Focus**: switch the terminal to the task session. Shown when the session exists, the task is not finished and the terminal supports it. Then it brings the terminal app to the front. The first time, it asks for the app name. When it fails, the card says so.
 - **Show MR**: open the merge request. Shown when the task has an MR link.
@@ -354,6 +357,18 @@ Card buttons:
 - A finished task has no Focus, Send prompt, Pause or Resume button.
 
 "Send prompt", "Pause", "Resume", "Launch", "Check" and the backlog "Start" are disabled when the terminal check fails.
+
+#### Task details
+
+Click a card, or its name, to open the task details on the right. The board stays usable and scrolls next to it.
+The panel closes with its ✕ button or Escape. The open task is in the address (`#task=<id>`), so a reload keeps it open.
+On a narrow window, the panel fills the page.
+The panel refreshes every 3 seconds. It shows:
+
+- The name, the ticket, the description, the status and the same buttons as the card.
+- **Pipeline**: every step of the pipeline. Done steps have a check, the current step says "now" and the loop count.
+- **Timeline**: the events of the task, newest first, from `events.jsonl`. It shows the last 200 events.
+- **Details**: pipeline, ticket, MR, branch, base, worktree, created and updated times, the values of the task state and the artifacts.
 
 #### Launch form
 

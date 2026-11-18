@@ -35,6 +35,7 @@ try { if (localStorage.getItem("factory.theme") === "light") document.documentEl
   --shadow: rgba(26, 17, 16, 0.15); --bot-band: #1A1110; --bot-eye: #FFFFFF; }
 body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var(--fg); min-height: 100vh; display: flex; flex-direction: column; }
 [hidden] { display: none !important; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 header { background: var(--top); border-bottom: 1px solid var(--panel-line); padding: 12px 24px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
 header .grow { flex: 1; }
 header nav { display: flex; gap: 6px; }
@@ -45,7 +46,8 @@ header nav { display: flex; gap: 6px; }
 .brand .wordmark em { font-style: normal; color: var(--brand-pink); }
 .brand .tagline { font-size: 11px; color: var(--muted-strong); letter-spacing: .02em; }
 #updated { color: var(--muted-strong); }
-main { padding: 20px 24px 32px; flex: 1; display: flex; flex-direction: column; box-sizing: border-box; }
+.workspace { flex: 1; display: flex; min-height: 0; }
+main { padding: 20px 24px 32px; flex: 1; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; }
 main > div { flex: 1; display: flex; flex-direction: column; }
 input, select, button, textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, .link:focus-visible { outline: 2px solid var(--brand-pink); outline-offset: 2px; }
@@ -147,6 +149,53 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .report .bad { color: var(--err); }
 .report .good { color: var(--ok); font-weight: 600; }
 .footer { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.card.selected { border-color: var(--brand-pink); box-shadow: 0 0 0 1px var(--brand-pink); }
+.card .name-link { font: inherit; font-weight: 700; color: var(--fg); background: none; border: 0; padding: 0; min-height: 0; border-radius: 4px; text-align: left; }
+.card .name-link:hover { background: none; text-decoration: underline; }
+.card.task { cursor: pointer; }
+#detail { flex: 0 0 480px; max-width: 480px; box-sizing: border-box; position: sticky; top: 0; height: 100vh; overflow: auto; background: var(--column); border-left: 1px solid var(--panel-line); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+#detail .dhead { display: flex; gap: 8px; align-items: flex-start; }
+#detail .dhead .names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#detail .dhead .ticket { font-size: 13px; font-weight: 700; }
+#detail h2 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+#detail .close { width: 36px; padding: 0; border-radius: 50%; flex: none; font-size: 16px; }
+#detail .desc { margin: 0; font-size: 15px; font-weight: 600; }
+#detail .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+#detail section { border-top: 1px solid var(--panel-line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+#detail section h3 { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-strong); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+#detail section h3 .muted { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.steps li { display: flex; gap: 10px; align-items: flex-start; padding: 4px 0; position: relative; }
+.steps li::before { content: ""; position: absolute; left: 7px; top: 20px; bottom: -6px; width: 2px; background: var(--panel-line); }
+.steps li:last-child::before { display: none; }
+.steps .mark { width: 16px; height: 16px; border-radius: 50%; flex: none; margin-top: 2px; box-sizing: border-box; border: 2px solid var(--line); background: var(--column); position: relative; z-index: 1; display: grid; place-items: center; }
+.steps .done .mark { background: var(--active-dot); border-color: var(--active-dot); }
+.steps .done .mark::after { content: ""; width: 4px; height: 7px; border: solid #FFFFFF; border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
+.steps .current .mark { border-color: var(--brand-pink); background: var(--brand-pink); box-shadow: 0 0 0 4px var(--attn-bg); }
+.steps .done .sname { color: var(--muted); }
+.steps .current .sname { font-weight: 700; }
+.steps .sname { overflow-wrap: anywhere; }
+.steps .parent { color: var(--muted); }
+.steps .now { font-size: 11px; font-weight: 700; color: var(--attn-fg); background: var(--attn-bg); border-radius: 8px; padding: 1px 6px; margin-left: 6px; white-space: nowrap; }
+.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.timeline li { display: grid; grid-template-columns: 44px 8px minmax(0, 1fr); gap: 10px; align-items: start; padding: 4px 0; }
+.timeline time { font-size: 12px; line-height: 20px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.timeline i { width: 8px; height: 8px; border-radius: 50%; background: var(--paused-dot); display: block; margin-top: 6px; }
+.timeline .ok i { background: var(--active-dot); }
+.timeline .bad i { background: var(--attn-dot); }
+.timeline .wait i { background: var(--approval-dot); }
+.timeline .what { font-weight: 600; }
+.timeline li > span { line-height: 20px; }
+.timeline .extra { display: block; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; white-space: pre-wrap; }
+.facts { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 10px; margin: 0; font-size: 13px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.facts details summary { cursor: pointer; color: var(--link); font-weight: 600; }
+.facts details pre { margin: 6px 0 0; font-size: 12px; }
+@media (max-width: 900px) {
+  #detail { position: fixed; inset: 0; z-index: 15; max-width: none; height: auto; border-left: 0; }
+}
 @media (max-width: 600px) {
   header, main { padding-left: 16px; padding-right: 16px; }
   .field { grid-template-columns: 1fr; }
@@ -190,7 +239,10 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
     <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
   </button>
 </header>
-<main id="main"></main>
+<div class="workspace">
+  <main id="main"></main>
+  <aside id="detail" hidden aria-label="Task details"></aside>
+</div>
 <div id="modal" hidden></div>
 <template id="empty-board">
   <div class="empty">
@@ -206,10 +258,12 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 <script>
 const TOKEN = new URLSearchParams(location.search).get("token");
 const REFRESH_MS = 5000;
+const DETAIL_REFRESH_MS = 3000;
+const DETAIL_HASH = "#task=";
 const JOB_POLL_MS = 1000;
 const HIDDEN_KEY = "factory.hiddenColumns";
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
-const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set() };
+const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null };
 const byId = (id) => document.getElementById(id);
 
 async function api(path, body, quiet) {
@@ -329,6 +383,8 @@ async function refresh(force) {
     for (const id of [...state.removed]) if (!tasks.some((x) => x.id === id)) state.removed.delete(id);
     Object.assign(state, { info, tasks: tasks.filter((x) => !state.removed.has(x.id)), backlog, lastKey: key });
     updateTitle();
+    if (state.detail && !state.tasks.some((x) => x.id === state.detail.id)) closeDetail();
+    else if (state.detail && force) loadDetail();
     if (!changed || modalOpen() || state.dragging || (!force && menuOpen())) return;
   } catch (e) { state.pollFailed = true; byId("offline").hidden = false; return; }
   render();
@@ -343,6 +399,7 @@ function closeMenus(except) { for (const d of document.querySelectorAll("details
 document.addEventListener("click", (e) => closeMenus(e.target.closest && e.target.closest("details.more")));
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape" || modalOpen() || !menuOpen()) return;
+  e.preventDefault();
   const open = document.querySelector("details.more[open]");
   closeMenus();
   open.querySelector("summary").focus();
@@ -363,6 +420,7 @@ function render() {
   const board = main.querySelector(".board");
   if (board) board.scrollLeft = left;
   window.scrollTo(window.scrollX, top);
+  renderDetail();
 }
 
 function allColumns() { return [...state.info.columns, "Done"]; }
@@ -449,22 +507,32 @@ async function checkNow(t) {
   }
 }
 function pill(kind, text) { return el("span", { class: "pill p-" + kind }, el("i", { "aria-hidden": "true" }), el("span", {}, text)); }
+function statusPills(t) {
+  const pills = [];
+  const since = ago(t.status_since);
+  const label = t.status.replace("_", " ");
+  if (!(t.attention && t.status === "active")) pills.push(pill(t.status, `${label}${since && t.status !== "finished" ? " for " + since : ""}`));
+  if (t.attention) {
+    const waited = ago(t.attention.at);
+    pills.push(pill("attention", `May wait for you${waited ? " · " + waited + " ago" : ""}`));
+  }
+  return pills;
+}
 function taskCard(t) {
-  const card = el("div", { class: "card s-" + (t.attention ? "blocked" : t.status) });
+  const selected = state.detail && state.detail.id === t.id;
+  const card = el("div", { class: "card task s-" + (t.attention ? "blocked" : t.status) + (selected ? " selected" : ""), "data-task": t.id });
+  card.addEventListener("click", (e) => {
+    if (e.target.closest("button, a, .link, details, pre, input, textarea, select") || String(window.getSelection())) return;
+    openDetail(t.id);
+  });
   const top = el("div", { class: "row" });
   const ticket = ticketNode(t);
   if (ticket) top.append(ticket);
-  top.append(el("strong", {}, t.display_name));
+  top.append(el("button", { type: "button", class: "name-link", "aria-label": `Show details of ${t.display_name}`, "aria-expanded": selected ? "true" : "false", onclick: () => openDetail(t.id) }, t.display_name));
   if (t.display_name !== t.id) top.append(el("span", { class: "muted" }, t.id));
   card.append(top, el("div", { class: "title" }, t.description), el("div", { class: "muted" }, `${t.pipeline} › ${t.step}${loopText(t)}`));
-  const since = ago(t.status_since);
-  const label = t.status.replace("_", " ");
-  if (!(t.attention && t.status === "active")) card.append(pill(t.status, `${label}${since && t.status !== "finished" ? " for " + since : ""}`));
-  if (t.attention) {
-    const waited = ago(t.attention.at);
-    card.append(pill("attention", `May wait for you${waited ? " · " + waited + " ago" : ""}`));
-    if (t.attention.message) card.append(el("pre", { class: "attention-message" }, t.attention.message));
-  }
+  card.append(...statusPills(t));
+  if (t.attention && t.attention.message) card.append(el("pre", { class: "attention-message" }, t.attention.message));
   const ex = t.exclusive;
   if (ex && ex.waiting) card.append(el("div", { class: "muted" }, `Waiting for ${ex.name}, used by ${ex.holder || "another task"}`));
   else if (t.status_reason) card.append(el("div", { class: "muted" }, t.status_reason));
@@ -858,9 +926,167 @@ byId("theme-toggle").addEventListener("click", () => {
   themeLabel();
 });
 themeLabel();
+
+const EVENT_LABELS = {
+  task_created: "Task created", step_started: "Step started", step_done: "Step done", step_goto: "Went to step",
+  task_blocked: "Blocked", task_unblocked: "Unblocked", waiting_started: "Started waiting", external_event: "External event",
+  done_check_failed: "Done check failed", task_paused: "Paused", task_resumed: "Resumed", task_finished: "Finished",
+  task_cancelled: "Cancelled", task_deleted: "Deleted", approved: "Approved", changes_requested: "Changes requested",
+  loop_back: "Loop back", loop_limit: "Loop limit reached", attention: "May wait for you", attention_cleared: "Attention cleared",
+  prompt_sent: "Prompt sent", prompt_failed: "Prompt failed", hook_failed: "Hook failed", exclusive_acquire: "Took a shared resource",
+  column_changed: "Moved to another column", task_renamed: "Renamed", claude_renamed: "Session renamed", rename_failed: "Rename failed",
+  config_asked: "Asked for a config value", migrated: "Migrated", approval_requested: "Approval requested",
+  exclusive_wait: "Waiting for a shared resource", exclusive_start: "Started with a shared resource",
+  exclusive_released: "Released a shared resource", exclusive_forced: "Shared resource released by force",
+};
+const EVENT_TONES = {
+  step_done: "ok", task_finished: "ok", approved: "ok", task_unblocked: "ok", task_resumed: "ok",
+  task_blocked: "bad", done_check_failed: "bad", prompt_failed: "bad", hook_failed: "bad", rename_failed: "bad", loop_limit: "bad", task_cancelled: "bad", attention: "bad",
+  waiting_started: "wait", changes_requested: "wait", task_paused: "wait", loop_back: "wait", approval_requested: "wait", exclusive_wait: "wait",
+  exclusive_forced: "bad",
+};
+const EXTRA_MAX = 300;
+function detailHashId() { return location.hash.startsWith(DETAIL_HASH) ? decodeURIComponent(location.hash.slice(DETAIL_HASH.length)) : null; }
+function openDetail(id) {
+  if (state.detail && state.detail.id === id) return;
+  state.detail = { id, data: null, key: null };
+  history.replaceState(null, "", location.pathname + location.search + DETAIL_HASH + encodeURIComponent(id));
+  render();
+  loadDetail();
+}
+function closeDetail() {
+  if (!state.detail) return;
+  const id = state.detail.id;
+  state.detail = null;
+  history.replaceState(null, "", location.pathname + location.search);
+  render();
+  const name = document.querySelector(`.card[data-task="${CSS.escape(id)}"] .name-link`);
+  if (name) name.focus();
+}
+async function loadDetail() {
+  const d = state.detail;
+  if (!d) return;
+  let data;
+  try { data = await api(`/api/tasks/${d.id}/detail`, undefined, true); } catch (e) { return; }
+  if (state.detail !== d) return;
+  const key = JSON.stringify([data, Math.floor(Date.now() / 60000)]);
+  if (key === d.key) return;
+  Object.assign(d, { data, key });
+  if (!menuOpen() && !modalOpen()) renderDetail();
+}
+function eventTime(iso) {
+  const at = new Date(iso);
+  if (isNaN(at)) return "";
+  const today = at.toDateString() === new Date().toDateString();
+  return today ? at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : at.toLocaleDateString([], { day: "numeric", month: "short" });
+}
+function eventExtra(ev) {
+  const parts = [];
+  for (const [k, v] of Object.entries(ev)) {
+    if (["ts", "type", "step"].includes(k) || v === null || v === undefined || v === "") continue;
+    parts.push(typeof v === "object" ? `${k}: ${JSON.stringify(v)}` : `${k}: ${v}`);
+  }
+  const text = parts.join(" · ");
+  return text.length > EXTRA_MAX ? text.slice(0, EXTRA_MAX) + "…" : text;
+}
+function stepsSection(d) {
+  const list = el("ol", { class: "steps" });
+  for (const s of d.data.steps) {
+    const parents = s.path.slice(0, -1);
+    const name = el("span", { class: "sname" }, parents.length ? el("span", { class: "parent" }, parents.join(" › ") + " › ") : "", s.id);
+    if (s.state === "current") name.append(el("span", { class: "now" }, "now" + loopText(d.data.row)));
+    list.append(el("li", { class: s.state }, el("span", { class: "mark", "aria-hidden": "true" }), el("span", { class: "visually-hidden" }, s.state + ": "), name));
+  }
+  const done = d.data.steps.filter((s) => s.state === "done").length;
+  return el("section", {}, el("h3", {}, "Pipeline", el("span", { class: "muted" }, `${done} of ${d.data.steps.length} steps done`)), list);
+}
+function timelineSection(d) {
+  const list = el("ol", { class: "timeline" });
+  const evs = [...d.data.events].reverse();
+  for (const ev of evs) {
+    const extra = eventExtra(ev);
+    const what = el("span", {}, el("span", { class: "what" }, EVENT_LABELS[ev.type] || ev.type.replace(/_/g, " ")), ev.step ? el("span", { class: "muted" }, " · " + ev.step) : "");
+    if (extra) what.append(el("span", { class: "extra" }, extra));
+    list.append(el("li", { class: EVENT_TONES[ev.type] || "" }, el("time", { datetime: ev.ts, title: new Date(ev.ts).toLocaleString() }, eventTime(ev.ts)), el("i", { "aria-hidden": "true" }), what));
+  }
+  const box = el("section", {}, el("h3", {}, "Timeline", el("span", { class: "muted" }, `${evs.length} events`)));
+  box.append(evs.length ? list : el("div", { class: "muted" }, "No events yet."));
+  return box;
+}
+function factRow(dl, label, value) {
+  if (value === null || value === undefined || value === "") return;
+  dl.append(el("dt", {}, label), el("dd", {}, value));
+}
+function longValue(v) {
+  const text = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+  if (text.length <= 120 && !text.includes("\n")) return el("code", {}, text);
+  return el("details", {}, el("summary", {}, `${text.split("\n")[0].slice(0, 60)}…`), el("pre", {}, text));
+}
+function infoSection(d) {
+  const row = d.data.row, info = d.data.info;
+  const dl = el("dl", { class: "facts" });
+  factRow(dl, "Pipeline", row.pipeline);
+  factRow(dl, "Ticket", ticketNode(row));
+  if (row.mr_url && /^https?:/.test(row.mr_url)) factRow(dl, "MR", el("a", { href: row.mr_url, target: "_blank", rel: "noopener" }, row.mr_url));
+  factRow(dl, "Branch", info.branch && el("code", {}, info.branch));
+  factRow(dl, "Base", info.base_ref && el("code", {}, info.base_ref));
+  factRow(dl, "Worktree", info.worktree && el("code", {}, info.worktree));
+  factRow(dl, "Created", info.created_at && new Date(info.created_at).toLocaleString());
+  factRow(dl, "Updated", info.updated_at && new Date(info.updated_at).toLocaleString());
+  const box = el("section", {}, el("h3", {}, "Details"), dl);
+  const values = Object.entries(d.data.values).filter(([k]) => !["branch", "ticket", "mr_url"].includes(k));
+  if (values.length) {
+    const vl = el("dl", { class: "facts" });
+    for (const [k, v] of values) factRow(vl, k, longValue(v));
+    box.append(el("h3", {}, "Values"), vl);
+  }
+  if (row.artifacts.length) {
+    const list = el("div", { class: "artifacts" });
+    for (const name of row.artifacts) list.append(el("span", { class: "link", tabindex: "0", onclick: () => openArtifact(row.id, name).catch(() => {}) }, name));
+    box.append(el("h3", {}, "Artifacts"), list);
+  }
+  return box;
+}
+function renderDetail() {
+  const aside = byId("detail");
+  const d = state.detail;
+  aside.hidden = !d;
+  if (!d) { clear(aside); return; }
+  const scroll = aside.scrollTop;
+  const openValues = new Set([...aside.querySelectorAll(".facts details[open] summary")].map((n) => n.textContent));
+  const row = (d.data && d.data.row) || state.tasks.find((x) => x.id === d.id);
+  const close = el("button", { type: "button", class: "close", "aria-label": "Close details", title: "Close (Esc)", onclick: closeDetail }, "✕");
+  const names = el("div", { class: "names" });
+  if (row) {
+    const ticket = ticketNode(row);
+    if (ticket) names.append(el("span", { class: "ticket" }, ticket));
+    names.append(el("h2", {}, row.display_name), row.display_name !== row.id ? el("span", { class: "muted" }, row.id) : "");
+  } else names.append(el("h2", {}, d.id));
+  clear(aside).append(el("div", { class: "dhead" }, names, close));
+  if (!row) return;
+  aside.append(el("p", { class: "desc" }, row.description), el("div", { class: "pills" }, ...statusPills(row)));
+  if (row.attention && row.attention.message) aside.append(el("pre", { class: "attention-message" }, row.attention.message));
+  if (row.status_reason) aside.append(el("div", { class: "muted" }, row.status_reason));
+  if (row.session_state === "gone" && row.status !== "paused" && row.status !== "finished") aside.append(el("div", { class: "gone" }, "Session gone"));
+  if (state.deliveryErrors.has(row.id)) aside.append(deliveryBlock(row));
+  if (row.approval) aside.append(approvalBlock(row));
+  if (row.status === "waiting_external" && row.wait_has_check) aside.append(checkBlock(row));
+  aside.append(taskButtons(row));
+  if (!d.data) { aside.append(el("div", { class: "muted" }, "Loading…")); return; }
+  aside.append(stepsSection(d), timelineSection(d), infoSection(d));
+  for (const s of aside.querySelectorAll(".facts details summary")) if (openValues.has(s.textContent)) s.parentElement.open = true;
+  aside.scrollTop = scroll;
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || e.defaultPrevented || modalOpen() || menuOpen() || !state.detail) return;
+  closeDetail();
+});
+window.addEventListener("hashchange", () => { const id = detailHashId(); if (id) openDetail(id); else closeDetail(); });
+setInterval(() => { if (state.detail && !document.hidden) loadDetail(); }, DETAIL_REFRESH_MS);
 function setView(view) { state.view = view; render(); }
 byId("tab-tasks").addEventListener("click", () => setView("tasks"));
 byId("tab-backlog").addEventListener("click", () => setView("backlog"));
+{ const id = detailHashId(); if (id) state.detail = { id, data: null, key: null }; }
 refresh(true);
 setInterval(refresh, REFRESH_MS);
 setInterval(() => { for (const n of document.querySelectorAll("[data-next-check]")) n.textContent = countdownText(n.dataset.nextCheck); }, 1000);
