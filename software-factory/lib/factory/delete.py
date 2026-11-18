@@ -144,7 +144,8 @@ def plan_delete(ctx, tid):
     merged, reason, by_content = merge_state(ctx, branch, base_name)
     plan = {
         "task_id": tid, "session_id": task.get("session_id"), "terminal_handle": task.get("terminal_handle"),
-        "worktree": worktree, "branch": branch, "base_ref": base_name, "merged_into": short_ref(base_ref(ctx, base_name)), "uncommitted": [], "unpushed": [],
+        "worktree": worktree, "branch": branch, "base_ref": base_name, "merged_into": short_ref(base_ref(ctx, base_name)),
+        "has_origin": repo.has_origin(ctx.main), "uncommitted": [], "unpushed": [],
         "squash_merged": by_content and reason == "merged (squash)", "delete_branch": False, "needs_confirm": False,
         "check_errors": [], "reason": reason, "by_content": by_content,
     }
@@ -170,6 +171,10 @@ def session_line(plan):
     return f"- Claude session {plan['session_id']} and its terminal"
 
 
+def unpushed_title(plan):
+    return "Commits not pushed to origin:" if plan["has_origin"] else f"Commits not in {plan['base_ref']}:"
+
+
 def render_plan(plan):
     lines = [f"Delete task {plan['task_id']}:", session_line(plan)]
     if plan["worktree"]:
@@ -185,7 +190,7 @@ def render_plan(plan):
     if plan["uncommitted"]:
         lines += ["Uncommitted changes:"] + [f"  {line}" for line in plan["uncommitted"]]
     if plan["unpushed"]:
-        lines += ["Commits not pushed to origin:"] + [f"  {line}" for line in plan["unpushed"]]
+        lines += [unpushed_title(plan)] + [f"  {line}" for line in plan["unpushed"]]
     if plan["check_errors"]:
         lines += ["Checks that failed, so the work may not be safe to delete:"] + [f"  {error}" for error in plan["check_errors"]]
     return "\n".join(lines)

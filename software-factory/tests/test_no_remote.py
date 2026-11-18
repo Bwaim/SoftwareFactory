@@ -57,6 +57,14 @@ def test_launch_without_origin_detached(local):
     assert "detached HEAD on main" in launch.render_report(launch.plan_launch(ctx(local), "plain", "Other", {}))
 
 
+def test_launch_without_origin_ignores_same_named_tag(local):
+    git("tag", "main", "HEAD~1", cwd=local.repo)
+    rep = launch.plan_launch(ctx(local), "plain", "Tagged", {})
+    assert "detached HEAD on main" in launch.render_report(rep)
+    task = launch.launch(ctx(local), "plain", "Tagged", {})
+    assert git("rev-parse", "HEAD", cwd=task["worktree"]) == git("rev-parse", "refs/heads/main", cwd=local.repo)
+
+
 def test_launch_without_origin_missing_base(local):
     local.factory("config", "set", "create-worktree", "base_ref", "nope")
     rep = launch.plan_launch(ctx(local), "plain", "Missing", {})
@@ -85,6 +93,8 @@ def test_delete_without_origin_lost_commits(local):
     assert plan["reason"] == "not merged" and not plan["check_errors"]
     assert len(plan["unpushed"]) == 1 and plan["unpushed"][0].endswith("lost work")
     assert not plan["delete_branch"] and plan["needs_confirm"]
+    text = delete.render_plan(plan)
+    assert "Commits not in main:" in text and "pushed to origin" not in text
 
 
 def test_delete_without_origin_merged_removes_branch(local):
@@ -101,3 +111,13 @@ def test_base_ref_follows_origin(local):
     assert delete.base_ref(ctx(local), "main") == "refs/heads/main"
     git("remote", "add", "origin", str(local.work / "origin.git"), cwd=local.repo)
     assert delete.base_ref(ctx(local), "main") == "refs/remotes/origin/main"
+
+
+def test_delete_with_origin_keeps_unpushed_text(inited):
+    write_step(inited.fdir, "work", {})
+    write_pipeline(inited.fdir, {"id": "branchy", "inputs": {"branch": {"description": "Branch"}}, "steps": ["work"]})
+    c = ctx(inited)
+    task = launch.launch(c, "branchy", "Kept", {"branch": "feat/kept"})
+    (inited.worktrees / task["id"] / "k.txt").write_text("x")
+    commit_all(inited.worktrees / task["id"], "kept work")
+    assert "Commits not pushed to origin:" in delete.render_plan(delete.plan_delete(c, task["id"]))

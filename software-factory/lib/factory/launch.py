@@ -90,7 +90,7 @@ def base_ready(ctx, base, report):
 
 
 def start_point(ctx, base):
-    return f"origin/{base}" if repo.has_origin(ctx.main) else base
+    return f"origin/{base}" if repo.has_origin(ctx.main) else f"refs/heads/{base}"
 
 
 def remote_has_branch(ctx, branch):
@@ -296,7 +296,7 @@ def render_report(report):
         ff = " (fast-forward)" if report["fast_forward"] else ""
         lines.append(f"Branch: {report['branch']} ({report['branch_case']}){ff}")
     elif report["branch_case"] == "detached":
-        lines.append(f"Branch: none, detached HEAD on {report['start_point']}")
+        lines.append(f"Branch: none, detached HEAD on {report['start_point'].removeprefix('refs/heads/')}")
     for key in report["missing_inputs"]:
         lines.append(f"Missing input: {key}")
     for item in report["missing_config"]:
