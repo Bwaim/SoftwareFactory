@@ -51,6 +51,20 @@ def test_link_fixes_wrong_target(factory, work):
     assert out["changed"] is True and os.path.realpath(link).endswith("bin/factory")
 
 
+def test_link_keeps_standalone_install(factory, work):
+    install = work / "standalone"
+    (install / "bin").mkdir(parents=True)
+    (install / "bin/factory").write_text("x")
+    (install / ".installed-by-script").write_text("")
+    link = work / "bin" / "factory"
+    link.unlink()
+    link.symlink_to(install / "bin/factory")
+    out = factory.json("link")
+    assert out["changed"] is False
+    assert os.path.realpath(link) == str((install / "bin/factory").resolve())
+    assert out["target"] == str((install / "bin/factory").resolve())
+
+
 def test_menu_before_and_after_init(factory, origin_repo, library_path):
     before = factory.json("menu")
     assert [a["key"] for g in before["groups"] for a in g["actions"]] == ["init"]
