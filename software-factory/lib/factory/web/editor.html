@@ -3,51 +3,144 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pipeline editor</title>
+<title>Pipeline editor · CAPTN</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect x='18' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E%3Crect x='94' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E%3Crect x='26' y='50' width='68' height='56' rx='18' fill='%23673888'/%3E%3Cpath d='M30 48 L22 28 Q60 10 98 28 L90 48 Z' fill='%23C4005E'/%3E%3Crect x='20' y='44' width='80' height='11' rx='5.5' fill='%231A1110'/%3E%3Ccircle cx='60' cy='32' r='7' fill='%23FECD40'/%3E%3Ccircle cx='46' cy='76' r='8' fill='%23FFFFFF'/%3E%3Ccircle cx='47.5' cy='77' r='3.5' fill='%231A1110'/%3E%3Ccircle cx='74' cy='76' r='9' fill='%231A1110'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
 <style>
-:root { --bg: #fafafa; --fg: #1d1d1f; --muted: #6e6e73; --line: #d2d2d7; --err: #c62828; --warn: #b26a00; --accent: #0a62c9; --panel: #ffffff; }
-@media (prefers-color-scheme: dark) { :root { --bg: #161618; --fg: #f2f2f7; --muted: #a1a1a6; --line: #3a3a3c; --err: #ff6b6b; --warn: #ffb74d; --accent: #64a8ff; --panel: #1f1f22; } }
-body { margin: 0; font: 14px/1.4 -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--fg); }
-header { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
-main { display: grid; grid-template-columns: 320px 1fr 360px; gap: 16px; padding: 16px; align-items: start; }
+:root { color-scheme: dark;
+  --bg: #1A1110; --top: #000000; --fg: #FFFFFF; --muted: #B3A8A4; --muted-strong: #CFC7C3; --soft: #E6DFDC;
+  --column: #241A19; --panel: #2E2322; --panel-line: #3D302F; --line: #4A3B39; --raised: #3A2E2D; --done: #261C1B;
+  --accent: #C4005E; --accent-hover: #A8004F; --link: #FF7AB6; --link-hover: #FFA8CF; --brand-pink: #FF5AA5;
+  --yellow: #FECD40; --err: #FF8AC0; --err-line: #6E2A4A; --err-bg: #3A1A29; --ok: #B5E07F;
+  --active-bg: #283A16; --active-fg: #B5E07F; --active-dot: #7CC63A;
+  --approval-bg: #423410; --approval-fg: #FECD40; --approval-dot: #FECD40;
+  --attn-bg: #4A1430; --attn-fg: #FF9CC8; --attn-dot: #FF5AA5; --attn-line: #5C2441;
+  --wait-bg: #352448; --wait-fg: #D6BCEB; --wait-dot: #B98BDB;
+  --neutral-fg: #D8D0CC; --paused-dot: #A99E9A;
+  --shadow: rgba(0, 0, 0, 0.5); --bot-band: #FFFFFF; --bot-eye: #1A1110;
+  --font: "Nextory Sans", Figtree, Roboto, Arial, sans-serif; }
+:root[data-theme="light"] { color-scheme: light;
+  --bg: #F9F5F2; --top: #FFFFFF; --fg: #1A1110; --muted: #6B5F5B; --muted-strong: #5A4E4A; --soft: #3D302F;
+  --column: #F1ECE8; --panel: #FFFFFF; --panel-line: #E4DDD8; --line: #D6CDC8; --raised: #EEE7E3; --done: #F7F3F0;
+  --link: #B0005A; --link-hover: #8A0047; --brand-pink: #C4005E;
+  --err: #B0004F; --err-line: #F0B3CE; --err-bg: #FDEBF3; --ok: #3E7A12;
+  --active-bg: #E6F4D7; --active-fg: #2F6110; --active-dot: #5DA21E;
+  --approval-bg: #FFF3CC; --approval-fg: #6E5100; --approval-dot: #E0A800;
+  --attn-bg: #FDE3EF; --attn-fg: #A3004E; --attn-dot: #E0337F; --attn-line: #F5C2D9;
+  --wait-bg: #EFE6F7; --wait-fg: #5B2D80; --wait-dot: #8A55B5;
+  --neutral-fg: #4A3F3B; --paused-dot: #8C817D;
+  --shadow: rgba(26, 17, 16, 0.15); --bot-band: #1A1110; --bot-eye: #FFFFFF; }
+body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var(--fg); min-height: 100vh; }
 [hidden] { display: none !important; }
+header { background: var(--top); border-bottom: 1px solid var(--panel-line); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+header .grow { flex: 1; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { width: 48px; height: 48px; flex: none; }
+.brand .names { display: flex; flex-direction: column; }
+.brand .wordmark { font-size: 22px; font-weight: 800; letter-spacing: .05em; line-height: 1.1; }
+.brand .wordmark em { font-style: normal; color: var(--brand-pink); }
+.brand .tagline { font-size: 11px; color: var(--muted-strong); letter-spacing: .02em; }
+.page-name { font-size: 16px; font-weight: 700; padding-left: 16px; border-left: 1px solid var(--line); }
+#title { font-size: 13px; color: var(--muted-strong); }
+.theme-toggle { width: 36px; padding: 0; border-radius: 50%; background: transparent; }
+.theme-toggle svg { width: 18px; height: 18px; }
+:root:not([data-theme="light"]) .theme-toggle .moon, :root[data-theme="light"] .theme-toggle .sun { display: none; }
+main { display: grid; grid-template-columns: 320px minmax(0, 1fr) 360px; gap: 16px; padding: 20px 24px 32px; align-items: start; }
+main > section { background: var(--column); border-radius: 16px; padding: 16px; }
 section { min-width: 0; }
-h3 { margin: 0 0 8px; }
-input, select, button, textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
-button { cursor: pointer; }
+h3 { margin: 0 0 12px; font-size: 17px; font-weight: 800; }
+input, select, button, textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .link:focus-visible { outline: 2px solid var(--brand-pink); outline-offset: 2px; }
+input[type=checkbox], input[type=radio] { accent-color: var(--accent); padding: 0; }
+button { cursor: pointer; font-size: 13px; font-weight: 600; min-height: 32px; padding: 0 14px; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+button:hover:not(:disabled) { background: var(--raised); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
-button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-.card { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 6px 0; background: var(--panel); cursor: grab; }
+button.primary { background: var(--accent); color: #FFFFFF; border-color: var(--accent); min-height: 36px; }
+button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+button.danger { color: var(--err); border-color: var(--err-line); }
+.card { border: 1px solid var(--panel-line); border-radius: 12px; padding: 12px; margin: 8px 0; background: var(--panel); cursor: grab; word-break: break-word; }
 .card.clickable { cursor: pointer; }
+.card.clickable:hover { border-color: var(--line); }
+.card > strong { font-size: 14px; }
+.card > button { min-height: 26px; font-size: 12px; padding: 0 10px; margin-left: 4px; }
+.card .muted { margin-top: 4px; }
 .muted { color: var(--muted); font-size: 12px; }
-#error { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: var(--err); color: white; padding: 8px 16px; }
+#error { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: var(--accent); color: #FFFFFF; font-weight: 600; padding: 10px 24px; }
+.problem { font-size: 13px; margin: 4px 0; }
 .problem.error { color: var(--err); }
-.problem.warning { color: var(--warn); }
-#pipeline { min-height: 200px; border: 2px dashed var(--line); border-radius: 8px; padding: 8px; margin: 8px 0; }
-#pipeline.over { border-color: var(--accent); }
-pre { white-space: pre-wrap; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--panel); }
-.field { display: grid; grid-template-columns: 110px 1fr; gap: 8px; margin: 6px 0; align-items: center; }
-.row { display: flex; gap: 6px; margin: 4px 0; align-items: center; }
+.problem.warning { color: var(--approval-fg); }
+#pipeline { min-height: 200px; border: 2px dashed var(--line); border-radius: 12px; padding: 8px; margin: 12px 0; }
+#pipeline > .muted:only-child { text-align: center; padding: 72px 0; font-size: 13px; }
+#pipeline.over { border-color: var(--brand-pink); background: var(--attn-bg); }
+pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius: 8px; padding: 10px; background: var(--panel); font-size: 12px; }
+.field { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; margin: 8px 0; align-items: center; }
+.field > label { font-weight: 600; color: var(--soft); font-size: 13px; }
+.row { display: flex; gap: 6px; margin: 6px 0; align-items: center; flex-wrap: wrap; }
 .row input { flex: 1; min-width: 0; }
+.field > input[type=checkbox] { justify-self: start; margin: 0; }
 .head { display: flex; gap: 8px; align-items: center; cursor: grab; }
 .head .grow { flex: 1; }
-.link { color: var(--accent); cursor: pointer; text-decoration: underline; }
-.start { padding: 16px; border-bottom: 1px solid var(--line); }
-.start .row { margin: 8px 0; }
-dl { display: grid; grid-template-columns: 110px 1fr; gap: 4px 8px; margin: 8px 0; }
+.head > .muted:first-child { min-width: 22px; height: 22px; border-radius: 11px; background: var(--raised); color: var(--soft); display: inline-grid; place-items: center; font-weight: 700; }
+.head > button { min-height: 28px; font-size: 12px; padding: 0 10px; }
+.link { color: var(--link); cursor: pointer; font-weight: 600; text-decoration: none; }
+.link:hover { color: var(--link-hover); text-decoration: underline; }
+.loop { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--wait-bg); }
+.loop > .muted:first-child { color: var(--wait-fg); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+.start { max-width: 720px; margin: 32px auto; padding: 24px; background: var(--column); border-radius: 16px; }
+.start h3 { font-size: 22px; }
+.start .row { margin: 12px 0; }
+.start .row > button:first-child { min-width: 220px; }
+dl { display: grid; grid-template-columns: 110px 1fr; gap: 6px 8px; margin: 8px 0; }
 dt { color: var(--muted); }
 dd { margin: 0; word-break: break-word; }
 .dim { opacity: 0.5; }
-.tag { border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; font-size: 11px; color: var(--muted); margin-right: 4px; }
-#stepform { position: fixed; inset: 0; background: var(--bg); overflow: auto; padding: 16px; z-index: 10; }
+.tag { display: inline-block; border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: 600; color: var(--soft); background: var(--raised); margin-right: 4px; }
+#stepform { position: fixed; inset: 0; background: var(--bg); overflow: auto; padding: 20px 24px; z-index: 10; }
 .formgrid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+.formgrid > div { background: var(--column); border-radius: 16px; padding: 16px; }
 #stepform textarea { width: 100%; min-height: 280px; box-sizing: border-box; font-family: ui-monospace, monospace; }
 .formside { position: sticky; top: 0; }
+@media (max-width: 1100px) {
+  main, .formgrid { grid-template-columns: minmax(0, 1fr); }
+  .formside { position: static; }
+}
+@media (max-width: 600px) {
+  header, main { padding-left: 16px; padding-right: 16px; }
+  .page-name { padding-left: 0; border-left: 0; }
+  .field { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
 <div id="error"></div>
-<header><strong>Pipeline editor</strong><span id="title" class="muted"></span></header>
+<svg width="0" height="0" style="position: absolute" aria-hidden="true"><defs>
+  <symbol id="captain-bot" viewBox="0 0 120 120">
+    <rect x="18" y="68" width="8" height="18" rx="4" fill="#C4005E"/><rect x="94" y="68" width="8" height="18" rx="4" fill="#C4005E"/>
+    <rect x="26" y="50" width="68" height="56" rx="18" fill="#673888"/>
+    <path d="M30 48 L22 28 Q60 10 98 28 L90 48 Z" fill="#C4005E"/>
+    <rect x="20" y="44" width="80" height="11" rx="5.5" fill="var(--bot-band)"/>
+    <circle cx="60" cy="32" r="7" fill="#FECD40"/>
+    <circle cx="46" cy="76" r="8" fill="var(--bot-eye)"/><circle cx="47.5" cy="77" r="3.5" fill="var(--bot-band)"/>
+    <line x1="66" y1="64" x2="94" y2="58" stroke="var(--bot-band)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="74" cy="76" r="9" fill="var(--bot-band)"/>
+    <path d="M50 92 Q60 99 70 92" fill="none" stroke="var(--bot-eye)" stroke-width="4" stroke-linecap="round"/>
+  </symbol>
+</defs></svg>
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 120 120" role="img" aria-label="Captain Bot"><use href="#captain-bot"/></svg>
+    <div class="names">
+      <span class="wordmark">CAPT<em>N</em></span>
+      <span class="tagline">Create Agentic Pipelines for Team Nextory</span>
+    </div>
+  </div>
+  <strong class="page-name">Pipeline editor</strong><span id="title" class="muted"></span>
+  <span class="grow"></span>
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode" title="Switch to light mode">
+    <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
+</header>
 <section id="start" class="start" hidden></section>
 <main id="editor" hidden>
   <section>
@@ -278,7 +371,7 @@ function pipelineRow(s, i) {
     loopTag,
     mark,
     el("button", { type: "button", onclick: () => { s.open = !s.open; renderPipeline(); } }, s.open ? "Close" : "Edit"),
-    el("button", { type: "button", onclick: () => { state.model.steps.splice(i, 1); renderPipeline(); changed(); } }, "Remove"));
+    el("button", { type: "button", class: "danger", onclick: () => { state.model.steps.splice(i, 1); renderPipeline(); changed(); } }, "Remove"));
   head.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "move:" + i); e.dataTransfer.effectAllowed = "move"; });
   const card = el("div", { class: "card", "data-row": "1" }, head);
   if (s.open) {
@@ -406,7 +499,7 @@ async function showDetail(id, position = null) {
     actions.append(el("button", { type: "button", onclick: guard(async () => {
       const plan = await api("/api/steps/" + encodeURIComponent(d.id) + "/delete/dry-run", { level: d.level });
       box.append(deletePlanBlock(d, plan));
-    }) }, "Delete"));
+    }), class: "danger" }, "Delete"));
   }
   box.append(actions);
   if (position && state.model) box.append(await keysBlock(position));
@@ -835,7 +928,7 @@ function renderStart() {
   box.hidden = false;
   box.append(el("h3", {}, "Start"));
   box.append(el("div", { class: "row" }, el("button", { type: "button", onclick: () => openStepForm({ mode: "new" }) }, "New step")));
-  box.append(el("div", { class: "row" }, el("button", { type: "button", onclick: () => openModel(emptyModel(), null) }, "Create an empty pipeline")));
+  box.append(el("div", { class: "row" }, el("button", { type: "button", class: "primary", onclick: () => openModel(emptyModel(), null) }, "Create an empty pipeline")));
   const copySelect = pipelineSelect();
   const newId = el("input", { type: "text", placeholder: "new pipeline id" });
   box.append(el("div", { class: "row" },
@@ -872,6 +965,20 @@ async function init() {
   renderStart();
   if (failure) showError(failure);
 }
+const THEME_KEY = "factory.theme";
+function themeLabel() {
+  const label = document.documentElement.dataset.theme === "light" ? "Switch to dark mode" : "Switch to light mode";
+  const b = byId("theme-toggle");
+  b.setAttribute("aria-label", label);
+  b.title = label;
+}
+byId("theme-toggle").addEventListener("click", () => {
+  const light = document.documentElement.dataset.theme !== "light";
+  if (light) document.documentElement.dataset.theme = "light"; else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem(THEME_KEY, light ? "light" : "dark"); } catch (e) {}
+  themeLabel();
+});
+themeLabel();
 init().catch(() => {});
 </script>
 </body>
