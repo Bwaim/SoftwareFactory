@@ -177,9 +177,6 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .steps .sname { overflow-wrap: anywhere; }
 .steps .parent { color: var(--muted); }
 .steps .now { font-size: 11px; font-weight: 700; color: var(--attn-fg); background: var(--attn-bg); border-radius: 8px; padding: 1px 6px; margin-left: 6px; white-space: nowrap; }
-.terminal { margin: 0; max-height: 360px; overflow: auto; background: #0E0908; color: #E6DFDC; border: 1px solid #2E2322; border-radius: 8px; padding: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-.live { display: inline-flex; align-items: center; gap: 6px; }
-.live i { width: 8px; height: 8px; border-radius: 50%; background: var(--active-dot); display: block; }
 .timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .timeline li { display: grid; grid-template-columns: 44px 8px minmax(0, 1fr); gap: 10px; align-items: start; padding: 4px 0; }
 .timeline time { font-size: 12px; line-height: 20px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -952,7 +949,7 @@ const EXTRA_MAX = 300;
 function detailHashId() { return location.hash.startsWith(DETAIL_HASH) ? decodeURIComponent(location.hash.slice(DETAIL_HASH.length)) : null; }
 function openDetail(id) {
   if (state.detail && state.detail.id === id) return;
-  state.detail = { id, data: null, screen: null, screenAt: null, key: null };
+  state.detail = { id, data: null, key: null };
   history.replaceState(null, "", location.pathname + location.search + DETAIL_HASH + encodeURIComponent(id));
   render();
   loadDetail();
@@ -969,18 +966,14 @@ function closeDetail() {
 async function loadDetail() {
   const d = state.detail;
   if (!d) return;
-  let data, screen;
-  try {
-    [data, screen] = await Promise.all([api(`/api/tasks/${d.id}/detail`, undefined, true), api(`/api/tasks/${d.id}/screen`, undefined, true)]);
-  } catch (e) { return; }
+  let data;
+  try { data = await api(`/api/tasks/${d.id}/detail`, undefined, true); } catch (e) { return; }
   if (state.detail !== d) return;
-  const key = JSON.stringify([data, screen, Math.floor(Date.now() / 60000)]);
-  d.screenAt = new Date();
-  if (key === d.key) { const at = byId("detail").querySelector("[data-screen-at]"); if (at) at.textContent = screenAtText(d); return; }
-  Object.assign(d, { data, screen, key });
+  const key = JSON.stringify([data, Math.floor(Date.now() / 60000)]);
+  if (key === d.key) return;
+  Object.assign(d, { data, key });
   if (!menuOpen() && !modalOpen()) renderDetail();
 }
-function screenAtText(d) { return d.screenAt ? `Read at ${d.screenAt.toLocaleTimeString()}` : ""; }
 function eventTime(iso) {
   const at = new Date(iso);
   if (isNaN(at)) return "";
@@ -1006,17 +999,6 @@ function stepsSection(d) {
   }
   const done = d.data.steps.filter((s) => s.state === "done").length;
   return el("section", {}, el("h3", {}, "Pipeline", el("span", { class: "muted" }, `${done} of ${d.data.steps.length} steps done`)), list);
-}
-function terminalSection(d) {
-  const box = el("section", {});
-  const sc = d.screen;
-  if (sc && sc.available) {
-    box.append(el("h3", {}, "Terminal", el("span", { class: "muted live" }, el("i", { "aria-hidden": "true" }), el("span", { "data-screen-at": "1" }, screenAtText(d)))));
-    box.append(el("pre", { class: "terminal", tabindex: "0", "aria-label": "Last lines of the session" }, sc.text.replace(/\s+$/, "") || "(empty)"));
-  } else {
-    box.append(el("h3", {}, "Terminal"), el("div", { class: "muted" }, sc ? sc.reason : "Loading…"));
-  }
-  return box;
 }
 function timelineSection(d) {
   const list = el("ol", { class: "timeline" });
@@ -1071,9 +1053,6 @@ function renderDetail() {
   aside.hidden = !d;
   if (!d) { clear(aside); return; }
   const scroll = aside.scrollTop;
-  const oldTerm = aside.querySelector(".terminal");
-  const termAtEnd = !oldTerm || oldTerm.scrollHeight - oldTerm.scrollTop - oldTerm.clientHeight < 24;
-  const termTop = oldTerm ? oldTerm.scrollTop : 0;
   const openValues = new Set([...aside.querySelectorAll(".facts details[open] summary")].map((n) => n.textContent));
   const row = (d.data && d.data.row) || state.tasks.find((x) => x.id === d.id);
   const close = el("button", { type: "button", class: "close", "aria-label": "Close details", title: "Close (Esc)", onclick: closeDetail }, "✕");
@@ -1094,10 +1073,8 @@ function renderDetail() {
   if (row.status === "waiting_external" && row.wait_has_check) aside.append(checkBlock(row));
   aside.append(taskButtons(row));
   if (!d.data) { aside.append(el("div", { class: "muted" }, "Loading…")); return; }
-  aside.append(stepsSection(d), terminalSection(d), timelineSection(d), infoSection(d));
+  aside.append(stepsSection(d), timelineSection(d), infoSection(d));
   for (const s of aside.querySelectorAll(".facts details summary")) if (openValues.has(s.textContent)) s.parentElement.open = true;
-  const term = aside.querySelector(".terminal");
-  if (term) term.scrollTop = termAtEnd ? term.scrollHeight : termTop;
   aside.scrollTop = scroll;
 }
 document.addEventListener("keydown", (e) => {
@@ -1109,7 +1086,7 @@ setInterval(() => { if (state.detail && !document.hidden) loadDetail(); }, DETAI
 function setView(view) { state.view = view; render(); }
 byId("tab-tasks").addEventListener("click", () => setView("tasks"));
 byId("tab-backlog").addEventListener("click", () => setView("backlog"));
-{ const id = detailHashId(); if (id) state.detail = { id, data: null, screen: null, screenAt: null, key: null }; }
+{ const id = detailHashId(); if (id) state.detail = { id, data: null, key: null }; }
 refresh(true);
 setInterval(refresh, REFRESH_MS);
 setInterval(() => { for (const n of document.querySelectorAll("[data-next-check]")) n.textContent = countdownText(n.dataset.nextCheck); }, 1000);

@@ -1,6 +1,6 @@
 import pytest
 
-from conftest import SF, fake_config, make_task
+from conftest import SF, make_task
 from factory import events, repo, task_detail
 from serverutil import info, request
 
@@ -51,41 +51,24 @@ def test_detail_keeps_only_the_last_events(ctx, monkeypatch):
     assert [e["n"] for e in task_detail.detail(ctx, "t1")["events"]] == [3, 4]
 
 
-def test_screen_without_a_session_says_why(ctx):
-    make_task(ctx, tid="t1")
-    assert task_detail.screen(ctx, "t1") == {"available": False, "reason": "The task has no live session."}
 
 
-def test_screen_returns_the_session_text(ctx, inited):
-    fake_config(inited.fdir, capabilities=["read_screen"], screen="line 1\nline 2")
-    make_task(ctx, tid="t1", terminal_handle={"agent": "t1"})
-    assert task_detail.screen(ctx, "t1") == {"available": True, "text": "line 1\nline 2"}
 
 
-def test_screen_says_when_the_adapter_cannot_read(ctx, inited):
-    fake_config(inited.fdir, capabilities=["focus"])
-    make_task(ctx, tid="t1", terminal_handle={"agent": "t1"})
-    assert task_detail.screen(ctx, "t1") == {"available": False, "reason": "The fake terminal adapter cannot read the session."}
-
-
-def test_screen_reports_a_failed_read(ctx, inited):
-    fake_config(inited.fdir, capabilities=["read_screen"], read_screen_fails=True)
-    make_task(ctx, tid="t1", terminal_handle={"agent": "t1"})
-    assert task_detail.screen(ctx, "t1") == {"available": False, "reason": "The fake adapter failed to read the screen."}
-
-
-def test_detail_and_screen_routes(served):
+def test_detail_route(served):
     inited, i = served
     ctx = repo.load_ctx(cwd=inited.repo)
-    fake_config(inited.fdir, capabilities=["read_screen"], screen="hello")
-    make_task(ctx, tid="t1", steps=STEPS, position=2, terminal_handle={"agent": "t1"})
+    make_task(ctx, tid="t1", steps=STEPS, position=2)
     status, data = request(i, "GET", "/api/tasks/t1/detail")
     assert status == 200 and data["row"]["id"] == "t1" and [s["state"] for s in data["steps"]][2] == "current"
-    assert request(i, "GET", "/api/tasks/t1/screen") == (200, {"available": True, "text": "hello"})
     status, error = request(i, "GET", "/api/tasks/nope/detail")
     assert status == 400 and "Unknown task" in error["error"]
 
 
 def test_dashboard_page_has_the_detail_panel():
-    for text in ('id="detail"', "/detail`", "/screen`", "#task=", "Close details", "Pipeline", "Terminal", "Timeline", "closeDetail", "DETAIL_REFRESH_MS"):
+    for text in ('id="detail"', "/detail`", "#task=", "Close details", "Pipeline", "Timeline", "closeDetail", "DETAIL_REFRESH_MS"):
         assert text in PAGE
+
+
+def test_dashboard_page_has_no_terminal_section():
+    assert "/screen`" not in PAGE and "terminalSection" not in PAGE

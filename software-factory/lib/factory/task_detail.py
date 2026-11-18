@@ -1,8 +1,6 @@
-from . import adapters, board, events, state
-from .adapters.base import AdapterError
+from . import board, events, state
 
 EVENT_LIMIT = 200
-SCREEN_LINES = 80
 
 
 def step_rows(task):
@@ -37,17 +35,3 @@ def detail(ctx, tid, next_poll=None):
         "events": events.read(ctx, tid)[-EVENT_LIMIT:],
     }
 
-
-def screen(ctx, tid):
-    """The last lines of the task's terminal session, or why they cannot be read."""
-    task = state.load(ctx, tid)
-    handle = task.get("terminal_handle")
-    if not handle:
-        return {"available": False, "reason": "The task has no live session."}
-    try:
-        adapter = adapters.get_adapter(ctx)
-        if "read_screen" not in adapter.capabilities():
-            return {"available": False, "reason": f"The {adapter.name} terminal adapter cannot read the session."}
-        return {"available": True, "text": adapter.read_screen(handle, SCREEN_LINES)}
-    except AdapterError as e:
-        return {"available": False, "reason": str(e)}

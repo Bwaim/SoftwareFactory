@@ -367,7 +367,6 @@ The panel refreshes every 3 seconds. It shows:
 
 - The name, the ticket, the description, the status and the same buttons as the card.
 - **Pipeline**: every step of the pipeline. Done steps have a check, the current step says "now" and the loop count.
-- **Terminal**: the last 80 lines of the Claude session, read with `herdr agent read`. It needs a live session and a terminal adapter with `read_screen`. Otherwise the panel says why.
 - **Timeline**: the events of the task, newest first, from `events.jsonl`. It shows the last 200 events.
 - **Details**: pipeline, ticket, MR, branch, base, worktree, created and updated times, the values of the task state and the artifacts.
 

@@ -269,10 +269,6 @@ class HerdrAdapter(Adapter):
         self.require_owned(handle)
         run(["agent", "focus", handle["agent"]])
 
-    def read_screen(self, handle, lines):
-        self.require_owned(handle)
-        return run(["agent", "read", handle["agent"], "--source", "recent-unwrapped", "--lines", str(lines)]).stdout
-
     def rename(self, handle, name):
         self.require_owned(handle)
         run(["agent", "rename", handle["agent"], name])
