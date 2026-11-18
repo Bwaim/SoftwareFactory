@@ -1,7 +1,14 @@
 import os
 import re
+import subprocess
+import sys
 
+from . import workspaces
 from .errors import FactoryError
+
+NO_FACTORY = "This repository has no factory. Run `factory init` in it first."
+LIBRARY_MISSING = "The library folder does not exist. Create it, or leave the field blank."
+PICKER_ONLY_MACOS = "The folder picker works only on macOS."
 
 ROUTES = {"global": [], "workspace": []}
 WORKSPACE_PATH = re.compile(r"^/api/w/([a-z0-9-]{1,40})(/.*)$")
@@ -9,6 +16,12 @@ WORKSPACE_PATH = re.compile(r"^/api/w/([a-z0-9-]{1,40})(/.*)$")
 
 class NotFound(Exception):
     pass
+
+
+class DetailedError(FactoryError):
+    def __init__(self, message, **details):
+        super().__init__(message)
+        self.details = details
 
 
 def route(method, pattern, scope="workspace"):
@@ -69,6 +82,82 @@ def job(server, job_id, query, body):
     if job_id not in server.jobs:
         raise NotFound(job_id)
     return server.jobs[job_id]
+
+
+def workspace_row(server, entry):
+    from . import board, state
+    ws = server.fresh(entry["id"])
+    row = {**entry, "needs_you": 0, "open_tasks": 0, "error": ws.error if ws else "Unknown workspace."}
+    if ws and not ws.error:
+        tasks = state.list_tasks(ws.ctx)
+        row.update(needs_you=board.needs_you(tasks), open_tasks=board.open_tasks(tasks))
+    return row
+
+
+@route("GET", "/api/workspaces", scope="global")
+def workspaces_list(server, query, body):
+    server.reload_if_changed()
+    return [workspace_row(server, w) for w in workspaces.list_all()]
+
+
+def init_workspace(main, body):
+    from . import init
+    try:
+        init.init(main, body.get("library"))
+    except init.MissingLibraryError:
+        raise DetailedError(LIBRARY_MISSING, checks=[])
+    except init.InitChecksError:
+        raise
+    except FactoryError as e:
+        raise DetailedError(str(e), checks=[])
+
+
+@route("POST", "/api/workspaces/add", scope="global")
+def workspace_add(server, query, body):
+    main = workspaces.resolve_main(body["path"])
+    existing = workspaces.find_by_path(main)
+    if existing:
+        raise FactoryError(f"{main} is already the workspace {existing['name']}.")
+    if not (main / ".factory" / "factory.yaml").exists():
+        if not body.get("init"):
+            raise DetailedError(NO_FACTORY, code="no_factory", main=str(main))
+        init_workspace(main, body)
+    entry = workspaces.add(main)
+    server.reload()
+    return entry
+
+
+@route("POST", "/api/workspaces/([a-z0-9-]{1,40})/rename", scope="global")
+def workspace_rename(server, wid, query, body):
+    if workspaces.get(wid) is None:
+        raise NotFound(wid)
+    entry = workspaces.rename(wid, body["name"])
+    server.reload()
+    return entry
+
+
+@route("POST", "/api/workspaces/([a-z0-9-]{1,40})/delete", scope="global")
+def workspace_delete(server, wid, query, body):
+    if workspaces.get(wid) is None:
+        raise NotFound(wid)
+    entry = workspaces.remove(wid)
+    server.reload()
+    return entry
+
+
+@route("POST", "/api/workspaces/pick-folder", scope="global")
+def pick_folder(server, query, body):
+    if sys.platform != "darwin":
+        raise FactoryError(PICKER_ONLY_MACOS)
+    r = subprocess.run(["osascript", "-e", "POSIX path of (choose folder)"], capture_output=True, text=True)
+    if r.returncode != 0:
+        return {"path": None}
+    return {"path": r.stdout.strip().rstrip("/") or None}
+
+
+@route("GET", "/api/host", scope="global")
+def host(server, query, body):
+    return {"folder_picker": sys.platform == "darwin"}
 
 
 def registry(server):
