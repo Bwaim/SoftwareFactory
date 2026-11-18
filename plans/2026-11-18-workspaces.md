@@ -140,7 +140,7 @@ Spec: "Server > Life", "Runtimes", "Poll loop", "Routes" 2, "Automatic registrat
   - `test_dashboard_in_repo_selects_workspace`: `inited.factory("dashboard")` prints a URL with `ws=repo`.
   - `test_two_workspaces_one_server`: init a second repo (copy of the `origin_repo` setup in `work / "second" / "repo"`). One `server.json`. `/api/w/repo/tasks` and `/api/w/repo-2/tasks` both return 200. `/api/w/nope/tasks` returns 404.
   - `test_poll_covers_all_workspaces`: one waiting task with a `done_check` on a flag file in each workspace, `FACTORY_POLL_SECONDS=1`; both flags created; both tasks move on within 15 seconds.
-  - `test_broken_workspace_does_not_stop_others`: register a second workspace, make sure that `/api/w/<second>/tasks` returns 200 (the runtime is built), then delete its folder. One `GET /api/workspaces` gives the second row an `error`. `/api/w/<second>/tasks` returns 400 with an error text. `/api/w/repo/tasks` returns 200. The poll still moves the first workspace's task.
+  - `test_broken_workspace_does_not_stop_others`: register a second workspace, make sure that `/api/w/<second>/tasks` returns 200 (the runtime is built), then delete its folder. `/api/w/<second>/tasks` returns 400 with an error text. `/api/w/repo/tasks` returns 200. The poll still moves the first workspace's task.
   - `test_error_runtime_recovers` (in-process `Server()` with `FACTORY_HOME` set): break `factory.yaml` of a registered repo, `reload()`, the runtime has an error; fix the file, `reload()`, the error is gone. Then break it again: `server.fresh(id)` returns a runtime with an error, without `reload()`. Fix it again: one call of the `GET /api/workspaces` route function gives `error: None`, without a poll.
   - `test_legacy_server_file_is_removed`: write `<repo>/.factory/server.json` with a dead pid; start the server; the file is gone.
   - `test_stop_legacy_calls_shutdown` (in-process): monkeypatch `server.pid_alive` and `server.ping` to True and record the URL that `urllib.request.urlopen` gets; `stop_legacy(fdir)` posts to `/api/shutdown` and removes the file.
@@ -181,6 +181,7 @@ Spec: "Routes" 1 and 3, "Add rules" 2 and 3, "Needs-you count", "Runtimes" 2 (mt
   - `test_add_with_failed_check`: a repo without `origin` remote; 400 with `checks` that has one entry with `name == "git"`.
   - `test_add_duplicate`: adding the registered repo again gives 400 and names `repo`.
   - `test_rename_and_delete`: rename gives the new name in `/api/workspaces`; delete removes the row and `/api/w/repo/tasks` gives 404 afterwards; the repo `.factory/` still exists.
+  - `test_list_marks_deleted_folder`: register a second workspace, make sure that `/api/w/<second>/tasks` returns 200, delete its folder, and one `GET /api/workspaces` gives that row an `error` (no poll, `FACTORY_POLL_SECONDS` not set).
   - `test_list_sees_cli_init`: run `factory init` in a second repo through the CLI while the server runs; the next `GET /api/workspaces` has two rows.
   - `test_pick_folder` (in-process): monkeypatch `api.subprocess.run` to return code 0 with `"/Users/x/repo/\n"` → `{"path": "/Users/x/repo"}`; code 1 → `{"path": None}`; monkeypatch `api.sys.platform` to `"linux"` → `FactoryError` with the picker text.
 - [ ] **Step 2: Run** `tests/test_workspaces_api.py`. Expected: FAIL.
