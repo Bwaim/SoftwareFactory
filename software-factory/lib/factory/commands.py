@@ -737,8 +737,10 @@ def pipeline_list_cmd(args):
 
 def editor_url(ctx, **params):
     from . import server, workspaces
-    ws = workspaces.register(ctx.main)["id"]
-    return server.page_url(server.ensure_server(), "editor", ws=ws, **params)
+    entry = workspaces.find_by_path(ctx.main)
+    if entry is None:
+        raise FactoryError("This repository is not in the dashboard. Run `factory dashboard` in it first.")
+    return server.page_url(server.ensure_server(), "editor", ws=entry["id"], **params)
 
 
 @cli.command("pipeline edit")

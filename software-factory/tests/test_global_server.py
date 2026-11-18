@@ -162,3 +162,12 @@ def test_keep_polling_registers(inited):
 def test_editor_url_has_ws(inited):
     assert "ws=repo" in inited.factory("pipeline", "edit").stdout
     assert "ws=repo" in inited.factory("step", "edit").stdout
+
+
+def test_editor_needs_a_listed_workspace(inited):
+    from factory import workspaces
+    workspaces.remove("repo")
+    r = inited.factory("pipeline", "edit", check=False)
+    assert r.returncode == 1
+    assert "This repository is not in the dashboard. Run `factory dashboard` in it first." in r.stderr
+    assert workspaces.list_all() == []
