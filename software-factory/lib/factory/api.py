@@ -160,6 +160,18 @@ def artifact(server, tid, name, query, body):
     return {"name": name, "text": path.read_text(errors="replace")}
 
 
+@route("GET", f"/api/tasks/{TASK}/detail")
+def task_detail(server, tid, query, body):
+    from . import task_detail
+    return task_detail.detail(server.ctx, tid, server.next_poll)
+
+
+@route("GET", f"/api/tasks/{TASK}/screen")
+def task_screen(server, tid, query, body):
+    from . import task_detail
+    return task_detail.screen(server.ctx, tid)
+
+
 @route("POST", f"/api/tasks/{TASK}/focus")
 def focus(server, tid, query, body):
     from . import session

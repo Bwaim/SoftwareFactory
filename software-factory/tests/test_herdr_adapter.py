@@ -277,3 +277,20 @@ def test_existing_main_workspace_is_never_closed(herdr_env, origin_repo, monkeyp
     assert adapter.close(handle) == []
     assert "w5" not in closed(calls())
     assert "w5" not in recorded(origin_repo)
+
+
+def test_herdr_read_screen_reads_recent_lines(herdr_env, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    monkeypatch.setenv("FAKE_HERDR_SCREEN", "Working on it")
+    assert "read_screen" in adapter.capabilities()
+    assert adapter.read_screen({"agent": "t1", "tab": "w9:t1"}, 80).strip() == "Working on it"
+    assert ["agent", "read", "t1", "--source", "recent-unwrapped", "--lines", "80"] in calls()
+
+
+def test_herdr_read_screen_refused_when_agent_in_other_tab(herdr_env, monkeypatch):
+    adapter, _ = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w3:t4")
+    with pytest.raises(AdapterError, match="does not belong"):
+        adapter.read_screen({"agent": "t1", "tab": "w9:t1"}, 80)

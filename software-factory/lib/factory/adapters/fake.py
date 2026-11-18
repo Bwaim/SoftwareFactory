@@ -60,6 +60,13 @@ class FakeAdapter(Adapter):
         self.require("focus")
         self.record("focus", handle=handle)
 
+    def read_screen(self, handle, lines):
+        self.require("read_screen")
+        cfg = self.cfg()
+        if cfg.get("read_screen_fails"):
+            raise AdapterError("The fake adapter failed to read the screen.")
+        return cfg.get("screen", "")
+
     def rename(self, handle, name):
         self.require("rename")
         self.record("rename", handle=handle, name=name)
