@@ -30,7 +30,7 @@ You need:
 
 - `uv`. Install it with `brew install uv`.
 - Herdr: https://herdr.dev
-- git, with an `origin` remote in each repository.
+- git. Each repository can have an `origin` remote, but it is optional.
 - Claude Code.
 - Optional: `gh` or `glab`, for the forge steps of the catalog.
 
@@ -58,6 +58,8 @@ Start the factory:
 2. Run `factory dashboard`. The dashboard launches and manages tasks.
 
 The library is optional. Without a library, only built-in and local steps exist. To add a library later, set `library:` in `.factory/factory.yaml`.
+
+A repository without an `origin` remote also works. `factory init` shows a warning. Tasks start from the local base branch, with no fetch. Push and pull request steps fail.
 
 Some actions exist only in the CLI:
 
@@ -183,7 +185,7 @@ Step execution, inside a task session:
 
 Task life:
 
-- `factory launch <pipeline> [--description <text>] [--input <name=value>] [--id <id>] [--from-backlog <id>] [--dry-run]`: start a task. When the pipeline input `ticket` holds a Jira key (`HT-4549`, a URL or a text), the task id is that key in lowercase, for example `ht-4549`, plus `-2` when taken.
+- `factory launch <pipeline> [--description <text>] [--input <name=value>] [--id <id>] [--from-backlog <id>] [--dry-run]`: start a task. When the pipeline input `ticket` holds a Jira key (`HT-4549`, a URL or a text), the task id is that key in lowercase, for example `ht-4549`, plus `-2` when taken. Without an `origin` remote, the task starts from the local base branch.
 - `factory tasks`: list the tasks.
 - `factory status`: show the status of the current task.
 - `factory block <reason>`: block the task.
@@ -423,6 +425,8 @@ Clean, delete and cancel use the same check. The reason of a task is one of thes
 4. `merged (squash)`, by patch id: the changes of the branch have the same patch id as a commit of `origin/<base_ref>`. This also works when a later commit changed the same lines. A commit added to the branch after the squash changes its patch id, so it is listed as lost.
 5. `pushed, and its remote branch was deleted`: the branch tracks its own remote branch, and that branch is gone. The delete asks for approval only when something would be lost: commits, uncommitted changes or failed checks. It always keeps the local branch.
 6. `not merged`: none of the above.
+
+Without an `origin` remote, the checks compare with the local `<base_ref>` branch. Reason 2 is then `merged into <base_ref>`. Reason 5 never happens.
 
 For reasons 2 to 4, the commits are not listed as lost, and the delete removes the local branch. Uncommitted changes still need approval. So do commits on a detached HEAD.
 

@@ -5,10 +5,11 @@ import shlex
 import shutil
 from pathlib import Path
 
-from . import adapters, fsio, repo
+from . import adapters, config, fsio, repo
 from . import library as library_module
 from .adapters.base import AdapterError
 from .errors import FactoryError
+from .registry import CREATE_WORKTREE
 from .version import DATA_VERSION
 
 SETTINGS = {"permissions": {"allow": ["Bash(factory:*)", "Bash(factory *)"]}}
@@ -136,13 +137,15 @@ def terminal_check(ctx):
 
 
 def git_check(ctx):
-    has_origin = repo.git(["remote", "get-url", "origin"], ctx.main, check=False).returncode == 0
-    message = (
-        "Git repository with an origin remote."
-        if has_origin
-        else "This repository has no `origin` remote. Add it with `git remote add origin <url>`."
-    )
-    return {"name": "git", "ok": has_origin, "message": message}
+    message = "Git repository with an origin remote." if repo.has_origin(ctx.main) else "Git repository without a remote."
+    return {"name": "git", "ok": True, "message": message}
+
+
+def origin_warning(ctx):
+    if repo.has_origin(ctx.main):
+        return None
+    base = config.get_value(ctx, CREATE_WORKTREE, "base_ref") or "main"
+    return f"This repository has no `origin` remote. Tasks start from the local `{base}` branch. Push and pull request steps fail."
 
 
 def uv_check():
@@ -220,7 +223,7 @@ def init(cwd, library=None, create_library=False):
         report["kept"].append(str(settings_file))
         report.setdefault("warnings", []).append(str(e))
     add_excludes(ctx)
-    warning = link_warning()
-    if warning:
-        report.setdefault("warnings", []).append(warning)
+    for warning in (link_warning(), origin_warning(ctx)):
+        if warning:
+            report.setdefault("warnings", []).append(warning)
     return report

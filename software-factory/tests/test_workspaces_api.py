@@ -1,7 +1,7 @@
 import pytest
 import yaml
 
-from conftest import git, make_repo, make_task
+from conftest import fake_config, git, make_repo, make_task
 from factory import api, repo, state
 from factory.errors import FactoryError
 from serverutil import info, request
@@ -68,8 +68,10 @@ def test_add_with_failed_check(dash):
     other = inited.work / "plain"
     other.mkdir()
     git("init", "-b", "main", cwd=other)
+    (other / ".factory").mkdir()
+    fake_config(other / ".factory", check_ok=False)
     status, err = request(i, "POST", "/api/workspaces/add", {"path": str(other), "init": True})
-    assert status == 400 and [c["name"] for c in err["checks"]] == ["git"]
+    assert status == 400 and [c["name"] for c in err["checks"]] == ["terminal"]
 
 
 def test_add_duplicate(dash):

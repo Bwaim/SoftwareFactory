@@ -4,7 +4,7 @@ import os
 import pytest
 import yaml
 
-from conftest import fake_config, git
+from conftest import fake_config
 from factory import init, menu, repo, workspaces
 
 
@@ -73,9 +73,11 @@ def test_init_needs_existing_library_or_flag(factory, library_path):
 
 
 def test_init_reports_failed_prerequisite(factory, origin_repo, library_path):
-    git("remote", "remove", "origin", cwd=origin_repo)
+    (origin_repo / ".factory").mkdir()
+    fake_config(origin_repo / ".factory", check_ok=False, check_message="No terminal.")
     r = factory("init", "--library", library_path, "--create-library", check=False)
-    assert r.returncode == 1 and "origin" in (r.stdout + r.stderr)
+    assert r.returncode == 1 and "terminal: No terminal." in (r.stdout + r.stderr)
+    assert not (origin_repo / ".factory" / "factory.yaml").exists()
 
 
 def test_link_fixes_wrong_target(factory, work):
