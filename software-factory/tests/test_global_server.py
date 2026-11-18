@@ -119,6 +119,28 @@ def test_legacy_server_file_is_removed(inited):
     assert not legacy.exists()
 
 
+def test_legacy_server_of_new_workspace_is_removed(inited):
+    from factory import workspaces
+    inited.factory("dashboard")
+    try:
+        other = second(inited)
+        legacy = other / ".factory" / "server.json"
+        legacy.write_text(json.dumps({"port": 1, "token": "x", "pid": 999999}))
+        workspaces.register(other)
+        assert request(info(), "GET", "/api/workspaces")[0] == 200
+        assert not legacy.exists()
+    finally:
+        inited.factory("server", "stop", check=False)
+
+
+def test_stop_legacy_without_port(tmp_path):
+    import os
+    from factory import server
+    (tmp_path / "server.json").write_text(json.dumps({"token": "x", "pid": os.getpid()}))
+    assert not server.stop_legacy(tmp_path)
+    assert not (tmp_path / "server.json").exists()
+
+
 def test_stop_legacy_calls_shutdown(tmp_path, monkeypatch):
     from factory import server
     (tmp_path / "server.json").write_text(json.dumps({"port": 4321, "token": "tok", "pid": 1}))

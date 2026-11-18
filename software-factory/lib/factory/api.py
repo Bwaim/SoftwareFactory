@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 from . import workspaces
 from .errors import FactoryError
@@ -9,6 +10,12 @@ from .errors import FactoryError
 NO_FACTORY = "This repository has no factory. Run `factory init` in it first."
 LIBRARY_MISSING = "The library folder does not exist. Create it, or leave the field blank."
 PICKER_ONLY_MACOS = "The folder picker works only on macOS."
+FULL_PATH = "Give the full path of the repository folder."
+PICKER_TIMEOUT = 300
+PICKER_SCRIPT = [
+    "-e", 'tell application "System Events" to activate',
+    "-e", 'tell application "System Events" to POSIX path of (choose folder)',
+]
 
 ROUTES = {"global": [], "workspace": []}
 WORKSPACE_PATH = re.compile(r"^/api/w/([a-z0-9-]{1,40})(/.*)$")
@@ -112,9 +119,16 @@ def init_workspace(main, body):
         raise DetailedError(str(e), checks=[])
 
 
+def full_path(value):
+    path = value.strip() if isinstance(value, str) else ""
+    if not path or not Path(path).expanduser().is_absolute():
+        raise FactoryError(FULL_PATH)
+    return path
+
+
 @route("POST", "/api/workspaces/add", scope="global")
 def workspace_add(server, query, body):
-    main = workspaces.resolve_main(body["path"])
+    main = workspaces.resolve_main(full_path(body["path"]))
     existing = workspaces.find_by_path(main)
     if existing:
         raise FactoryError(f"{main} is already the workspace {existing['name']}.")
@@ -149,7 +163,10 @@ def workspace_delete(server, wid, query, body):
 def pick_folder(server, query, body):
     if sys.platform != "darwin":
         raise FactoryError(PICKER_ONLY_MACOS)
-    r = subprocess.run(["osascript", "-e", "POSIX path of (choose folder)"], capture_output=True, text=True)
+    try:
+        r = subprocess.run(["osascript", *PICKER_SCRIPT], capture_output=True, text=True, timeout=PICKER_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return {"path": None}
     if r.returncode != 0:
         return {"path": None}
     return {"path": r.stdout.strip().rstrip("/") or None}

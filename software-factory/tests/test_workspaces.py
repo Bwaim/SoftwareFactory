@@ -77,3 +77,19 @@ def test_remove_and_register(origin_repo):
 
 def test_mtime_missing():
     assert workspaces.mtime() is None
+
+
+def test_null_workspaces_is_empty(origin_repo):
+    workspaces.list_path().parent.mkdir(parents=True, exist_ok=True)
+    workspaces.list_path().write_text("workspaces: null\n")
+    assert workspaces.list_all() == []
+    assert workspaces.register(origin_repo)["id"] == "repo"
+    assert [w["id"] for w in workspaces.list_all()] == ["repo"]
+
+
+def test_non_map_file_is_refused(origin_repo):
+    workspaces.list_path().parent.mkdir(parents=True, exist_ok=True)
+    workspaces.list_path().write_text("- a\n- b\n")
+    for call in (workspaces.list_all, lambda: workspaces.add(origin_repo), lambda: workspaces.register(origin_repo)):
+        with pytest.raises(FactoryError, match="must be a map"):
+            call()

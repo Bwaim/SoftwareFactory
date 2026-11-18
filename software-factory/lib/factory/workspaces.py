@@ -37,7 +37,10 @@ def resolve_main(path):
 
 
 def rows(data):
-    return data.setdefault("workspaces", [])
+    fsio.require_map(list_path(), data)
+    if data.get("workspaces") is None:
+        data["workspaces"] = []
+    return data["workspaces"]
 
 
 def list_all():
@@ -61,27 +64,42 @@ def unique_id(base, taken):
     return wid
 
 
+def same_path(w, main):
+    return Path(w["path"]).resolve() == Path(main).resolve()
+
+
+def append(items, main):
+    entry = {"id": unique_id(slug(main.name), {w["id"] for w in items}), "name": main.name, "path": str(main)}
+    items.append(entry)
+    return dict(entry)
+
+
 def add(main):
     main = Path(main)
 
     def fn(data):
         items = rows(data)
         for w in items:
-            if Path(w["path"]).resolve() == main.resolve():
+            if same_path(w, main):
                 raise FactoryError(f"{main} is already the workspace {w['name']}.")
-        entry = {"id": unique_id(slug(main.name), {w["id"] for w in items}), "name": main.name, "path": str(main)}
-        items.append(entry)
-        return dict(entry)
+        return append(items, main)
 
     return fsio.update_yaml(list_path(), fn)
 
 
 def register(main):
-    return find_by_path(main) or add(main)
+    main = Path(main)
+
+    def fn(data):
+        items = rows(data)
+        found = next((w for w in items if same_path(w, main)), None)
+        return dict(found) if found else append(items, main)
+
+    return find_by_path(main) or fsio.update_yaml(list_path(), fn)
 
 
 def rename(wid, name):
-    name = name.strip()
+    name = name.strip() if isinstance(name, str) else ""
     if not name or len(name) > MAX_NAME:
         raise FactoryError(f"A name has 1 to {MAX_NAME} characters.")
 

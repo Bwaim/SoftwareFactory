@@ -119,14 +119,46 @@ def test_pick_folder(monkeypatch):
         def __init__(self, code, out):
             self.returncode, self.stdout = code, out
 
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append((cmd, kw["timeout"]))
+        return Done(0, "/Users/x/repo/\n")
+
     monkeypatch.setattr(api.sys, "platform", "darwin")
-    monkeypatch.setattr(api.subprocess, "run", lambda *a, **k: Done(0, "/Users/x/repo/\n"))
+    monkeypatch.setattr(api.subprocess, "run", fake_run)
     assert api.pick_folder(None, query={}, body={}) == {"path": "/Users/x/repo"}
+    assert calls == [(["osascript", *api.PICKER_SCRIPT], 300)]
+    assert 'tell application "System Events" to activate' in api.PICKER_SCRIPT
     monkeypatch.setattr(api.subprocess, "run", lambda *a, **k: Done(1, ""))
     assert api.pick_folder(None, query={}, body={}) == {"path": None}
     monkeypatch.setattr(api.sys, "platform", "linux")
     with pytest.raises(FactoryError, match="The folder picker works only on macOS."):
         api.pick_folder(None, query={}, body={})
+
+
+def test_pick_folder_timeout(monkeypatch):
+    def slow(cmd, **kw):
+        raise api.subprocess.TimeoutExpired(cmd, kw["timeout"])
+
+    monkeypatch.setattr(api.sys, "platform", "darwin")
+    monkeypatch.setattr(api.subprocess, "run", slow)
+    assert api.pick_folder(None, query={}, body={}) == {"path": None}
+
+
+def test_add_needs_full_path(dash):
+    _, i = dash
+    for path in ("", "   ", "repo", "./repo"):
+        status, err = request(i, "POST", "/api/workspaces/add", {"path": path})
+        assert status == 400 and err["error"] == api.FULL_PATH
+
+
+def test_add_and_rename_refuse_non_string(dash):
+    _, i = dash
+    status, err = request(i, "POST", "/api/workspaces/add", {"path": 5})
+    assert status == 400 and err["error"] == api.FULL_PATH
+    status, err = request(i, "POST", "/api/workspaces/repo/rename", {"name": ["x"]})
+    assert status == 400 and err["error"] == "A name has 1 to 64 characters."
 
 
 def test_host(dash):

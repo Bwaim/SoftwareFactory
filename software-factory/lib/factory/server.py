@@ -74,8 +74,17 @@ class Server:
     def reload(self):
         with self.lock:
             list_mtime, entries = workspaces.mtime(), workspaces.list_all()
+            added = [w for w in entries if w["id"] not in self.runtimes]
             self.runtimes = {w["id"]: runtime.Workspace(self, w) for w in entries}
             self.list_mtime = list_mtime
+        self.stop_legacy_servers(added)
+
+    def stop_legacy_servers(self, entries):
+        for w in entries:
+            try:
+                stop_legacy(Path(w["path"]) / ".factory")
+            except Exception as e:
+                log(f"legacy server check failed for {w['id']}: {e}")
 
     def reload_if_changed(self):
         if workspaces.mtime() != self.list_mtime or any(w.error for w in self.snapshot()):
@@ -103,11 +112,6 @@ class Server:
             return ws
 
     def run(self):
-        for ws in self.snapshot():
-            try:
-                stop_legacy(Path(ws.path) / ".factory")
-            except Exception as e:
-                log(f"legacy server check failed for {ws.id}: {e}")
         fsio.write_json(info_path(), {"port": self.port, "token": self.token, "pid": os.getpid()})
         os.chmod(info_path(), SERVER_INFO_MODE)
         threading.Thread(target=self.watch_idle, daemon=True).start()
@@ -374,7 +378,10 @@ def stop_legacy(fdir):
         info = fsio.read_json(path)
     except (OSError, ValueError):
         info = None
-    live = isinstance(info, dict) and pid_alive(info.get("pid")) and ping(info)
+    try:
+        live = isinstance(info, dict) and pid_alive(info.get("pid")) and ping(info)
+    except KeyError:
+        live = False
     if live:
         post_shutdown(info)
     path.unlink(missing_ok=True)
