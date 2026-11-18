@@ -80,7 +80,22 @@ def fetch(ctx, ref, report):
     return True
 
 
+def base_ready(ctx, base, report):
+    if repo.has_origin(ctx.main):
+        return fetch(ctx, base, report)
+    if ref_exists(ctx, f"refs/heads/{base}"):
+        return True
+    report["errors"].append(f"The branch `{base}` does not exist in this repository.")
+    return False
+
+
+def start_point(ctx, base):
+    return f"origin/{base}" if repo.has_origin(ctx.main) else f"refs/heads/{base}"
+
+
 def remote_has_branch(ctx, branch):
+    if not repo.has_origin(ctx.main):
+        return False
     r = repo.git(["ls-remote", "--heads", "origin", branch], ctx.main, check=False)
     return r.returncode == 0 and bool(r.stdout.strip())
 
@@ -135,7 +150,7 @@ def resolve_inputs(ctx, pipeline, inputs, report):
 def plan_launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlog=None):
     report = {
         "ok": False, "errors": [], "task_id": None, "pipeline": pipeline_id, "description": description,
-        "worktree": None, "base_ref": None, "branch": None, "branch_case": "none", "fast_forward": False,
+        "worktree": None, "base_ref": None, "start_point": None, "branch": None, "branch_case": "none", "fast_forward": False,
         "missing_inputs": [], "missing_config": [], "summary": None, "inputs": {},
     }
     check_arguments(description, inputs, task_id)
@@ -179,12 +194,13 @@ def plan_worktree(ctx, reg, pipeline, report, inputs):
     ]
     base_ref = values.get("base_ref", "main")
     report["base_ref"] = base_ref
+    report["start_point"] = start_point(ctx, base_ref)
     if "worktree_root" in values:
         wt = Path(str(values["worktree_root"])).expanduser().resolve() / report["task_id"]
         report["worktree"] = str(wt)
         if wt.exists():
             report["errors"].append(f"The folder {wt} already exists.")
-    if not fetch(ctx, base_ref, report):
+    if not base_ready(ctx, base_ref, report):
         return
     if "branch" in pipeline.inputs:
         if str(inputs.get("branch", "")).strip():
@@ -194,10 +210,10 @@ def plan_worktree(ctx, reg, pipeline, report, inputs):
 
 
 def create_worktree(ctx, report):
-    wt, base, branch, case = report["worktree"], report["base_ref"], report["branch"], report["branch_case"]
+    wt, base, branch, case = report["worktree"], report["start_point"], report["branch"], report["branch_case"]
     Path(wt).parent.mkdir(parents=True, exist_ok=True)
     if case == "new":
-        repo.git(["worktree", "add", "-b", branch, wt, f"origin/{base}"], ctx.main)
+        repo.git(["worktree", "add", "-b", branch, wt, base], ctx.main)
         return True
     if case == "existing":
         if report["fast_forward"]:
@@ -207,7 +223,7 @@ def create_worktree(ctx, report):
     if case == "remote":
         repo.git(["worktree", "add", "--track", "-b", branch, wt, f"origin/{branch}"], ctx.main)
         return True
-    repo.git(["worktree", "add", "--detach", wt, f"origin/{base}"], ctx.main)
+    repo.git(["worktree", "add", "--detach", wt, base], ctx.main)
     return False
 
 
@@ -280,7 +296,7 @@ def render_report(report):
         ff = " (fast-forward)" if report["fast_forward"] else ""
         lines.append(f"Branch: {report['branch']} ({report['branch_case']}){ff}")
     elif report["branch_case"] == "detached":
-        lines.append(f"Branch: none, detached HEAD on origin/{report['base_ref']}")
+        lines.append(f"Branch: none, detached HEAD on {report['start_point'].removeprefix('refs/heads/')}")
     for key in report["missing_inputs"]:
         lines.append(f"Missing input: {key}")
     for item in report["missing_config"]:

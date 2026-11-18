@@ -33,9 +33,9 @@ Run these checks in order. Stop at the first failure and say why.
 Before any command that changes something, show what it will do and wait for the user to confirm, when the action says so.
 
 - **Init the factory** (`init`):
-  1. Ask for the library folder path. Explain: generic steps and pipelines live there, and it can be shared by many repositories.
-  2. Run `FACTORY init --library <path> --json`. If the folder does not exist, ask to create it and add `--create-library`. Show each check. If the library is not in git, say that library commits are disabled.
-  3. Offer the starter pack: `factory catalog install quick-task --local|--generic --with-steps --dry-run --json`, show it, then install after approval. For a generic install, offer the library commit (Library commits below).
+  1. Ask if the user wants a library. Explain: generic steps and pipelines live there, and many repositories can share it. The library is optional. Ask for the folder path only if the user wants a library.
+  2. Run `FACTORY init --json`, and add `--library <path>` if the user wants a library. If the folder does not exist, ask to create it and add `--create-library`. Show each check. If the library is not in git, say that library commits are disabled.
+  3. Offer the starter pack: `factory catalog install quick-task --local|--generic --with-steps --dry-run --json`. Show it, then install after approval. If there is no library, offer only `--local`, because `--generic` fails with "No library is configured.". For a generic install, offer the library commit (Library commits below).
   4. Backlog import: ask if the user wants to import entries. They paste a list or give a file path. Run `factory backlog import --dry-run --json` with the text on stdin or `--file <path>`, show the parsed titles, then run it without `--dry-run` after approval.
 - **Launch a new pipeline** (`launch`): follow the built-in step `create-task`. Ask each input by its type: one line for `text`, several lines allowed for `long-text`, a path for `file`. Pipelines: `factory pipeline list --json`. Backlog: `factory backlog list --json`. The menu returns at once. Do not wait for the task.
 - **Show tasks** (`show-tasks`): run `factory tasks` and show the output. Tasks with `attention` are listed first, with `blocked` tasks. They "may wait for you": the session ended its turn and may have asked you a question. Tell the user which tasks need them: `blocked`, `awaiting_approval` and tasks with `attention`. To answer, use Send a prompt or Focus.
@@ -63,7 +63,7 @@ Before any command that changes something, show what it will do and wait for the
 - **Add a backlog entry** (`backlog-add`): follow the built-in step `backlog-add`.
 - **Remove a backlog entry** (`backlog-remove`): follow the built-in step `backlog-remove`.
 - **Open dashboard** (`dashboard`): run `factory dashboard`. Show the URL it prints.
-- **Exit** (`exit`): list the tasks that are not `paused` or `finished`. Ask whether to pause all of them. If yes, ask: wait until each session is idle, or stop now. Run `factory pause --all` (add `--wait` to wait). Then run `factory server stop --unless-waiting`, show its output, and stop the menu.
+- **Exit** (`exit`): list the tasks that are not `paused` or `finished`. Ask whether to pause all of them. If yes, ask: wait until each session is idle, or stop now. Run `factory pause --all` (add `--wait` to wait). Then stop the menu. Do not stop the server, because it stops by itself after the idle time.
 
 ## Migrate
 

@@ -9,7 +9,7 @@ class StopLoop(Exception):
 
 def test_poll_loop_applies_pending_renames(inited, monkeypatch, capsys):
     ctx = repo.load_ctx(cwd=inited.repo)
-    srv = server.Server(ctx)
+    srv = server.Server()
     sleeps = []
     applied = []
 

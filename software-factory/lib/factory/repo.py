@@ -18,6 +18,10 @@ def git(args, cwd, check=True, input=None):
     return r
 
 
+def has_origin(cwd):
+    return git(["remote", "get-url", "origin"], cwd, check=False).returncode == 0
+
+
 def main_repo(cwd):
     r = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd, check=False)
     if r.returncode != 0:

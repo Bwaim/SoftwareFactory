@@ -165,6 +165,9 @@ dd { margin: 0; word-break: break-word; }
 <script>
 const params = new URLSearchParams(location.search);
 const TOKEN = params.get("token");
+const WS = params.get("ws");
+const GLOBAL_API = /^\/api\/(ping|shutdown|jobs\/|workspaces|host)/;
+function apiPath(path) { return GLOBAL_API.test(path) ? path : `/api/w/${encodeURIComponent(WS)}${path.slice(4)}`; }
 const CHECK_DELAY_MS = 300;
 const SHOW_HIDDEN_KEY = "factory-editor-show-hidden";
 const KEY_TYPES = ["text", "long-text", "file"];
@@ -178,7 +181,7 @@ const byId = (id) => document.getElementById(id);
 async function api(path, body) {
   const opts = { headers: { "X-Factory-Token": TOKEN } };
   if (body !== undefined) { opts.method = "POST"; opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
-  const r = await fetch(path, opts);
+  const r = await fetch(apiPath(path), opts);
   const data = await r.json();
   if (r.status === 409) { const conflict = new Error(data.error); conflict.conflict = true; throw conflict; }
   if (!r.ok) { showError(data.error || r.statusText); throw new Error(data.error || r.statusText); }

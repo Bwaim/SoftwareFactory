@@ -47,7 +47,7 @@ def test_stop(served):
     inited, i = served
     inited.factory("server", "stop")
     assert wait_dead(i["pid"])
-    assert not (inited.fdir / "server.json").exists()
+    assert not (inited.home / "server.json").exists()
 
 
 def test_idle_stop(inited):
@@ -78,7 +78,7 @@ def test_invalid_json_body_is_refused(served):
 
 def test_server_info_file_is_private(served):
     inited, i = served
-    assert stat.S_IMODE(os.stat(inited.fdir / "server.json").st_mode) == 0o600
+    assert stat.S_IMODE(os.stat(inited.home / "server.json").st_mode) == 0o600
 
 
 def test_pages_send_privacy_headers(served):

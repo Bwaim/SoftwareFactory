@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from conftest import git, make_task
-from factory import repo
+from factory import migrate, repo
 
 SCRIPT = '''
 from pathlib import Path
@@ -77,3 +77,9 @@ def test_newer_refused(v2):
     assert inited.factory.json("version", "check", env=env)["state"] == "newer"
     r = inited.factory("migrate", env=env, check=False)
     assert r.returncode == 1 and "Run the install script again to update it." in r.stderr
+
+
+def test_migrate_plan_without_library(factory, origin_repo):
+    factory("init")
+    p = migrate.plan(repo.load_ctx(origin_repo))
+    assert p["library"]["migrate"] is False and p["library"]["path"] is None

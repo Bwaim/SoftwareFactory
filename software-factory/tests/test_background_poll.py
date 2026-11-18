@@ -24,8 +24,8 @@ def waits(inited):
 
 
 def server_pid(inited):
-    path = inited.fdir / "server.json"
-    return info(inited.fdir)["pid"] if path.exists() else None
+    path = inited.home / "server.json"
+    return info()["pid"] if path.exists() else None
 
 
 def failing_start(inited, monkeypatch):
@@ -35,8 +35,8 @@ def failing_start(inited, monkeypatch):
         monkeypatch.setenv(key, value)
     monkeypatch.chdir(inited.repo)
 
-    def fail(ctx):
-        raise FactoryError("The local server did not start. See .factory/server.log.")
+    def fail():
+        raise FactoryError(f"The local server did not start. See {server.log_path()}.")
 
     monkeypatch.setattr(server, "ensure_server", fail)
     return server
@@ -125,7 +125,7 @@ def test_wait_warns_when_the_server_does_not_start(waits, monkeypatch, capsys):
     inited.factory("next", "--task", "t1")
     server = failing_start(inited, monkeypatch)
     assert cli.main(["wait", "--task", "t1"]) == 0
-    assert capsys.readouterr().err.strip() == server.START_WARNING
+    assert capsys.readouterr().err.strip() == server.start_warning()
     assert task_json(inited.fdir, "t1")["status"] == "waiting_external"
 
 
@@ -137,7 +137,7 @@ def test_tasks_json_stays_valid_when_the_server_does_not_start(waits, monkeypatc
     assert cli.main(["tasks", "--json"]) == 0
     out = capsys.readouterr()
     assert [row["id"] for row in json.loads(out.out)] == ["t1"]
-    assert out.err.strip() == server.START_WARNING
+    assert out.err.strip() == server.start_warning()
 
 
 def one_line_error(result, path):

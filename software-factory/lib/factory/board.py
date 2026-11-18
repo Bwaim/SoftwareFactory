@@ -13,6 +13,14 @@ def priority(task):
     return PRIORITY.get(task["status"], len(PRIORITY))
 
 
+def needs_you(tasks):
+    return sum(1 for t in tasks if priority(t) < len(PRIORITY))
+
+
+def open_tasks(tasks):
+    return sum(1 for t in tasks if t["status"] != "finished")
+
+
 def iso_time(epoch):
     return datetime.fromtimestamp(epoch, timezone.utc).isoformat(timespec="seconds") if epoch else None
 

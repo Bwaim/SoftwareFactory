@@ -1,6 +1,6 @@
 ---
 id: create-worktree
-description: Create the task worktree from the latest origin base branch
+description: Create the task worktree from the latest base branch, from origin when the repository has one
 category: git
 type: ai
 done_when: The worktree exists.

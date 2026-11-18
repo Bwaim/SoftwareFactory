@@ -24,7 +24,7 @@ def library_version(lib):
 
 def require_repo(ctx):
     if not ctx.initialized():
-        raise FactoryError("The factory is not initialized in this repository. Run `factory init --library <path>`.")
+        raise FactoryError("The factory is not initialized in this repository. Run `factory init`.")
     v = repo_version(ctx)
     if v != DATA_VERSION:
         raise FactoryError(

@@ -11,41 +11,59 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
-from . import adapters, api, fsio, repo
+from . import api, fsio, repo, runtime, workspaces
 from .errors import ExistsError, FactoryError
 
 IDLE_SECONDS = int(os.environ.get("FACTORY_SERVER_IDLE_SECONDS", "1800"))
 START_TIMEOUT = 30
-FALLBACK_POLL_SECONDS = 300
+POLL_SECONDS = 300
 MAX_BODY_BYTES = 1024 * 1024
 SERVER_INFO_MODE = 0o600
 WEB_DIR = Path(__file__).resolve().parent / "web"
-START_WARNING = "Warning: the local server did not start, so done checks do not run. See .factory/server.log."
+START_WARNING = "Warning: the local server did not start, so done checks do not run. See {log}."
 PAGES = {"/editor": "editor.html", "/dashboard": "dashboard.html"}
 
 
-def info_path(ctx):
-    return ctx.fdir / "server.json"
+def info_path():
+    return workspaces.home() / "server.json"
 
 
-def read_info(ctx):
-    return fsio.read_json(info_path(ctx))
+def log_path():
+    return workspaces.home() / "server.log"
+
+
+def start_warning():
+    return START_WARNING.format(log=log_path())
+
+
+def read_info():
+    return fsio.read_json(info_path())
+
+
+def log(text):
+    print(text, file=sys.stderr, flush=True)
+
+
+def poll_interval():
+    try:
+        return int(os.environ.get("FACTORY_POLL_SECONDS") or POLL_SECONDS)
+    except ValueError:
+        return POLL_SECONDS
 
 
 class Server:
-    def __init__(self, ctx):
-        self.ctx = ctx
+    def __init__(self):
         self.token = secrets.token_urlsafe(24)
         self.last = time.time()
         self.jobs = {}
         self.next_poll = None
+        self.lock = threading.Lock()
+        self.runtimes = {}
+        self.list_mtime = None
         try:
-            adapter = adapters.get_adapter(ctx)
-            ok, message = adapter.check()
-            self.capabilities = sorted(adapter.capabilities()) if ok else []
+            self.reload()
         except Exception as e:
-            ok, message, self.capabilities = False, str(e), []
-        self.adapter = {"ok": ok, "message": message}
+            log(f"workspace list failed: {e}")
         self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self))
         self.httpd.daemon_threads = True
         self.port = self.httpd.server_address[1]
@@ -53,59 +71,106 @@ class Server:
     def origin(self):
         return f"http://127.0.0.1:{self.port}"
 
+    def reload(self):
+        with self.lock:
+            list_mtime, entries = workspaces.mtime(), workspaces.list_all()
+            added = [w for w in entries if w["id"] not in self.runtimes]
+            self.runtimes = {w["id"]: runtime.Workspace(self, w) for w in entries}
+            self.list_mtime = list_mtime
+        self.stop_legacy_servers(added)
+
+    def stop_legacy_servers(self, entries):
+        for w in entries:
+            try:
+                stop_legacy(Path(w["path"]) / ".factory")
+            except Exception as e:
+                log(f"legacy server check failed for {w['id']}: {e}")
+
+    def reload_if_changed(self):
+        if workspaces.mtime() != self.list_mtime or any(w.error for w in self.snapshot()):
+            return self.reload()
+        with self.lock:
+            for wid, ws in self.runtimes.items():
+                if ws.stale():
+                    self.runtimes[wid] = ws.rebuilt()
+
+    def runtime(self, wid):
+        with self.lock:
+            return self.runtimes.get(wid)
+
+    def snapshot(self):
+        with self.lock:
+            return list(self.runtimes.values())
+
+    def fresh(self, wid):
+        if self.runtime(wid) is None and workspaces.mtime() != self.list_mtime:
+            self.reload()
+        with self.lock:
+            ws = self.runtimes.get(wid)
+            if ws and ws.stale():
+                ws = self.runtimes[wid] = ws.rebuilt()
+            return ws
+
     def run(self):
-        fsio.write_json(info_path(self.ctx), {"port": self.port, "token": self.token, "pid": os.getpid()})
-        os.chmod(info_path(self.ctx), SERVER_INFO_MODE)
+        fsio.write_json(info_path(), {"port": self.port, "token": self.token, "pid": os.getpid()})
+        os.chmod(info_path(), SERVER_INFO_MODE)
         threading.Thread(target=self.watch_idle, daemon=True).start()
         threading.Thread(target=self.poll_loop, daemon=True).start()
         try:
             self.httpd.serve_forever()
         finally:
-            info = read_info(self.ctx)
+            info = read_info()
             if info and info.get("pid") == os.getpid():
-                info_path(self.ctx).unlink(missing_ok=True)
+                info_path().unlink(missing_ok=True)
 
     def stop(self):
         threading.Thread(target=self.httpd.shutdown, daemon=True).start()
 
     def replaced(self):
-        return (read_info(self.ctx) or {}).get("pid") != os.getpid()
+        return (read_info() or {}).get("pid") != os.getpid()
+
+    def waiting(self):
+        from . import engine
+        self.reload_if_changed()
+        return any(engine.waiting_checks(ws.ctx) for ws in self.snapshot() if not ws.error)
 
     def watch_idle(self):
-        from . import engine
         while True:
             time.sleep(min(30, IDLE_SECONDS))
             try:
-                done = self.replaced() or (time.time() - self.last > IDLE_SECONDS and not engine.waiting_checks(self.ctx))
+                done = self.replaced() or (time.time() - self.last > IDLE_SECONDS and not self.waiting())
             except Exception as e:
-                print(f"idle check failed: {e}", file=sys.stderr, flush=True)
+                log(f"idle check failed: {e}")
                 continue
             if done:
                 self.stop()
                 return
 
-    def poll_seconds(self):
-        override = os.environ.get("FACTORY_POLL_SECONDS")
-        return int(override) if override else int(self.ctx.factory_yaml().get("poll_minutes", 5)) * 60
-
-    def poll_interval(self):
-        try:
-            return self.poll_seconds()
-        except Exception as e:
-            print(f"poll interval fallback: {e}", file=sys.stderr, flush=True)
-            return FALLBACK_POLL_SECONDS
-
     def poll_loop(self):
-        from . import engine, rename
         while True:
-            interval = self.poll_interval()
+            interval = poll_interval()
             self.next_poll = time.time() + interval
             time.sleep(interval)
-            try:
-                engine.poll(self.ctx)
-                rename.apply_all_pending(self.ctx)
-            except Exception as e:
-                print(f"poll failed: {e}", file=sys.stderr, flush=True)
+            self.poll_all()
+
+    def poll_all(self):
+        try:
+            self.reload()
+        except Exception as e:
+            log(f"workspace list failed: {e}")
+        for ws in self.snapshot():
+            self.poll_one(ws)
+
+    def poll_one(self, ws):
+        from . import engine, rename
+        if ws.error:
+            log(f"poll failed for {ws.id}: {ws.error}")
+            return
+        try:
+            engine.poll(ws.ctx)
+            rename.apply_all_pending(ws.ctx)
+        except Exception as e:
+            log(f"poll failed for {ws.id}: {e}")
 
     def start_job(self, fn):
         job_id = secrets.token_hex(6)
@@ -223,41 +288,46 @@ def ping(info):
         return False
 
 
-def running(ctx):
-    info = read_info(ctx)
+def running():
+    info = read_info()
     return info if info and pid_alive(info.get("pid")) and ping(info) else None
 
 
-def ensure_server(ctx):
-    with fsio.locked(info_path(ctx)):
-        info = running(ctx)
+def ensure_server():
+    home = workspaces.home()
+    with fsio.locked(info_path()):
+        info = running()
         if info:
             return info
-        old_pid = (read_info(ctx) or {}).get("pid")
-        with open(ctx.fdir / "server.log", "a") as log:
+        old_pid = (read_info() or {}).get("pid")
+        with open(log_path(), "a") as out:
             child = subprocess.Popen(
                 [sys.executable, str(repo.PLUGIN_ROOT / "bin" / "factory"), "serve"],
-                cwd=ctx.main, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                cwd=home, stdin=subprocess.DEVNULL, stdout=out, stderr=out,
                 start_new_session=True, close_fds=True,
             )
         deadline = time.time() + START_TIMEOUT
         while time.time() < deadline and child.poll() is None:
-            info = read_info(ctx)
+            info = read_info()
             if info and info.get("pid") != old_pid and ping(info):
                 return info
             time.sleep(0.2)
-        stop_child(ctx, child)
-        raise FactoryError("The local server did not start. See .factory/server.log.")
+        stop_child(child)
+        raise FactoryError(f"The local server did not start. See {log_path()}.")
 
 
 def keep_polling(ctx):
     try:
-        ensure_server(ctx)
+        workspaces.register(ctx.main)
+    except Exception as e:
+        print(f"Warning: {e}", file=sys.stderr)
+    try:
+        ensure_server()
     except Exception:
-        print(START_WARNING, file=sys.stderr)
+        print(start_warning(), file=sys.stderr)
 
 
-def stop_child(ctx, child):
+def stop_child(child):
     if child.poll() is None:
         child.terminate()
         try:
@@ -265,8 +335,8 @@ def stop_child(ctx, child):
         except subprocess.TimeoutExpired:
             child.kill()
             child.wait()
-    if (read_info(ctx) or {}).get("pid") == child.pid:
-        info_path(ctx).unlink(missing_ok=True)
+    if (read_info() or {}).get("pid") == child.pid:
+        info_path().unlink(missing_ok=True)
 
 
 def page_url(info, page, **params):
@@ -279,11 +349,7 @@ def open_page(url):
     subprocess.run(["open", url], check=False)
 
 
-def stop_server(ctx):
-    info = running(ctx)
-    if not info:
-        info_path(ctx).unlink(missing_ok=True)
-        return False
+def post_shutdown(info):
     req = urllib.request.Request(
         f"http://127.0.0.1:{info['port']}/api/shutdown", data=b"{}", method="POST",
         headers={"X-Factory-Token": info["token"], "Content-Type": "application/json"},
@@ -292,7 +358,43 @@ def stop_server(ctx):
         urllib.request.urlopen(req, timeout=5).read()
     except (urllib.error.URLError, OSError):
         pass
+
+
+def stop_server():
+    info = running()
+    if not info:
+        info_path().unlink(missing_ok=True)
+        return False
+    post_shutdown(info)
     deadline = time.time() + 10
     while time.time() < deadline and pid_alive(info["pid"]):
         time.sleep(0.2)
     return True
+
+
+def stop_legacy(fdir):
+    path = Path(fdir) / "server.json"
+    try:
+        info = fsio.read_json(path)
+    except (OSError, ValueError):
+        info = None
+    try:
+        live = isinstance(info, dict) and pid_alive(info.get("pid")) and ping(info)
+    except KeyError:
+        live = False
+    if live:
+        post_shutdown(info)
+    path.unlink(missing_ok=True)
+    return bool(live)
+
+
+def waiting_checks():
+    from . import engine
+    ids = []
+    for w in workspaces.list_all():
+        try:
+            ctx = runtime.load(w["path"])
+        except Exception:
+            continue
+        ids += engine.waiting_checks(ctx)
+    return ids

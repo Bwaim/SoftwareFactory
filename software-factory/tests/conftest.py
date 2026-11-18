@@ -29,6 +29,13 @@ def commit_all(repo, message):
     git("commit", "-m", message, cwd=repo)
 
 
+@pytest.fixture(autouse=True)
+def factory_home(tmp_path, monkeypatch):
+    home = tmp_path / "factory-home"
+    monkeypatch.setenv("FACTORY_HOME", str(home))
+    return home
+
+
 @pytest.fixture
 def work(request):
     d = WORK / f"{request.node.name[:40]}-{uuid.uuid4().hex[:6]}"
@@ -39,6 +46,11 @@ def work(request):
 
 @pytest.fixture
 def origin_repo(work):
+    return make_repo(work)
+
+
+def make_repo(work):
+    work.mkdir(parents=True, exist_ok=True)
     origin = work / "origin.git"
     git("init", "--bare", "-b", "main", str(origin), cwd=work)
     seed = work / "seed"
@@ -91,11 +103,12 @@ class Factory:
 
 
 @pytest.fixture
-def factory(work, origin_repo):
+def factory(work, origin_repo, factory_home):
     link_dir = work / "bin"
     env = {
         **os.environ,
         "FACTORY_LINK_DIR": str(link_dir),
+        "FACTORY_HOME": str(factory_home),
         "FACTORY_TERMINAL": "fake",
         "FACTORY_NO_OPEN": "1",
         "FACTORY_CLAUDE_HOME": str(work / "claude-home"),
@@ -113,8 +126,9 @@ def factory(work, origin_repo):
 
 
 class Inited:
-    def __init__(self, repo, library, factory, work):
+    def __init__(self, repo, library, factory, work, home):
         self.repo = repo
+        self.home = home
         self.library = library
         self.factory = factory
         self.work = work
@@ -123,11 +137,11 @@ class Inited:
 
 
 @pytest.fixture
-def inited(factory, origin_repo, library_path, work):
+def inited(factory, origin_repo, library_path, work, factory_home):
     factory("init", "--library", library_path, "--create-library")
     factory("config", "set", "create-worktree", "worktree_root", work / "worktrees")
-    yield Inited(origin_repo, library_path, factory, work)
-    if (origin_repo / ".factory" / "server.json").exists():
+    yield Inited(origin_repo, library_path, factory, work, factory_home)
+    if (factory_home / "server.json").exists():
         factory("server", "stop", check=False)
 
 

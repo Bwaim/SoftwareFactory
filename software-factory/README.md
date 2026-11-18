@@ -30,7 +30,7 @@ You need:
 
 - `uv`. Install it with `brew install uv`.
 - Herdr: https://herdr.dev
-- git, with an `origin` remote in each repository.
+- git. Each repository can have an `origin` remote, but it is optional.
 - Claude Code.
 - Optional: `gh` or `glab`, for the forge steps of the catalog.
 
@@ -40,7 +40,7 @@ Install the factory with this command:
 curl -fsSL https://raw.githubusercontent.com/Bwaim/SoftwareFactory/main/install.sh | sh
 ```
 
-The script downloads the latest release into `~/.local/share/software-factory` and makes sure that its SHA-256 matches the release. It creates the link `~/.local/bin/factory`. If `~/.local/bin` is not in your `PATH`, add it.
+The script downloads the latest release into `~/.local/share/software-factory` and makes sure that its SHA-256 matches the release. It creates the link `~/.local/bin/factory`. If `~/.local/bin` is not in your `PATH`, add it. `factory init` does not create the link. If the link is missing, run `factory link`.
 
 To update the factory, run the same command again.
 
@@ -54,8 +54,12 @@ Hooks run the installed copy through `~/.local/bin/factory`, and the plugin skil
 
 Start the factory:
 
-1. In the main repository, run `factory init --library <path>`. The library folder holds the generic steps and pipelines.
+1. In the main repository, run `factory init`. To use a library, run `factory init --library <path>`. The library folder holds the generic steps and pipelines.
 2. Run `factory dashboard`. The dashboard launches and manages tasks.
+
+The library is optional. Without a library, only built-in and local steps exist. To add a library later, set `library:` in `.factory/factory.yaml`.
+
+A repository without an `origin` remote also works. `factory init` shows a warning. Tasks start from the local base branch, with no fetch. Push and pull request steps fail.
 
 Some actions exist only in the CLI:
 
@@ -96,8 +100,8 @@ Herdr adapter:
 
 1. **Init the factory.**
    - Open the orchestrator in a repository. Choose "Init the factory".
-   - Give the library folder path. Say yes to create it if it does not exist.
-   - Say yes to the starter pack.
+   - If you want a library, give the library folder path. Say yes to create it if it does not exist. If you do not want a library, say no.
+   - Say yes to the starter pack. Without a library, the starter pack is local.
    - Expected: the folder `.factory/` exists in the repository. `factory pipeline list` shows `quick-task`.
 2. **Run `quick-task` on a small change.**
    - Choose "Launch a new pipeline". Pick `quick-task`. Write a short description.
@@ -146,9 +150,9 @@ Herdr adapter:
 - **Browse the catalog**: list and install catalog pipelines and steps.
 - **Add a backlog entry**: add an entry to the backlog.
 - **Remove a backlog entry**: remove an entry from the backlog.
-- **Open dashboard**: start the local server and print the dashboard URL.
+- **Open dashboard**: start the local server, add this repository to the dashboard list and print the dashboard URL.
 - **Init the factory**: set up the repository. Shown only before init.
-- **Exit**: ask to pause all tasks. Then stop the local server, unless a task waits on a done check.
+- **Exit**: ask to pause all tasks. The local server keeps running and stops by itself after the idle time.
 
 ### Commands
 
@@ -158,7 +162,7 @@ Inside a task worktree, the task is found from the folder.
 
 Setup:
 
-- `factory init --library <path> [--create-library]`: set up the factory in this repository.
+- `factory init [--library <path>] [--create-library]`: set up the factory in this repository and add it to the dashboard list. The library is optional.
 - `factory link`: create or fix the `~/.local/bin/factory` link.
 - `factory menu`: show the orchestrator menu.
 - `factory terminal check`: check the terminal adapter.
@@ -181,7 +185,7 @@ Step execution, inside a task session:
 
 Task life:
 
-- `factory launch <pipeline> [--description <text>] [--input <name=value>] [--id <id>] [--from-backlog <id>] [--dry-run]`: start a task. When the pipeline input `ticket` holds a Jira key (`HT-4549`, a URL or a text), the task id is that key in lowercase, for example `ht-4549`, plus `-2` when taken.
+- `factory launch <pipeline> [--description <text>] [--input <name=value>] [--id <id>] [--from-backlog <id>] [--dry-run]`: start a task. When the pipeline input `ticket` holds a Jira key (`HT-4549`, a URL or a text), the task id is that key in lowercase, for example `ht-4549`, plus `-2` when taken. Without an `origin` remote, the task starts from the local base branch.
 - `factory tasks`: list the tasks.
 - `factory status`: show the status of the current task.
 - `factory block <reason>`: block the task.
@@ -236,7 +240,7 @@ Pipelines, steps and the library:
 Local server:
 
 - `factory serve`: run the local server in the foreground.
-- `factory dashboard`: start the local server if needed and print the dashboard URL.
+- `factory dashboard`: start the local server if needed, add this repository to the dashboard list and print the dashboard URL. It works from any folder.
 - `factory server stop`: stop the local server.
 - `factory server stop --unless-waiting`: stop the local server only when no task waits on a done check.
 
@@ -303,9 +307,32 @@ Then review the pipeline in the browser with `factory pipeline edit <id>`.
 
 ### Dashboard
 
-Open it with the menu action "Open dashboard" or with `factory dashboard`.
+Open it with the menu action "Open dashboard" or with `factory dashboard`. `factory dashboard` works from any folder.
 The page refreshes every 5 seconds.
 The header has two views: **Tasks** and **Backlog**.
+
+#### Workspaces
+
+One server serves all your repositories. Each repository in the dashboard is a workspace.
+The sidebar lists the workspaces. Each entry shows the number of tasks that need you.
+If there is no workspace, the main area shows "No workspace. Click + to add a factory."
+
+- Click `+` to add a workspace. Type the path of a repository, or click the folder picker.
+- The folder picker works only on macOS. On another platform, type the path.
+- If the repository has no factory, a confirm step opens with the title "Set up the factory in <main>?". It has the field "Library folder". Leave the field blank for no library. Click "Set up and add" to run `factory init` and add the workspace.
+- If the library folder does not exist, the dashboard shows an error. Create the folder, or leave the field blank.
+- Click `⋯` on a workspace, then "Rename", to change its name in the sidebar.
+- Click `⋯` on a workspace, then "Delete", to remove it from the dashboard. The repository and its tasks stay on disk. Done checks of this workspace stop.
+
+A workspace comes back when you run `factory init` or `factory dashboard` in the repository. It also comes back when `factory tasks`, `factory resume` or `factory wait` finds a task in the repository that waits for a done check. `factory launch` does not add it.
+
+The commands `factory pipeline edit` and `factory step edit` need the repository in the dashboard list. If it is not, they print "This repository is not in the dashboard. Run `factory dashboard` in it first."
+
+The server keeps its data in `$FACTORY_HOME`. The default is `~/.config/software-factory`. It has these files:
+
+- `workspaces.yaml`: the list of workspaces.
+- `server.json`: the port and the token.
+- `server.log`: the server log.
 
 #### Tasks view
 
@@ -399,6 +426,8 @@ Clean, delete and cancel use the same check. The reason of a task is one of thes
 5. `pushed, and its remote branch was deleted`: the branch tracks its own remote branch, and that branch is gone. The delete asks for approval only when something would be lost: commits, uncommitted changes or failed checks. It always keeps the local branch.
 6. `not merged`: none of the above.
 
+Without an `origin` remote, the checks compare with the local `<base_ref>` branch. Reason 2 is then `merged into <base_ref>`. Reason 5 never happens.
+
 For reasons 2 to 4, the commits are not listed as lost, and the delete removes the local branch. Uncommitted changes still need approval. So do commits on a detached HEAD.
 
 #### Backlog view
@@ -430,10 +459,10 @@ Only `http` and `https` URLs are used.
 - The server stops after 30 minutes without requests. `factory dashboard` starts it again.
 - While a task waits on a step with a `done_check`, the server keeps running, so the checks run without an open page.
 - `factory wait`, `factory resume` and `factory tasks` start the server when a task waits on a done check. After a restart of the computer, the orchestrator start runs `factory tasks`, so the polling starts again.
-- Only one server runs per repository. A server that is replaced stops by itself.
-- `factory server stop` stops it now. The menu action "Exit" runs `factory server stop --unless-waiting`.
-- The file `.factory/server.json` holds the port and the token. Only you can read it.
-- The log is `.factory/server.log`.
+- Only one server runs for all workspaces. A server that is replaced stops by itself.
+- `factory server stop` stops it now. The menu action "Exit" does not stop the server.
+- The file `$FACTORY_HOME/server.json` holds the port and the token. Only you can read it.
+- The log is `$FACTORY_HOME/server.log`. `server.json` and `server.log` are not in `.factory/` any more.
 
 ### Step manifest fields
 
@@ -516,7 +545,9 @@ Renames add `task_renamed` (`name`), `rename_failed` (`name`, `reason`) and `cla
 
 ### `.factory/factory.yaml` fields
 
-`version`, `library`, `terminal`, `columns`, `poll_minutes`, `ticket_url`, `hidden_steps` (optional: the ids of hidden steps).
+`version`, `library`, `terminal`, `columns`, `ticket_url`, `hidden_steps` (optional: the ids of hidden steps).
+
+The key `poll_minutes` is not used any more. The poll interval is 5 minutes, or `FACTORY_POLL_SECONDS` seconds.
 
 When `factory.yaml` or `config.yaml` is not valid YAML, every command prints `Error: <path>: <problem>, line <n>.` and exits with code 1.
 

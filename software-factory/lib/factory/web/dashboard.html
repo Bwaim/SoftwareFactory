@@ -47,6 +47,21 @@ header nav { display: flex; gap: 6px; }
 .brand .tagline { font-size: 11px; color: var(--muted-strong); letter-spacing: .02em; }
 #updated { color: var(--muted-strong); }
 .workspace { flex: 1; display: flex; min-height: 0; }
+.layout { flex: 1; display: flex; min-height: 0; }
+#sidebar { flex: 0 0 220px; width: 220px; box-sizing: border-box; background: var(--column); border-right: 1px solid var(--panel-line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+#sidebar .side-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 8px; }
+#sidebar h2 { margin: 0; font-size: 15px; font-weight: 700; }
+#sidebar .add { min-height: 28px; min-width: 28px; padding: 0; font-size: 16px; }
+.ws { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 12px; }
+.ws.on { background: var(--raised); }
+.ws .name { flex: 1; min-width: 0; justify-content: flex-start; text-align: left; border-color: transparent; background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; line-height: 36px; }
+.ws input { flex: 1; min-width: 0; }
+.ws .warn { color: var(--err); font-weight: 700; }
+.ws .more > summary { min-height: 28px; min-width: 28px; padding: 0 6px; }
+.ws .more .menu { left: auto; right: 0; }
+.count.badge { background: var(--accent); color: #FFFFFF; }
+.ws-error { color: var(--err); background: var(--err-bg); border: 1px solid var(--err-line); border-radius: 12px; padding: 12px 16px; margin: 0; }
+.ws-list { margin: 8px 0; padding-left: 20px; }
 main { padding: 20px 24px 32px; flex: 1; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; }
 main > div { flex: 1; display: flex; flex-direction: column; }
 input, select, button, textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
@@ -198,6 +213,8 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 }
 @media (max-width: 600px) {
   header, main { padding-left: 16px; padding-right: 16px; }
+  .layout { flex-direction: column; }
+  #sidebar { flex: none; width: auto; border-right: 0; border-bottom: 1px solid var(--panel-line); }
   .field { grid-template-columns: 1fr; }
   .field > label { padding-top: 0; }
 }
@@ -239,9 +256,12 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
     <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
   </button>
 </header>
-<div class="workspace">
-  <main id="main"></main>
-  <aside id="detail" hidden aria-label="Task details"></aside>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="workspace">
+    <main id="main"></main>
+    <aside id="detail" hidden aria-label="Task details"></aside>
+  </div>
 </div>
 <div id="modal" hidden></div>
 <template id="empty-board">
@@ -261,21 +281,25 @@ const REFRESH_MS = 5000;
 const DETAIL_REFRESH_MS = 3000;
 const DETAIL_HASH = "#task=";
 const JOB_POLL_MS = 1000;
-const HIDDEN_KEY = "factory.hiddenColumns";
+const HIDDEN_PREFIX = "factory.hiddenColumns.";
+const WORKSPACE_KEY = "factory.workspace";
+const GLOBAL_API = /^\/api\/(ping|shutdown|jobs\/|workspaces|host)/;
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
-const state = { view: "tasks", info: { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }, tasks: [], backlog: [], hidden: loadHidden(), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null };
+const state = { generation: 0, view: "tasks", ws: new URLSearchParams(location.search).get("ws"), workspaces: [], renaming: null, info: emptyInfo(), tasks: [], backlog: [], hidden: loadHidden(new URLSearchParams(location.search).get("ws")), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null };
 const byId = (id) => document.getElementById(id);
+function emptyInfo() { return { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }; }
 
-async function api(path, body, quiet) {
+function apiUrl(path) { return GLOBAL_API.test(path) ? path : `/api/w/${encodeURIComponent(state.ws)}${path.slice(4)}`; }
+async function api(path, body, quiet, silent) {
   const opts = { headers: { "X-Factory-Token": TOKEN } };
   if (body !== undefined) { opts.method = "POST"; opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
   let data;
   try {
-    const r = await fetch(path, opts);
+    const r = await fetch(apiUrl(path), opts);
     data = await r.json();
-    if (!r.ok) throw Object.assign(new Error(data.error || r.statusText), { data });
+    if (!r.ok) throw Object.assign(new Error(data.error || r.statusText), { data, stale: r.status === 404 && !GLOBAL_API.test(path) });
   } catch (e) {
-    showError(e.message);
+    if (!e.stale && !silent) showError(e.message);
     throw e;
   }
   if (!quiet) hideError();
@@ -293,12 +317,36 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 function clear(node) { node.replaceChildren(); return node; }
-function loadHidden() {
-  try { const v = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+function loadHidden(id) {
+  if (!id) return [];
+  try { const v = JSON.parse(localStorage.getItem(HIDDEN_PREFIX + id) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
 }
 function saveHidden() {
-  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(state.hidden)); } catch (e) {}
+  if (!state.ws) return;
+  try { localStorage.setItem(HIDDEN_PREFIX + state.ws, JSON.stringify(state.hidden)); } catch (e) {}
 }
+function storedWorkspace() {
+  try { return localStorage.getItem(WORKSPACE_KEY); } catch (e) { return null; }
+}
+function currentWorkspace() { return state.workspaces.find((w) => w.id === state.ws) || null; }
+function pickWorkspace() {
+  const stored = storedWorkspace();
+  const found = state.workspaces.find((w) => w.id === stored) || state.workspaces[0];
+  return found ? found.id : null;
+}
+function setWorkspace(id) {
+  const switched = id !== state.ws;
+  if (switched) state.detail = null;
+  Object.assign(state, { generation: state.generation + 1, ws: id, hidden: loadHidden(id), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), removed: new Set(), renaming: null, info: emptyInfo(), tasks: [], backlog: [] });
+  if (id) { try { localStorage.setItem(WORKSPACE_KEY, id); } catch (e) {} }
+  const url = new URL(location.href);
+  if (id) url.searchParams.set("ws", id); else url.searchParams.delete("ws");
+  if (switched) url.hash = "";
+  history.replaceState(null, "", url);
+  closeModal();
+  state.lastKey = null;
+}
+async function selectWorkspace(id) { setWorkspace(id); await refresh(true); }
 function modalOpen() { return !byId("modal").hidden; }
 function closeModal() { const m = byId("modal"); m.hidden = true; clear(m); m.dataset.dismissable = ""; m.dataset.busy = ""; state.lastKey = null; state.modalStart = new WeakMap(); }
 function textFields(m) { return [...m.querySelectorAll("textarea, input:not([type]), input[type=text]")]; }
@@ -372,21 +420,35 @@ function deliveryBlock(t) {
 function adapterDown() { return !state.info.adapter.ok; }
 function can(cap) { return state.info.adapter.ok && state.info.capabilities.includes(cap); }
 
+async function loadBoard() {
+  const ws = currentWorkspace();
+  if (!ws || ws.error) return null;
+  const [info, tasks, backlog] = await Promise.all([api("/api/info", undefined, true), api("/api/tasks", undefined, true), api("/api/backlog", undefined, true)]);
+  return { info, tasks, backlog };
+}
 async function refresh(force) {
   if (!force && (state.dragging || modalOpen())) return;
+  const started = state.generation;
   try {
-    const [info, tasks, backlog] = await Promise.all([api("/api/info", undefined, true), api("/api/tasks", undefined, true), api("/api/backlog", undefined, true)]);
+    const list = await api("/api/workspaces", undefined, true);
+    if (state.generation !== started) return;
+    state.workspaces = list;
+    if (!currentWorkspace() && state.ws !== pickWorkspace()) setWorkspace(pickWorkspace());
+    const generation = state.generation;
+    const board = await loadBoard();
+    if (state.generation !== generation) return;
     if (state.pollFailed) { hideError(); state.pollFailed = false; }
     byId("offline").hidden = true;
-    const key = JSON.stringify([info, tasks, backlog, Math.floor(Date.now() / 60000)]);
+    const key = JSON.stringify([state.workspaces, state.ws, board, Math.floor(Date.now() / 60000)]);
     const changed = key !== state.lastKey;
+    const { info, tasks, backlog } = board || { info: emptyInfo(), tasks: [], backlog: [] };
     for (const id of [...state.removed]) if (!tasks.some((x) => x.id === id)) state.removed.delete(id);
     Object.assign(state, { info, tasks: tasks.filter((x) => !state.removed.has(x.id)), backlog, lastKey: key });
     updateTitle();
     if (state.detail && !state.tasks.some((x) => x.id === state.detail.id)) closeDetail();
     else if (state.detail && force) loadDetail();
     if (!changed || modalOpen() || state.dragging || (!force && menuOpen())) return;
-  } catch (e) { state.pollFailed = true; byId("offline").hidden = false; return; }
+  } catch (e) { if (!e.stale) { state.pollFailed = true; byId("offline").hidden = false; } return; }
   render();
 }
 function needsYou(t) { return t.attention || t.status === "blocked" || t.status === "awaiting_approval"; }
@@ -412,17 +474,115 @@ function render() {
   byId("tab-tasks").classList.toggle("on", state.view === "tasks");
   byId("tab-backlog").classList.toggle("on", state.view === "backlog");
   byId("updated").textContent = "Updated " + new Date().toLocaleTimeString();
+  renderSidebar();
   const main = byId("main");
   const oldBoard = main.querySelector(".board");
   const left = oldBoard ? oldBoard.scrollLeft : 0;
   const top = window.scrollY;
-  clear(main).append(state.view === "tasks" ? tasksView() : backlogView());
+  clear(main).append(mainView());
   const board = main.querySelector(".board");
   if (board) board.scrollLeft = left;
   window.scrollTo(window.scrollX, top);
   renderDetail();
 }
 
+function mainView() {
+  const ws = currentWorkspace();
+  if (!ws) return el("div", {}, el("p", { class: "muted" }, "No workspace. Click + to add a factory."));
+  if (ws.error) return el("div", {}, el("p", { class: "ws-error" }, ws.error));
+  return state.view === "tasks" ? tasksView() : backlogView();
+}
+function closeOnClick(menu) {
+  for (const b of menu.querySelectorAll("button")) b.addEventListener("click", () => { const d = b.closest("details"); if (d) d.open = false; });
+}
+function workspaceMenu(ws) {
+  const menu = el("div", { class: "menu" }, button("Rename", () => startRename(ws)), button("Delete", () => openDeleteWorkspace(ws), { cls: "danger" }));
+  closeOnClick(menu);
+  return el("details", { class: "more" }, el("summary", { "aria-label": `More actions for ${ws.name}`, title: "More actions" }, "⋯"), menu);
+}
+function renameField(ws) {
+  const input = el("input", { type: "text", "aria-label": "Workspace name" });
+  input.value = ws.name;
+  input.addEventListener("keydown", async (e) => {
+    if (e.key === "Escape") { e.stopPropagation(); state.renaming = null; renderSidebar(true); return; }
+    if (e.key !== "Enter") return;
+    const name = input.value.trim();
+    state.renaming = null;
+    if (name && name !== ws.name) { try { await api(`/api/workspaces/${encodeURIComponent(ws.id)}/rename`, { name }); } catch (err) {} }
+    state.lastKey = null;
+    await refresh(true);
+  });
+  input.addEventListener("blur", () => { if (state.renaming === ws.id) { state.renaming = null; renderSidebar(true); } });
+  return input;
+}
+function workspaceRow(ws) {
+  const row = el("div", { class: "ws" + (ws.id === state.ws ? " on" : "") });
+  row.append(state.renaming === ws.id ? renameField(ws) : el("button", { class: "name", type: "button", title: ws.path, onclick: () => selectWorkspace(ws.id) }, ws.name));
+  if (ws.needs_you > 0) row.append(el("span", { class: "count badge", title: "Needs you" }, ws.needs_you));
+  if (ws.error) row.append(el("span", { class: "warn", title: ws.error, "aria-label": "Workspace error" }, "⚠"));
+  row.append(workspaceMenu(ws));
+  return row;
+}
+function renderSidebar(force) {
+  if (!force && (menuOpen() || state.renaming)) return;
+  const side = clear(byId("sidebar"));
+  side.append(el("div", { class: "side-head" }, el("h2", {}, "Workspaces"),
+    el("button", { type: "button", class: "add", "aria-label": "Add a workspace", title: "Add a workspace", onclick: () => openAddWorkspace().catch(() => {}) }, "+")));
+  for (const ws of state.workspaces) side.append(workspaceRow(ws));
+}
+function startRename(ws) {
+  state.renaming = ws.id;
+  renderSidebar(true);
+  const input = byId("sidebar").querySelector("input");
+  if (input) { input.focus(); input.select(); }
+}
+function openDeleteWorkspace(ws) {
+  const text = `Remove ${ws.name} from the dashboard? The repository and its tasks stay on disk. Done checks of this workspace stop. The workspace comes back when a task in this repository waits for a done check, when you resume a task in it, or when you run \`factory dashboard\` in it.`;
+  const content = [el("p", {}, text)];
+  if (ws.open_tasks > 0) content.push(el("p", { class: "muted" }, `${ws.open_tasks} tasks are not finished.`));
+  const remove = button("Remove", async () => { await api(`/api/workspaces/${encodeURIComponent(ws.id)}/delete`, {}); closeModal(); state.lastKey = null; await refresh(true); }, { cls: "danger" });
+  showModal({ title: `Remove ${ws.name}`, content: [...content, el("div", { class: "footer" }, closeButton("Cancel"), remove)], dismissable: true });
+}
+function failureBox(e) {
+  const box = el("div", { class: "report" }, el("pre", { class: "bad" }, e.message));
+  const checks = (e.data && e.data.checks) || [];
+  if (checks.length) box.append(el("ul", { class: "ws-list" }, ...checks.filter((c) => !c.ok).map((c) => el("li", {}, `${c.name}: ${c.message}`))));
+  return box;
+}
+async function openAddWorkspace() {
+  let picker = false;
+  try { picker = !!(await api("/api/host", undefined, true, true)).folder_picker; } catch (e) {}
+  const path = el("input", { type: "text", placeholder: "/path/to/repository" });
+  const out = el("div");
+  const row = el("div", { class: "row" }, path);
+  if (picker) {
+    row.append(button("Choose folder…", async () => {
+      try { const res = await api("/api/workspaces/pick-folder", {}, true, true); if (res.path) path.value = res.path; } catch (e) { out.replaceChildren(failureBox(e)); }
+    }));
+  }
+  const add = button("Add", async () => {
+    out.replaceChildren();
+    try { await finishAdd(await api("/api/workspaces/add", { path: path.value.trim() }, true, true)); } catch (e) {
+      if (e.data && e.data.code === "no_factory") openSetup(path.value.trim(), e.data.main);
+      else out.replaceChildren(failureBox(e));
+    }
+  }, { cls: "primary" });
+  openModal("Add a workspace", field("Folder", row), out, el("div", { class: "footer" }, closeButton("Cancel"), add));
+}
+async function finishAdd(entry) { await selectWorkspace(entry.id); }
+function openSetup(path, main) {
+  const library = el("input", { type: "text", placeholder: "optional" });
+  const out = el("div");
+  const go = button("Set up and add", async () => {
+    out.replaceChildren();
+    try { await finishAdd(await api("/api/workspaces/add", { path, init: true, library: library.value.trim() }, true, true)); } catch (e) { out.replaceChildren(failureBox(e)); }
+  }, { cls: "primary" });
+  showModal({ title: `Set up the factory in ${main}?`, content: [
+    el("p", {}, "Init writes these files:"),
+    el("ul", { class: "ws-list" }, el("li", {}, `${main}/.factory/`), el("li", {}, "two lines in .git/info/exclude")),
+    el("p", { class: "muted" }, "Git does not track these files. Init keeps files that exist."),
+    field("Library folder", library), out, el("div", { class: "footer" }, closeButton("Cancel"), go)] });
+}
 function allColumns() { return [...state.info.columns, "Done"]; }
 function columnOf(t) {
   if (t.status === "finished") return "Done";
@@ -588,7 +748,7 @@ function taskButtons(t) {
     menu.append(button("Send prompt", () => openSendPrompt(t), { disabled: down || !can("send_prompt"), hint: ADAPTER_BUTTONS }));
     if (!paused && live && !state.pausing.has(t.id)) menu.append(button("Pause", () => openPause(t), { disabled: down, hint: ADAPTER_BUTTONS }));
     menu.append(button("Cancel", () => openCancel(t), { cls: "danger" }));
-    for (const b of menu.querySelectorAll("button")) b.addEventListener("click", () => { const d = b.closest("details"); if (d) d.open = false; });
+    closeOnClick(menu);
     row.append(el("details", { class: "more" }, el("summary", { "aria-label": `More actions for ${t.display_name}`, title: "More actions" }, "⋯"), menu));
   }
   return row;
