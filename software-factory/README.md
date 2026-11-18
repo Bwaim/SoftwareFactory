@@ -150,7 +150,7 @@ Herdr adapter:
 - **Remove a backlog entry**: remove an entry from the backlog.
 - **Open dashboard**: start the local server, add this repository to the dashboard list and print the dashboard URL.
 - **Init the factory**: set up the repository. Shown only before init.
-- **Exit**: ask to pause all tasks. Then stop the local server, unless a task waits on a done check.
+- **Exit**: ask to pause all tasks. The local server keeps running and stops by itself after the idle time.
 
 ### Commands
 
@@ -313,7 +313,7 @@ The header has two views: **Tasks** and **Backlog**.
 
 One server serves all your repositories. Each repository in the dashboard is a workspace.
 The sidebar lists the workspaces. Each entry shows the number of tasks that need you.
-If there is no workspace, the sidebar shows "No workspace. Click + to add a factory."
+If there is no workspace, the main area shows "No workspace. Click + to add a factory."
 
 - Click `+` to add a workspace. Type the path of a repository, or click the folder picker.
 - The folder picker works only on macOS. On another platform, type the path.
@@ -456,7 +456,7 @@ Only `http` and `https` URLs are used.
 - While a task waits on a step with a `done_check`, the server keeps running, so the checks run without an open page.
 - `factory wait`, `factory resume` and `factory tasks` start the server when a task waits on a done check. After a restart of the computer, the orchestrator start runs `factory tasks`, so the polling starts again.
 - Only one server runs for all workspaces. A server that is replaced stops by itself.
-- `factory server stop` stops it now. The menu action "Exit" runs `factory server stop --unless-waiting`.
+- `factory server stop` stops it now. The menu action "Exit" does not stop the server.
 - The file `$FACTORY_HOME/server.json` holds the port and the token. Only you can read it.
 - The log is `$FACTORY_HOME/server.log`. `server.json` and `server.log` are not in `.factory/` any more.
 
@@ -541,7 +541,9 @@ Renames add `task_renamed` (`name`), `rename_failed` (`name`, `reason`) and `cla
 
 ### `.factory/factory.yaml` fields
 
-`version`, `library`, `terminal`, `columns`, `poll_minutes`, `ticket_url`, `hidden_steps` (optional: the ids of hidden steps).
+`version`, `library`, `terminal`, `columns`, `ticket_url`, `hidden_steps` (optional: the ids of hidden steps).
+
+The key `poll_minutes` is not used any more. The poll interval is 5 minutes, or `FACTORY_POLL_SECONDS` seconds.
 
 When `factory.yaml` or `config.yaml` is not valid YAML, every command prints `Error: <path>: <problem>, line <n>.` and exits with code 1.
 

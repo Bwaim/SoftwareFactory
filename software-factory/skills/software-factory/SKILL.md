@@ -63,7 +63,7 @@ Before any command that changes something, show what it will do and wait for the
 - **Add a backlog entry** (`backlog-add`): follow the built-in step `backlog-add`.
 - **Remove a backlog entry** (`backlog-remove`): follow the built-in step `backlog-remove`.
 - **Open dashboard** (`dashboard`): run `factory dashboard`. Show the URL it prints.
-- **Exit** (`exit`): list the tasks that are not `paused` or `finished`. Ask whether to pause all of them. If yes, ask: wait until each session is idle, or stop now. Run `factory pause --all` (add `--wait` to wait). Then run `factory server stop --unless-waiting`, show its output, and stop the menu.
+- **Exit** (`exit`): list the tasks that are not `paused` or `finished`. Ask whether to pause all of them. If yes, ask: wait until each session is idle, or stop now. Run `factory pause --all` (add `--wait` to wait). Then stop the menu. Do not stop the server, because it stops by itself after the idle time.
 
 ## Migrate
 
