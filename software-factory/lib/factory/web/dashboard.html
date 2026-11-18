@@ -89,6 +89,17 @@ button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-h
 .check { font-size: 12px; color: var(--soft); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .check button { min-height: 28px; font-size: 12px; padding: 0 10px; }
 .check.approval { display: block; }
+.validate { font-size: 11px; font-weight: 700; color: var(--yellow); background: #423410; border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
+.more { position: relative; }
+.more > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 32px; min-width: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); font-weight: 700; letter-spacing: .1em; }
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary:hover, .more[open] > summary { background: var(--raised); }
+.more > summary:focus-visible { outline: 2px solid var(--brand-pink); outline-offset: 2px; }
+.more .menu { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 160px; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--column); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+.more .menu button { justify-content: flex-start; border-color: transparent; background: transparent; border-radius: 8px; }
+.more .menu button:hover:not(:disabled) { background: var(--raised); }
+.more .menu .muted { padding: 4px 12px; }
+#offline { font-size: 12px; font-weight: 700; color: #FF9CC8; background: #4A1430; border-radius: 12px; padding: 3px 10px; }
 .check.approval .link { margin-left: 4px; }
 .empty { min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 48px 0; }
 .empty .inner { max-width: 440px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
@@ -148,6 +159,7 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
     <button class="tab" id="tab-backlog">Backlog</button>
   </nav>
   <span class="grow"></span>
+  <span id="offline" hidden title="The dashboard cannot reach the factory server. The board may be out of date.">Offline</span>
   <span id="updated" class="muted"></span>
 </header>
 <main id="main"></main>
@@ -283,15 +295,32 @@ async function refresh(force) {
   try {
     const [info, tasks, backlog] = await Promise.all([api("/api/info", undefined, true), api("/api/tasks", undefined, true), api("/api/backlog", undefined, true)]);
     if (state.pollFailed) { hideError(); state.pollFailed = false; }
+    byId("offline").hidden = true;
     const key = JSON.stringify([info, tasks, backlog, Math.floor(Date.now() / 60000)]);
     const changed = key !== state.lastKey;
     for (const id of [...state.removed]) if (!tasks.some((x) => x.id === id)) state.removed.delete(id);
     Object.assign(state, { info, tasks: tasks.filter((x) => !state.removed.has(x.id)), backlog, lastKey: key });
-    if (!changed || modalOpen() || state.dragging) return;
-  } catch (e) { state.pollFailed = true; return; }
+    updateTitle();
+    if (!changed || modalOpen() || state.dragging || (!force && menuOpen())) return;
+  } catch (e) { state.pollFailed = true; byId("offline").hidden = false; return; }
   render();
 }
+function needsYou(t) { return t.attention || t.status === "blocked" || t.status === "awaiting_approval"; }
+function updateTitle() {
+  const n = state.tasks.filter((t) => !state.removed.has(t.id) && needsYou(t)).length;
+  document.title = n ? `(${n}) CAPTN` : "CAPTN";
+}
+function menuOpen() { return !!document.querySelector("details.more[open]"); }
+function closeMenus(except) { for (const d of document.querySelectorAll("details.more[open]")) if (d !== except) d.open = false; }
+document.addEventListener("click", (e) => closeMenus(e.target.closest && e.target.closest("details.more")));
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || modalOpen() || !menuOpen()) return;
+  const open = document.querySelector("details.more[open]");
+  closeMenus();
+  open.querySelector("summary").focus();
+});
 function render() {
+  updateTitle();
   const banner = byId("banner");
   banner.hidden = !adapterDown();
   banner.textContent = adapterDown() ? state.info.adapter.message : "";
@@ -402,7 +431,7 @@ function taskCard(t) {
   card.append(top, el("div", { class: "title" }, t.description), el("div", { class: "muted" }, `${t.pipeline} › ${t.step}${loopText(t)}`));
   const since = ago(t.status_since);
   const label = t.status.replace("_", " ");
-  card.append(pill(t.status, `${label}${since && t.status !== "finished" ? " for " + since : ""}`));
+  if (!(t.attention && t.status === "active")) card.append(pill(t.status, `${label}${since && t.status !== "finished" ? " for " + since : ""}`));
   if (t.attention) {
     const waited = ago(t.attention.at);
     card.append(pill("attention", `May wait for you${waited ? " · " + waited + " ago" : ""}`));
@@ -414,13 +443,18 @@ function taskCard(t) {
   if (ex && ex.holds) card.append(el("div", { class: "muted" }, ex.paused ? `Keeps ${ex.name} while paused` : `Uses ${ex.name}`));
   if (t.session_state === "gone" && t.status !== "paused" && t.status !== "finished") card.append(el("div", { class: "gone" }, "Session gone"));
   if (t.rename_error) card.append(el("div", { class: "rename-error" }, `Rename failed: ${t.rename_error}`));
+  const toValidate = t.approval && t.approval.target === "artifact" ? approvalArtifact(t) : null;
   if (t.artifacts.length) {
     const list = el("div", { class: "artifacts" });
-    for (const name of t.artifacts) list.append(el("span", { class: "link", onclick: () => openArtifact(t.id, name).catch(() => {}) }, name));
+    for (const name of t.artifacts) {
+      const link = el("span", { class: "link", onclick: () => openArtifact(t.id, name).catch(() => {}) }, name);
+      if (name === toValidate) link.append(el("span", { class: "validate" }, "to validate"));
+      list.append(link);
+    }
     card.append(list);
   }
   if (state.deliveryErrors.has(t.id)) card.append(deliveryBlock(t));
-  if (t.approval) card.append(approvalBlock(t));
+  if (t.approval && !toValidate) card.append(approvalBlock(t));
   if (t.status === "waiting_external" && t.wait_has_check) card.append(checkBlock(t));
   card.append(taskButtons(t));
   return card;
@@ -444,7 +478,7 @@ function taskButtons(t) {
   if (live && can("focus") && !finished) row.append(button("Focus", () => focusTask(t)));
   if (t.mr_url && /^https?:/.test(t.mr_url)) row.append(el("a", { href: t.mr_url, target: "_blank", rel: "noopener" }, "Show MR"));
   if (t.status === "awaiting_approval") {
-    row.append(button("Approve", action(async () => noteDelivery(t, await api(`/api/tasks/${t.id}/approve`, {}), "The approval"))), button("Request changes", () => openRequestChanges(t)));
+    row.append(button("Approve", action(async () => noteDelivery(t, await api(`/api/tasks/${t.id}/approve`, {}), "The approval")), { cls: "primary" }), button("Request changes", () => openRequestChanges(t)));
   }
   if (t.exclusive && t.exclusive.waiting) row.append(button("Release", () => openRelease(t)));
   if (t.status === "waiting_external" && t.wait_has_check === false) row.append(button("Mark done", action(() => api(`/api/tasks/${t.id}/external-done`, {}))));
@@ -452,12 +486,15 @@ function taskButtons(t) {
     row.append(state.checking.has(t.id) ? button("Checking…", () => {}, { disabled: true }) : button("Check now", () => checkNow(t)));
   }
   if (!finished) {
-    row.append(button("Send prompt", () => openSendPrompt(t), { disabled: down || !can("send_prompt"), hint: ADAPTER_BUTTONS }));
-    if (state.pausing.has(t.id)) row.append(el("span", { class: "muted" }, "Pausing..."));
-    else if (!paused && live) row.append(button("Pause", () => openPause(t), { disabled: down, hint: ADAPTER_BUTTONS }));
     if (paused || !live) row.append(button("Resume", action(() => api(`/api/tasks/${t.id}/resume`, {})), { disabled: down, hint: ADAPTER_BUTTONS }));
+    if (state.pausing.has(t.id)) row.append(el("span", { class: "muted" }, "Pausing..."));
+    const menu = el("div", { class: "menu" });
+    menu.append(button("Send prompt", () => openSendPrompt(t), { disabled: down || !can("send_prompt"), hint: ADAPTER_BUTTONS }));
+    if (!paused && live && !state.pausing.has(t.id)) menu.append(button("Pause", () => openPause(t), { disabled: down, hint: ADAPTER_BUTTONS }));
+    menu.append(button("Cancel", () => openCancel(t), { cls: "danger" }));
+    for (const b of menu.querySelectorAll("button")) b.addEventListener("click", () => { const d = b.closest("details"); if (d) d.open = false; });
+    row.append(el("details", { class: "more" }, el("summary", { "aria-label": `More actions for ${t.display_name}`, title: "More actions" }, "⋯"), menu));
   }
-  if (!finished) row.append(button("Cancel", () => openCancel(t), { cls: "danger" }));
   return row;
 }
 async function openCancel(t) {
