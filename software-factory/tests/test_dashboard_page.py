@@ -55,3 +55,8 @@ def test_workspace_menu_reuses_task_menu():
 def test_editor_page_uses_workspace_routes():
     editor = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
     assert "GLOBAL_API" in editor and "/api/w/" in editor
+
+
+def test_refresh_ignores_stale_responses():
+    assert "generation: state.generation + 1" in PAGE
+    assert PAGE.count("state.generation !== ") == 2

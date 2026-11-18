@@ -285,7 +285,7 @@ const HIDDEN_PREFIX = "factory.hiddenColumns.";
 const WORKSPACE_KEY = "factory.workspace";
 const GLOBAL_API = /^\/api\/(ping|shutdown|jobs\/|workspaces|host)/;
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
-const state = { view: "tasks", ws: new URLSearchParams(location.search).get("ws"), workspaces: [], renaming: null, info: emptyInfo(), tasks: [], backlog: [], hidden: loadHidden(new URLSearchParams(location.search).get("ws")), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null };
+const state = { generation: 0, view: "tasks", ws: new URLSearchParams(location.search).get("ws"), workspaces: [], renaming: null, info: emptyInfo(), tasks: [], backlog: [], hidden: loadHidden(new URLSearchParams(location.search).get("ws")), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null };
 const byId = (id) => document.getElementById(id);
 function emptyInfo() { return { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }; }
 
@@ -337,7 +337,7 @@ function pickWorkspace() {
 function setWorkspace(id) {
   const switched = id !== state.ws;
   if (switched) state.detail = null;
-  Object.assign(state, { ws: id, hidden: loadHidden(id), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), removed: new Set(), renaming: null, info: emptyInfo(), tasks: [], backlog: [] });
+  Object.assign(state, { generation: state.generation + 1, ws: id, hidden: loadHidden(id), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), removed: new Set(), renaming: null, info: emptyInfo(), tasks: [], backlog: [] });
   if (id) { try { localStorage.setItem(WORKSPACE_KEY, id); } catch (e) {} }
   const url = new URL(location.href);
   if (id) url.searchParams.set("ws", id); else url.searchParams.delete("ws");
@@ -428,10 +428,15 @@ async function loadBoard() {
 }
 async function refresh(force) {
   if (!force && (state.dragging || modalOpen())) return;
+  const started = state.generation;
   try {
-    state.workspaces = await api("/api/workspaces", undefined, true);
+    const list = await api("/api/workspaces", undefined, true);
+    if (state.generation !== started) return;
+    state.workspaces = list;
     if (!currentWorkspace() && state.ws !== pickWorkspace()) setWorkspace(pickWorkspace());
+    const generation = state.generation;
     const board = await loadBoard();
+    if (state.generation !== generation) return;
     if (state.pollFailed) { hideError(); state.pollFailed = false; }
     byId("offline").hidden = true;
     const key = JSON.stringify([state.workspaces, state.ws, board, Math.floor(Date.now() / 60000)]);
