@@ -17,6 +17,18 @@ EXCLUDES = [".factory/", ".factory.backup-*/"]
 BACKLOG_HEADER = "# Backlog\n"
 
 
+class InitChecksError(FactoryError):
+    def __init__(self, failed):
+        super().__init__("Init stopped. Fix these first:\n" + "\n".join(f"- {c['name']}: {c['message']}" for c in failed))
+        self.details = {"checks": failed}
+
+
+class MissingLibraryError(FactoryError):
+    def __init__(self, path):
+        super().__init__(f"The library folder {path} does not exist. Run again with --create-library to create it.")
+        self.path = path
+
+
 def link_dir():
     return Path(os.environ.get("FACTORY_LINK_DIR", "~/.local/bin")).expanduser()
 
@@ -46,6 +58,13 @@ def ensure_link():
         link.symlink_to(target)
     on_path = str(d) in os.environ.get("PATH", "").split(os.pathsep)
     return {"path": str(link), "target": str(target), "changed": changed, "on_path": on_path}
+
+
+def link_warning():
+    link = link_dir() / "factory"
+    if link.exists() or link.is_symlink():
+        return None
+    return f"The link {link} is missing. Run the install script."
 
 
 def hook_command(sub):
@@ -168,25 +187,26 @@ def add_excludes(ctx):
         fsio.atomic_write_text(path, "\n".join(lines + missing) + "\n")
 
 
-def init(cwd, library, create_library=False):
+def init(cwd, library=None, create_library=False):
     checks = prerequisites(cwd)
     failed = [c for c in checks if not c["ok"]]
     if failed:
-        raise FactoryError("Init stopped. Fix these first:\n" + "\n".join(f"- {c['name']}: {c['message']}" for c in failed))
+        raise InitChecksError(failed)
     ctx = repo.load_ctx(cwd)
-    lib = Path(library).expanduser().resolve()
-    if not lib.exists() and not create_library:
-        raise FactoryError(f"The library folder {lib} does not exist. Run again with --create-library to create it.")
-    if create_library or not (lib / "factory.yaml").exists():
-        create_library_folder(lib)
-    report = {"created": [], "kept": [], "library": str(lib), "checks": checks}
+    lib = Path(library).expanduser().resolve() if library and str(library).strip() else None
+    if lib is not None:
+        if not lib.exists() and not create_library:
+            raise MissingLibraryError(lib)
+        if create_library or not (lib / "factory.yaml").exists():
+            create_library_folder(lib)
+    report = {"created": [], "kept": [], "library": str(lib) if lib else None, "checks": checks}
     report["library_git"] = library_module.in_git(lib)
     f = ctx.fdir
     for d in ("steps", "pipelines", "tasks/archive"):
         (f / d).mkdir(parents=True, exist_ok=True)
     factory_data = {
-        "version": DATA_VERSION, "library": str(lib), "terminal": adapters.terminal_name(ctx),
-        "columns": list(repo.DEFAULT_COLUMNS), "poll_minutes": 5, "ticket_url": "",
+        "version": DATA_VERSION, "library": str(lib) if lib else "", "terminal": adapters.terminal_name(ctx),
+        "columns": list(repo.DEFAULT_COLUMNS), "ticket_url": "",
     }
     write_new(f / "factory.yaml", lambda p: fsio.write_yaml(p, factory_data), report)
     write_new(f / "config.yaml", lambda p: fsio.write_yaml(p, {}), report)
@@ -200,5 +220,7 @@ def init(cwd, library, create_library=False):
         report["kept"].append(str(settings_file))
         report.setdefault("warnings", []).append(str(e))
     add_excludes(ctx)
-    report["link"] = ensure_link()
+    warning = link_warning()
+    if warning:
+        report.setdefault("warnings", []).append(warning)
     return report

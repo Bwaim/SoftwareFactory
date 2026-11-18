@@ -5,7 +5,7 @@ import pytest
 import yaml
 
 from conftest import fake_config, git
-from factory import init, menu, repo
+from factory import init, menu, repo, workspaces
 
 
 def test_init_creates_files_and_exclude(factory, origin_repo, library_path, work):
@@ -23,6 +23,41 @@ def test_init_creates_files_and_exclude(factory, origin_repo, library_path, work
     assert yaml.safe_load((library_path / "factory.yaml").read_text())["version"] == 2
     assert out["library_git"] is True
     assert os.path.realpath(work / "bin" / "factory").endswith("bin/factory")
+
+
+def test_init_without_library(factory, origin_repo):
+    factory("init")
+    data = yaml.safe_load((origin_repo / ".factory" / "factory.yaml").read_text())
+    assert data["library"] == "" and "poll_minutes" not in data
+    factory("step", "list")
+
+
+def test_init_blank_library_is_none(factory, origin_repo, factory_home):
+    before = set(origin_repo.iterdir())
+    out = factory.json("init", "--library", "  ")
+    assert out["library"] is None and out["library_git"] is False
+    assert set(origin_repo.iterdir()) - before == {origin_repo / ".factory"}
+    assert not factory_home.exists() or not [p for p in factory_home.iterdir() if p.is_dir()]
+
+
+def test_init_registers_workspace(factory, origin_repo):
+    factory("init")
+    rows = workspaces.list_all()
+    assert len(rows) == 1 and rows[0]["path"] == str(origin_repo)
+    factory("init")
+    assert len(workspaces.list_all()) == 1
+
+
+def test_init_does_not_create_link(factory, work):
+    (work / "bin" / "factory").unlink()
+    r = factory("init")
+    assert not (work / "bin" / "factory").exists()
+    assert "Run the install script." in r.stdout
+
+
+def test_require_repo_text(factory):
+    r = factory("step", "list", check=False)
+    assert r.returncode == 1 and "Run `factory init`." in r.stderr
 
 
 def test_init_never_overwrites(factory, origin_repo, library_path):

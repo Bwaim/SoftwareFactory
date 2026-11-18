@@ -57,3 +57,7 @@ def test_commit_adds_changed_library_factory_yaml(inited):
     inited.factory("library", "commit", "Factory library: add step b", inited.library / "steps" / "b.md")
     committed = git("show", "--name-only", "--format=", "HEAD", cwd=root).splitlines()
     assert sorted(committed) == ["factory-library/factory.yaml", "factory-library/steps/b.md"]
+
+
+def test_in_git_none():
+    assert library.in_git(None) is False

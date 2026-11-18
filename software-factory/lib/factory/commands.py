@@ -74,7 +74,7 @@ def register(sub, common):
     p.add_argument("--dry-run", action="store_true")
     sub.add_parser("clean", parents=[common])
     p = sub.add_parser("init", parents=[common])
-    p.add_argument("--library", required=True)
+    p.add_argument("--library", default=None)
     p.add_argument("--create-library", action="store_true")
     sub.add_parser("link", parents=[common])
     sub.add_parser("open-ide", parents=[common])
@@ -359,8 +359,9 @@ def clean_cmd(args):
 
 @cli.command("init")
 def init_cmd(args):
-    from . import init
+    from . import init, repo, workspaces
     report = init.init(".", args.library, args.create_library)
+    workspaces.register(repo.load_ctx(".").main)
     if args.json:
         cli.emit(report, True)
         return
@@ -369,7 +370,9 @@ def init_cmd(args):
     print(f"Created: {len(report['created'])} files. Kept: {len(report['kept'])} files.")
     for w in report.get("warnings", []):
         print(f"Warning: {w}")
-    if not report["library_git"]:
+    if report["library"] is None:
+        print("No library. Only built-in and local steps exist.")
+    elif not report["library_git"]:
         print("Warning: the library is not in a git repository. Library commits are disabled.")
 
 

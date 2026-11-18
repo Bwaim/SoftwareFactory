@@ -58,7 +58,7 @@ def test_not_initialized_names_init(origin_repo):
     ctx = repo.load_ctx(cwd=origin_repo)
     with pytest.raises(FactoryError) as e:
         version.require_repo(ctx)
-    assert str(e.value) == "The factory is not initialized in this repository. Run `factory init --library <path>`."
+    assert str(e.value) == "The factory is not initialized in this repository. Run `factory init`."
 
 
 def test_old_repo_names_migrate(origin_repo):
