@@ -249,3 +249,30 @@ Spec: "Init changes" 3 and 8.
   - Delete in a second tab moves the first tab to the first remaining workspace (Review Focus 5).
   - Write the results in `verification/software-factory/workspaces-manual-check.md`.
 - [ ] **Step 3: Commit** `Workspaces: verification`.
+
+### Task 8: Repositories without a remote
+
+Spec: "Repositories without a remote".
+
+**Files:**
+- Modify: `lib/factory/repo.py` (`has_origin`), `lib/factory/init.py` (`git_check`), `lib/factory/launch.py` (`fetch`, `remote_has_branch`, `plan_branch`, base fetch in the plan, `create_worktree`), `lib/factory/delete.py` (`content_merged`, `patch_id_merged`, `merge_state`, `clean_report`, `lost_commits`, `plan_delete`, and any other `origin` use)
+- Modify tests that expect init to fail without `origin`: `tests/test_init_menu.py::test_init_reports_failed_prerequisite`, `tests/test_workspaces_api.py::test_add_with_failed_check` (make another check fail, for example the terminal check, so the `checks` body is still tested)
+- Test: `tests/test_no_remote.py`
+
+**Interfaces:**
+- `repo.has_origin(cwd) -> bool`
+- `delete.base_ref(ctx, base) -> str`: `refs/remotes/origin/<base>` with `origin`, else `refs/heads/<base>`. All merge checks use it. `launch` uses the same rule for the start point (`origin/<base>` or `<base>`).
+
+- [ ] **Step 1: Write the failing tests** in `tests/test_no_remote.py` (an `inited` repo, then `git remote remove origin`, or init after the removal):
+  - `test_init_without_origin_warns`: init succeeds; stdout has `This repository has no `origin` remote.`
+  - `test_launch_without_origin_new_branch`: a pipeline with a `branch` input launches; the worktree branch starts at the local `main` commit; no fetch error.
+  - `test_launch_without_origin_detached`: a pipeline without a `branch` input launches a detached worktree at local `main`.
+  - `test_launch_without_origin_missing_base`: base `nope` gives the dry run error `The branch `nope` does not exist in this repository.`
+  - `test_clean_without_origin_merged`: a finished task whose branch is merged into local `main` is reported `merged into main` and selected.
+  - `test_delete_without_origin_lost_commits`: a task branch with one commit not in local `main` lists that commit as lost.
+  - `test_with_origin_unchanged`: one existing launch test still passes with `origin` (covered by the full suite).
+- [ ] **Step 2: Run** the new tests. Expected: FAIL.
+- [ ] **Step 3: Implement.** Keep every `origin` path unchanged when `has_origin` is true.
+- [ ] **Step 4: Run** `tests/test_no_remote.py`, `tests/test_launch.py`, `tests/test_delete.py`, `tests/test_clean.py`, `tests/test_cancel.py`, `tests/test_merge_check.py`, `tests/test_squash_merge.py`, `tests/test_init_menu.py`, `tests/test_workspaces_api.py` (the ones that exist), then the full suite. Expected: all PASS.
+- [ ] **Step 5: Update the README** (init and launch parts): a repository without `origin` works, tasks start from the local base branch, and push and pull request steps fail. Follow the writing rules of the plan.
+- [ ] **Step 6: Commit** `Run a factory in a repository without a remote`.

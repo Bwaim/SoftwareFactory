@@ -187,6 +187,23 @@ These CLI changes are part of the same work.
 7. If the library folder does not exist, the CLI keeps its text "Run again with --create-library to create it.". The dashboard add route returns its own text: "The library folder does not exist. Create it, or leave the field blank.".
 8. Update the README: the init options, the optional library, how to add a library later, and the link.
 
+## Repositories without a remote
+
+The user decided this on 2026-11-18. A factory can run in a git repository that has no `origin` remote. Git itself stays required, because each task runs in a git worktree.
+
+1. Init: the `git` check passes without `origin`. The report adds this warning: "This repository has no `origin` remote. Tasks start from the local `<base>` branch. Push and pull request steps fail." The check still fails outside a git repository.
+2. A new helper `repo.has_origin(cwd) -> bool` runs `git remote get-url origin`. The code calls it at the time of use, so a remote added later works at once.
+3. Launch without `origin`:
+   - Do not run `git fetch` or `git ls-remote`.
+   - The base is the local branch `refs/heads/<base>`. If it does not exist, the dry run reports: "The branch `<base>` does not exist in this repository."
+   - A new branch and a detached worktree start from the local `<base>` branch. An existing local branch is used as today. The "remote" branch case never happens.
+4. Clean, delete, and cancel without `origin`:
+   - Do not run `git fetch`.
+   - The merge checks (ancestor, content, patch id) compare with `refs/heads/<base>`. The reason text is "merged into <base>".
+   - The "pushed, and its remote branch was deleted" case never happens.
+   - Lost commits are the commits of the task branch that are not in the local `<base>` branch.
+5. With `origin`, nothing changes.
+
 ## Constraints
 
 - Python standard library and `pyyaml` only, as today.
