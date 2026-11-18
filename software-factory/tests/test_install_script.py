@@ -138,3 +138,91 @@ def test_bad_digest_file_refused(release, env, digest):
     assert r.returncode == 1
     assert "factory install: The latest release has no valid software-factory.tar.gz.sha256." in r.stderr
     assert not (Path(env["HOME"]) / ".local/share/software-factory").exists()
+
+
+def test_second_run_updates(release, env):
+    assert run_install(env).returncode == 0
+    target = Path(env["HOME"]) / ".local/share/software-factory"
+    (target / "old-file").write_text("x")
+    r = run_install(env)
+    assert r.returncode == 0, r.stderr
+    assert not (target / "old-file").exists()
+    assert not list(target.parent.glob("software-factory.*"))
+
+
+def test_failed_swap_restores_old_install(release, env, work):
+    assert run_install(env).returncode == 0
+    target = Path(env["HOME"]) / ".local/share/software-factory"
+    (target / "old-file").write_text("x")
+    log = work / "mv.log"
+    write_stub(work / "fake bin/mv", f'''printf '%s|%s\\n' "$1" "$2" >> '{log}'
+case "$1" in *.stage.*) [ "$2" = '{target}' ] && exit 1;; esac
+exec /bin/mv "$@"''')
+    assert run_install(env).returncode == 1
+    assert (target / "old-file").exists()
+    assert not list(target.parent.glob("software-factory.*"))
+    calls = log.read_text().splitlines()
+    to_backup = next(i for i, c in enumerate(calls) if c.startswith(f"{target}|") and ".backup." in c)
+    failed = next(i for i, c in enumerate(calls) if ".stage." in c.split("|")[0] and c.endswith(f"|{target}"))
+    assert to_backup < failed
+
+
+def test_interrupted_run_restores_backup(release, env):
+    share = Path(env["HOME"]) / ".local/share"
+    backup = share / "software-factory.backup.111"
+    backup.mkdir(parents=True)
+    (backup / ".installed-by-script").write_text("")
+    (backup / "old-file").write_text("x")
+    (share / "software-factory.stage.222").mkdir()
+    r = run_install(env)
+    assert r.returncode == 0, r.stderr
+    assert f"Restored the previous install from {backup}." in r.stdout
+    assert not list(share.glob("software-factory.*"))
+
+
+def test_leftovers_removed_when_install_exists(release, env):
+    assert run_install(env).returncode == 0
+    share = Path(env["HOME"]) / ".local/share"
+    (share / "software-factory.backup.111").mkdir()
+    (share / "software-factory.stage.222").mkdir()
+    assert run_install(env).returncode == 0
+    assert not list(share.glob("software-factory.*"))
+
+
+def test_user_folder_with_similar_name_kept(release, env):
+    share = Path(env["HOME"]) / ".local/share"
+    user = share / "software-factory.backup.old"
+    user.mkdir(parents=True)
+    (user / ".installed-by-script").write_text("")
+    r = run_install(env)
+    assert r.returncode == 0, r.stderr
+    assert user.exists()
+    assert "Restored the previous install" not in r.stdout
+
+
+def test_unmanaged_folder_refused(release, env):
+    target = Path(env["HOME"]) / ".local/share/software-factory"
+    target.mkdir(parents=True)
+    r = run_install(env)
+    assert r.returncode == 1
+    assert (f"factory install: {target} exists and was not made by this script. "
+            "Move it away, then run again.") in r.stderr
+
+
+def test_link_file_refused(release, env):
+    link = Path(env["HOME"]) / ".local/bin/factory"
+    link.parent.mkdir(parents=True)
+    link.write_text("x")
+    r = run_install(env)
+    assert r.returncode == 1
+    assert f"factory install: {link} exists and is not a link. Move it away, then run again." in r.stderr
+
+
+def test_link_to_other_target_replaced(release, env, work):
+    link = Path(env["HOME"]) / ".local/bin/factory"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(work / "plugin-cache/bin/factory")
+    r = run_install(env)
+    assert r.returncode == 0
+    assert f"Replaced the link {link}, it pointed to {work / 'plugin-cache/bin/factory'}." in r.stdout
+    assert os.readlink(link).endswith("software-factory/bin/factory")
