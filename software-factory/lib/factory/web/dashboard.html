@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CAPTN</title>
+<script>
+try { if (localStorage.getItem("factory.theme") === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}
+</script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect x='18' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E%3Crect x='94' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E%3Crect x='26' y='50' width='68' height='56' rx='18' fill='%23673888'/%3E%3Cpath d='M30 48 L22 28 Q60 10 98 28 L90 48 Z' fill='%23C4005E'/%3E%3Crect x='20' y='44' width='80' height='11' rx='5.5' fill='%231A1110'/%3E%3Ccircle cx='60' cy='32' r='7' fill='%23FECD40'/%3E%3Ccircle cx='46' cy='76' r='8' fill='%23FFFFFF'/%3E%3Ccircle cx='47.5' cy='77' r='3.5' fill='%231A1110'/%3E%3Ccircle cx='74' cy='76' r='9' fill='%231A1110'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
 <style>
@@ -12,10 +15,27 @@
   --column: #241A19; --panel: #2E2322; --panel-line: #3D302F; --line: #4A3B39; --raised: #3A2E2D; --done: #261C1B;
   --accent: #C4005E; --accent-hover: #A8004F; --link: #FF7AB6; --link-hover: #FFA8CF; --brand-pink: #FF5AA5;
   --yellow: #FECD40; --err: #FF8AC0; --err-line: #6E2A4A; --err-bg: #3A1A29; --ok: #B5E07F;
+  --active-bg: #283A16; --active-fg: #B5E07F; --active-dot: #7CC63A;
+  --approval-bg: #423410; --approval-fg: #FECD40; --approval-dot: #FECD40;
+  --attn-bg: #4A1430; --attn-fg: #FF9CC8; --attn-dot: #FF5AA5; --attn-line: #5C2441;
+  --wait-bg: #352448; --wait-fg: #D6BCEB; --wait-dot: #B98BDB;
+  --neutral-fg: #D8D0CC; --paused-dot: #A99E9A;
+  --shadow: rgba(0, 0, 0, 0.5); --bot-band: #FFFFFF; --bot-eye: #1A1110;
   --font: "Nextory Sans", Figtree, Roboto, Arial, sans-serif; }
+:root[data-theme="light"] { color-scheme: light;
+  --bg: #F9F5F2; --top: #FFFFFF; --fg: #1A1110; --muted: #6B5F5B; --muted-strong: #5A4E4A; --soft: #3D302F;
+  --column: #F1ECE8; --panel: #FFFFFF; --panel-line: #E4DDD8; --line: #D6CDC8; --raised: #EEE7E3; --done: #F7F3F0;
+  --link: #B0005A; --link-hover: #8A0047; --brand-pink: #C4005E;
+  --err: #B0004F; --err-line: #F0B3CE; --err-bg: #FDEBF3; --ok: #3E7A12;
+  --active-bg: #E6F4D7; --active-fg: #2F6110; --active-dot: #5DA21E;
+  --approval-bg: #FFF3CC; --approval-fg: #6E5100; --approval-dot: #E0A800;
+  --attn-bg: #FDE3EF; --attn-fg: #A3004E; --attn-dot: #E0337F; --attn-line: #F5C2D9;
+  --wait-bg: #EFE6F7; --wait-fg: #5B2D80; --wait-dot: #8A55B5;
+  --neutral-fg: #4A3F3B; --paused-dot: #8C817D;
+  --shadow: rgba(26, 17, 16, 0.15); --bot-band: #1A1110; --bot-eye: #FFFFFF; }
 body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var(--fg); min-height: 100vh; display: flex; flex-direction: column; }
 [hidden] { display: none !important; }
-header { background: var(--top); border-bottom: 1px solid var(--panel); padding: 12px 24px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+header { background: var(--top); border-bottom: 1px solid var(--panel-line); padding: 12px 24px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
 header .grow { flex: 1; }
 header nav { display: flex; gap: 6px; }
 .brand { display: flex; align-items: center; gap: 12px; }
@@ -46,7 +66,7 @@ a:hover, .link:hover { color: var(--link-hover); }
 .muted { color: var(--muted); font-size: 12px; }
 .rename-error { color: var(--err); font-size: 12px; margin: 2px 0; }
 #error { display: none; position: sticky; top: 0; z-index: 20; background: var(--accent); color: #FFFFFF; font-weight: 600; padding: 10px 24px; }
-#banner { background: var(--yellow); color: var(--bg); font-weight: 600; padding: 10px 24px; }
+#banner { background: var(--yellow); color: #1A1110; font-weight: 600; padding: 10px 24px; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
 button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-height: 1; }
 .toolbar > button.launch { min-height: 40px; padding: 0 18px; font-size: 14px; }
@@ -72,16 +92,16 @@ button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-h
 .pill i { width: 8px; height: 8px; border-radius: 50%; display: block; flex: none; }
 .pill span { display: inline-block; }
 .pill span::first-letter { text-transform: uppercase; }
-.p-active { background: #283A16; color: #B5E07F; } .p-active i { background: #7CC63A; }
-.p-awaiting_approval { background: #423410; color: #FECD40; } .p-awaiting_approval i { background: #FECD40; }
-.p-blocked, .p-attention { background: #4A1430; color: #FF9CC8; } .p-blocked i, .p-attention i { background: #FF5AA5; }
-.p-waiting_external { background: #352448; color: #D6BCEB; } .p-waiting_external i { background: #B98BDB; }
-.p-paused { background: var(--raised); color: #D8D0CC; } .p-paused i { background: #A99E9A; }
-.p-finished { background: var(--raised); color: #D8D0CC; } .p-finished i { background: #7CC63A; }
-.attention-message { white-space: pre-wrap; margin: 0; font: inherit; font-size: 12px; background: var(--err-bg); border: 1px solid #5C2441; border-radius: 8px; padding: 8px; color: #FFFFFF; }
+.p-active { background: var(--active-bg); color: var(--active-fg); } .p-active i { background: var(--active-dot); }
+.p-awaiting_approval { background: var(--approval-bg); color: var(--approval-fg); } .p-awaiting_approval i { background: var(--approval-dot); }
+.p-blocked, .p-attention { background: var(--attn-bg); color: var(--attn-fg); } .p-blocked i, .p-attention i { background: var(--attn-dot); }
+.p-waiting_external { background: var(--wait-bg); color: var(--wait-fg); } .p-waiting_external i { background: var(--wait-dot); }
+.p-paused { background: var(--raised); color: var(--neutral-fg); } .p-paused i { background: var(--paused-dot); }
+.p-finished { background: var(--raised); color: var(--neutral-fg); } .p-finished i { background: var(--active-dot); }
+.attention-message { white-space: pre-wrap; margin: 0; font: inherit; font-size: 12px; background: var(--err-bg); border: 1px solid var(--attn-line); border-radius: 8px; padding: 8px; color: var(--fg); }
 .delivery { display: flex; gap: 6px; align-items: center; justify-content: space-between; background: var(--err-bg); border: 1px solid var(--err-line); color: var(--err); border-radius: 8px; padding: 6px 8px; font-size: 12px; }
 .delivery button { min-height: 28px; font-size: 12px; padding: 0 10px; }
-.gone { align-self: flex-start; display: inline-block; background: #4A1430; color: #FF9CC8; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+.gone { align-self: flex-start; display: inline-block; background: var(--attn-bg); color: var(--attn-fg); border-radius: 12px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
 .buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
 .buttons button, .buttons a { min-height: 32px; font-size: 12px; padding: 0 12px; }
 .buttons a { display: inline-flex; align-items: center; box-sizing: border-box; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); color: var(--fg); text-decoration: none; }
@@ -90,17 +110,20 @@ button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-h
 .check { font-size: 12px; color: var(--soft); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .check button { min-height: 28px; font-size: 12px; padding: 0 10px; }
 .check.approval { display: block; }
-.validate { font-size: 11px; font-weight: 700; color: var(--yellow); background: #423410; border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
+.validate { font-size: 11px; font-weight: 700; color: var(--approval-fg); background: var(--approval-bg); border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
 .more { position: relative; }
 .more > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 32px; min-width: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); font-weight: 700; letter-spacing: .1em; }
 .more > summary::-webkit-details-marker { display: none; }
 .more > summary:hover, .more[open] > summary { background: var(--raised); }
 .more > summary:focus-visible { outline: 2px solid var(--brand-pink); outline-offset: 2px; }
-.more .menu { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 160px; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--column); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+.more .menu { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 160px; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--column); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px var(--shadow); }
 .more .menu button { justify-content: flex-start; border-color: transparent; background: transparent; border-radius: 8px; }
 .more .menu button:hover:not(:disabled) { background: var(--raised); }
 .more .menu .muted { padding: 4px 12px; }
-#offline { font-size: 12px; font-weight: 700; color: #FF9CC8; background: #4A1430; border-radius: 12px; padding: 3px 10px; }
+.theme-toggle { width: 36px; padding: 0; border-radius: 50%; background: transparent; }
+.theme-toggle svg { width: 18px; height: 18px; }
+:root:not([data-theme="light"]) .theme-toggle .moon, :root[data-theme="light"] .theme-toggle .sun { display: none; }
+#offline { font-size: 12px; font-weight: 700; color: var(--attn-fg); background: var(--attn-bg); border-radius: 12px; padding: 3px 10px; }
 .check.approval .link { margin-left: 4px; }
 .empty { min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 48px 0; }
 .empty .inner { max-width: 440px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
@@ -110,11 +133,11 @@ button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-h
 .empty button.primary { min-height: 48px; padding: 0 24px; border-radius: 24px; font-size: 15px; font-weight: 700; margin-top: 8px; }
 .empty .link { font-size: 13px; background: none; border: 0; min-height: 0; padding: 0; }
 #modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 10; }
-#modal .box { background: var(--column); color: var(--fg); border: 1px solid var(--panel-line); border-radius: 16px; width: min(720px, 92vw); max-height: calc(100vh - 2rem); display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5); }
+#modal .box { background: var(--column); color: var(--fg); border: 1px solid var(--panel-line); border-radius: 16px; width: min(720px, 92vw); max-height: calc(100vh - 2rem); display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; box-shadow: 0 16px 48px var(--shadow); }
 #modal .bar { flex: none; display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--panel-line); }
 #modal .bar h3 { margin: 0; font-size: 18px; font-weight: 800; overflow-wrap: anywhere; }
 #modal .content { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 16px 20px 20px; }
-#modal .discard { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 8px 20px; border-bottom: 1px solid var(--panel-line); background: #423410; color: var(--yellow); font-weight: 600; }
+#modal .discard { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 8px 20px; border-bottom: 1px solid var(--panel-line); background: var(--approval-bg); color: var(--approval-fg); font-weight: 600; }
 pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius: 8px; padding: 10px; background: var(--panel); margin: 8px 0; }
 .field { display: grid; grid-template-columns: 130px 1fr; gap: 8px; margin: 8px 0; align-items: start; }
 .field > label { padding-top: 7px; font-weight: 600; color: var(--soft); }
@@ -139,12 +162,12 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
     <rect x="18" y="68" width="8" height="18" rx="4" fill="#C4005E"/><rect x="94" y="68" width="8" height="18" rx="4" fill="#C4005E"/>
     <rect x="26" y="50" width="68" height="56" rx="18" fill="#673888"/>
     <path d="M30 48 L22 28 Q60 10 98 28 L90 48 Z" fill="#C4005E"/>
-    <rect x="20" y="44" width="80" height="11" rx="5.5" fill="#FFFFFF"/>
+    <rect x="20" y="44" width="80" height="11" rx="5.5" fill="var(--bot-band)"/>
     <circle cx="60" cy="32" r="7" fill="#FECD40"/>
-    <circle cx="46" cy="76" r="8" fill="#1A1110"/><circle cx="47.5" cy="77" r="3.5" fill="#FFFFFF"/>
-    <line x1="66" y1="64" x2="94" y2="58" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="74" cy="76" r="9" fill="#FFFFFF"/>
-    <path d="M50 92 Q60 99 70 92" fill="none" stroke="#1A1110" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="46" cy="76" r="8" fill="var(--bot-eye)"/><circle cx="47.5" cy="77" r="3.5" fill="var(--bot-band)"/>
+    <line x1="66" y1="64" x2="94" y2="58" stroke="var(--bot-band)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="74" cy="76" r="9" fill="var(--bot-band)"/>
+    <path d="M50 92 Q60 99 70 92" fill="none" stroke="var(--bot-eye)" stroke-width="4" stroke-linecap="round"/>
   </symbol>
 </defs></svg>
 <header>
@@ -162,6 +185,10 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
   <span class="grow"></span>
   <span id="offline" hidden title="The dashboard cannot reach the factory server. The board may be out of date.">Offline</span>
   <span id="updated" class="muted"></span>
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode" title="Switch to light mode">
+    <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
 </header>
 <main id="main"></main>
 <div id="modal" hidden></div>
@@ -817,6 +844,20 @@ byId("main").addEventListener("wheel", (e) => {
   e.preventDefault();
   board.scrollLeft += dx;
 }, { passive: false });
+const THEME_KEY = "factory.theme";
+function themeLabel() {
+  const label = document.documentElement.dataset.theme === "light" ? "Switch to dark mode" : "Switch to light mode";
+  const b = byId("theme-toggle");
+  b.setAttribute("aria-label", label);
+  b.title = label;
+}
+byId("theme-toggle").addEventListener("click", () => {
+  const light = document.documentElement.dataset.theme !== "light";
+  if (light) document.documentElement.dataset.theme = "light"; else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem(THEME_KEY, light ? "light" : "dark"); } catch (e) {}
+  themeLabel();
+});
+themeLabel();
 function setView(view) { state.view = view; render(); }
 byId("tab-tasks").addEventListener("click", () => setView("tasks"));
 byId("tab-backlog").addEventListener("click", () => setView("backlog"));
