@@ -159,8 +159,8 @@ workspaces:
 
 1. The "⋯" button opens a small menu with "Rename" and "Delete". A click outside the menu or Escape closes it.
 2. "Rename" replaces the name with a text field. Enter saves. Escape cancels.
-3. "Delete" opens a confirmation modal. It does not use the browser `confirm()`. The modal text is: "Remove <name> from the dashboard? The repository and its tasks stay on disk. Done checks of this workspace stop. The workspace comes back when you launch or resume a task in this repository, or run `factory dashboard` in it." If the workspace has tasks that are not finished, the modal also shows their number.
-4. Delete does not stick. The user selected this. The list keeps no record of deleted workspaces, so automatic registration adds the repository again. The user prefers that a running task always has its done checks.
+3. "Delete" opens a confirmation modal. It does not use the browser `confirm()`. The modal text is: "Remove <name> from the dashboard? The repository and its tasks stay on disk. Done checks of this workspace stop. The workspace comes back when a task in this repository waits for a done check, when you resume a task in it, or when you run `factory dashboard` in it." If the workspace has tasks that are not finished, the modal also shows their number.
+4. Delete does not stick. The user selected this. The list keeps no record of deleted workspaces, so automatic registration adds the repository again. Only the `keep_polling` callers (`factory tasks` with a waiting check, `factory resume`, `factory wait`) and `factory dashboard` register a repository. `factory launch` does not. The user prefers that a running task always has its done checks.
 5. After delete, the page selects the first remaining workspace. With no workspace, the main area shows: "No workspace. Click + to add a factory."
 
 ### Editor

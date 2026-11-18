@@ -27,9 +27,11 @@
   - Link warning: `The link <path> is missing. Run the install script.`
   - Confirm step title: `Set up the factory in <main>?`
   - Confirm step button: `Set up and add`. Field label: `Library folder`.
-  - Delete modal: `Remove <name> from the dashboard? The repository and its tasks stay on disk. Done checks of this workspace stop. The workspace comes back when you launch or resume a task in this repository, or run `factory dashboard` in it.`
+  - Delete modal: `Remove <name> from the dashboard? The repository and its tasks stay on disk. Done checks of this workspace stop. The workspace comes back when a task in this repository waits for a done check, when you resume a task in it, or when you run `factory dashboard` in it.`
   - Empty state: `No workspace. Click + to add a factory.`
   - Picker on another platform: `The folder picker works only on macOS.`
+  - Start warning (`server.START_WARNING`): `Warning: the local server did not start, so done checks do not run. See <home>/server.log.`
+- Do not add workspace registration to `factory launch`. Only `keep_polling` callers and `factory dashboard` register.
 
 ## Review Focus
 
@@ -65,7 +67,7 @@ Spec: "Terms", "Workspace list", "Add rules" 1 and 4, "Constraints" (test home).
   - `rename(wid: str, name: str) -> dict`: trims, refuses an empty name or more than 64 characters, refuses an unknown id.
   - `remove(wid: str) -> dict`: returns the removed entry, refuses an unknown id.
   - All writes go through `fsio.update_yaml(list_path(), fn)`.
-- Produces (tests): autouse fixture `factory_home(tmp_path, monkeypatch) -> Path` that sets `FACTORY_HOME`. The `factory` fixture adds `"FACTORY_HOME": str(factory_home)` to its env. `Inited` gets `self.home`. The `inited` teardown checks `inited.home / "server.json"` (in place of `.factory/server.json`).
+- Produces (tests): autouse fixture `factory_home(tmp_path, monkeypatch) -> Path` that sets `FACTORY_HOME`. The `factory` fixture adds `"FACTORY_HOME": str(factory_home)` to its env. `Inited` gets `self.home`. The `inited` teardown does not change in this task: `server.json` moves to `$FACTORY_HOME` only in Task 3.
 
 - [ ] **Step 1: Save the baseline.** Run the full suite. Write the pass count in the task report.
 - [ ] **Step 2: Write the failing tests** in `tests/test_workspaces.py` with the `origin_repo` and `work` fixtures:
@@ -126,10 +128,10 @@ Spec: "Server > Life", "Runtimes", "Poll loop", "Routes" 2, "Automatic registrat
 - Consumes: `workspaces.list_all`, `workspaces.home`, `workspaces.mtime`, `workspaces.register` (Task 1).
 - Produces:
   - `runtime.Workspace(server, entry: dict)`: attributes `id`, `name`, `path`, `ctx` (None on error), `adapter` (`{"ok", "message"}`), `capabilities`, `error` (str or None). Properties `jobs`, `next_poll`, and method `start_job(fn)` delegate to the server. The build runs `repo.load_ctx(path)`, `version.require_repo(ctx)`, and the adapter check of today's `Server.__init__`. Any exception becomes `error`.
-  - `server.Server()`: no arguments. Methods: `reload()`, `reload_if_changed()`, `runtime(wid) -> Workspace | None`, `snapshot() -> list[Workspace]`. A `threading.Lock` guards `self.runtimes` (dict id → Workspace). `reload()` keeps a runtime whose path did not change and updates its name.
+  - `server.Server()`: no arguments. Methods: `reload()`, `reload_if_changed()`, `runtime(wid) -> Workspace | None`, `snapshot() -> list[Workspace]`. A `threading.Lock` guards `self.runtimes` (dict id → Workspace). `reload()` keeps a runtime whose path did not change and that has no error, and updates its name. It builds a runtime with an error again on each reload, so a fixed `factory.yaml` or a restored folder works without a restart.
   - `server.info_path() -> Path`, `read_info()`, `ensure_server()`, `running()`, `stop_server()`: no ctx. `keep_polling(ctx)`: `workspaces.register(ctx.main)`, then `ensure_server()`.
   - `server.stop_legacy(fdir: Path) -> bool`: if `fdir / "server.json"` names a live server that answers ping, POST `/api/shutdown` with its token; then remove the file. Called for each workspace at `Server.run()` start.
-  - Error texts use the real log path: `The local server did not start. See <home>/server.log.`
+  - Error texts use the real log path: `The local server did not start. See <home>/server.log.` `START_WARNING` uses the same path.
   - `api.route(method, pattern, scope="workspace")`. Global scope: `ping`, `shutdown`, `job`. `dispatch(server, method, path, query, body)`: a path that matches `^/api/w/([a-z0-9-]{1,40})(/.*)$` resolves the runtime (unknown id → `NotFound`; runtime with `error` → `FactoryError(error)`), then matches `"/api" + rest` against workspace routes with the runtime as first argument. Other paths match global routes with the server.
   - `serverutil.info(fdir=None) -> dict`: reads `$FACTORY_HOME/server.json`. With `fdir`, adds `"ws"`: the id of the workspace whose path is `fdir.parent`. `serverutil.request` rewrites a path that starts with `/api/` to `/api/w/<ws>/...` when `info` has `"ws"` and the path does not start with `/api/ping`, `/api/shutdown`, `/api/jobs/`, `/api/workspaces`, or `/api/host`.
 
@@ -139,6 +141,7 @@ Spec: "Server > Life", "Runtimes", "Poll loop", "Routes" 2, "Automatic registrat
   - `test_two_workspaces_one_server`: init a second repo (copy of the `origin_repo` setup in `work / "second" / "repo"`). One `server.json`. `/api/w/repo/tasks` and `/api/w/repo-2/tasks` both return 200. `/api/w/nope/tasks` returns 404.
   - `test_poll_covers_all_workspaces`: one waiting task with a `done_check` on a flag file in each workspace, `FACTORY_POLL_SECONDS=1`; both flags created; both tasks move on within 15 seconds.
   - `test_broken_workspace_does_not_stop_others`: register a second workspace, then delete its folder. `/api/w/<second>/tasks` returns 400 with an error text. `/api/w/repo/tasks` returns 200. The poll still moves the first workspace's task.
+  - `test_error_runtime_recovers` (in-process `Server()` with `FACTORY_HOME` set): break `factory.yaml` of a registered repo, `reload()`, the runtime has an error; fix the file, `reload()`, the error is gone.
   - `test_legacy_server_file_is_removed`: write `<repo>/.factory/server.json` with a dead pid; start the server; the file is gone.
   - `test_stop_legacy_calls_shutdown` (in-process): monkeypatch `server.pid_alive` and `server.ping` to True and record the URL that `urllib.request.urlopen` gets; `stop_legacy(fdir)` posts to `/api/shutdown` and removes the file.
   - `test_server_stop_from_anywhere`: `factory("server", "stop", cwd=work)` stops the server.
@@ -146,7 +149,7 @@ Spec: "Server > Life", "Runtimes", "Poll loop", "Routes" 2, "Automatic registrat
   - `test_editor_url_has_ws`: `factory("pipeline", "edit")` prints a URL with `ws=repo`.
 - [ ] **Step 2: Run** `tests/test_global_server.py`. Expected: FAIL.
 - [ ] **Step 3: Implement** `runtime.py`, the server changes, the dispatch change, and the CLI changes. Add `"serve"`, `"dashboard"`, and `"server stop"` to `NO_VERSION_CHECK`. `dashboard_cmd` tries `repo.load_ctx()`: if it is initialized, it calls `workspaces.register(ctx.main)` and adds `ws=<id>` to the URL; any `FactoryError` from `load_ctx` means no `ws`. `server stop --unless-waiting` collects `engine.waiting_checks` over all listed workspaces and skips the ones that fail to load. The poll interval is `FACTORY_POLL_SECONDS` or 300. `watch_idle` uses waiting checks of all runtimes. Each poll calls `reload()` first, and it logs `poll failed for <id>: <error>` per failing workspace.
-- [ ] **Step 4: Update the existing server tests** to the new helper (`info(inited.fdir)` keeps working through the `ws` rewrite). Replace reads of `inited.fdir / "server.json"` with `inited.home / "server.json"`. Change the `fail(ctx)` stub in `test_background_poll.py` to `fail()`. Remove the test that depends on `poll_minutes` if one exists, and write in the report which one.
+- [ ] **Step 4: Update the `inited` teardown** in `tests/conftest.py` to check `inited.home / "server.json"` in place of `.factory/server.json`. **Update the existing server tests** to the new helper (`info(inited.fdir)` keeps working through the `ws` rewrite). Replace reads of `inited.fdir / "server.json"` with `inited.home / "server.json"`. Change the `fail(ctx)` stub in `test_background_poll.py` to `fail()`. Remove the test that depends on `poll_minutes` if one exists, and write in the report which one.
 - [ ] **Step 5: Run** the full suite. Expected: all PASS (baseline + new tests).
 - [ ] **Step 6: Commit** `One global server for all workspaces`.
 
@@ -173,7 +176,7 @@ Spec: "Routes" 1 and 3, "Add rules" 2 and 3, "Needs-you count", "Runtimes" 2 (mt
 - [ ] **Step 1: Write the failing tests** (served through the real server, using `request` without `ws`):
   - `test_list_has_counts`: one task `awaiting_approval`, one `blocked`, one `active` with `attention`, one `finished`; the row has `needs_you == 3`, `open_tasks == 3`.
   - `test_add_needs_factory`: a second repo without init; add returns 400 with `code == "no_factory"` and `main` equal to its path.
-  - `test_add_with_init_without_library`: `{path, init: true, library: "  "}` returns 200; the repo has `.factory/factory.yaml` with `library: ""`; `factory_home` has only `server.json`, `server.log`, and `workspaces.yaml` (no library folder).
+  - `test_add_with_init_without_library`: `{path, init: true, library: "  "}` returns 200; the repo has `.factory/factory.yaml` with `library: ""`; `factory_home` has no folder in it (only files, for example `server.json`, `workspaces.yaml`, and their `.lock` files).
   - `test_add_with_missing_library`: `library` points to a missing folder; 400 with `The library folder does not exist. Create it, or leave the field blank.` and `checks == []`.
   - `test_add_with_failed_check`: a repo without `origin` remote; 400 with `checks` that has one entry with `name == "git"`.
   - `test_add_duplicate`: adding the registered repo again gives 400 and names `repo`.
@@ -228,7 +231,7 @@ Spec: "Init changes" 3 and 8.
   - Workspaces: the sidebar, the counter, Add with the init confirm step, Rename, Delete, and the folder picker on macOS only.
   - `FACTORY_HOME` and the files in it: `workspaces.yaml`, `server.json`, and `server.log`.
   - `server.json` and `server.log` are no longer in `.factory/`.
-- [ ] **Step 2: Update the skill line** so that it says the library is optional. Ask for a path only if the user wants a library.
+- [ ] **Step 2: Update the skill init flow** (`skills/software-factory/SKILL.md`, action "Init the factory"). Step 2: the library is optional, and the skill asks for a path only if the user wants a library. Step 3: without a library, offer the starter pack only with `--local`, because `--generic` fails with "No library is configured.".
 - [ ] **Step 3: Run** `tests/test_docs.py`. Expected: PASS.
 - [ ] **Step 4: Commit** `Document workspaces and the optional library`.
 
