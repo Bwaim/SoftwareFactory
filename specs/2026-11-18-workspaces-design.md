@@ -70,7 +70,7 @@ workspaces:
 
 ### Automatic registration
 
-1. `factory init` adds the repository to the workspace list.
+1. The `init` CLI command in `commands.py` adds the repository to the workspace list after `init.init()` succeeds. `init.init()` itself does not register. The dashboard add route calls `init.init()` and then adds the workspace once, so no duplicate path error occurs.
 2. `server.keep_polling(ctx)` and `factory dashboard` inside an initialized repository add the repository if it is not in the list. `keep_polling(ctx)` uses `ctx` only for this registration. `factory dashboard` outside a repository registers nothing. This makes sure that the done checks of a launched task run. It also moves existing users to workspaces without a manual step.
 
 ## Server
@@ -181,7 +181,9 @@ These CLI changes are part of the same work.
 3. A second `factory init` does not set a library, because `write_new` keeps `factory.yaml`. To add a library later, the user edits `factory.yaml`. A command for this is out of scope.
 4. The error text in `version.require_repo` changes from "Run `factory init --library <path>`." to "Run `factory init`.".
 5. `init` no longer calls `ensure_link()`. The install script owns the `~/.local/bin/factory` link. From the server, `ensure_link()` can create a link to the code that the server runs, for example a development checkout. In its place, init makes sure that the link exists. If the link is missing, init adds this warning to the report: "Run the install script." The `factory link` command stays.
-6. Update the README: the init options, the optional library, how to add a library later, and the link.
+6. `init.init()` changes an empty or blank `library` value to `None` before any `Path()` call. `Path("")` resolves to the current folder, and the server runs with `cwd=$FACTORY_HOME`, so a blank value would create a library there. Add a test for a blank library from the dashboard and from the CLI.
+7. If the library folder does not exist, the CLI keeps its text "Run again with --create-library to create it.". The dashboard add route returns its own text: "The library folder does not exist. Create it, or leave the field blank.".
+8. Update the README: the init options, the optional library, how to add a library later, and the link.
 
 ## Constraints
 
@@ -196,4 +198,4 @@ These CLI changes are part of the same work.
 - The exact CSS of the sidebar, badge, and menu. Use the existing CSS variables of `dashboard.html`.
 - How the dashboard code passes the workspace id to `api()` (for example a `wsApi()` helper).
 - The update of existing tests that call the old routes and the old `server.json` path.
-- Make sure that `library.in_git` and `migrate` accept no library (None). Today `init` and `migrate.plan` call `library.in_git(lib)` with the library path.
+- Add tests for `library.in_git(None)` and `migrate.plan` with no library. No code change is needed: `repo_root(None)` returns None, so `in_git(None)` returns False, and `library_version(None)` returns None, so `migrate.plan` marks no library migration.
