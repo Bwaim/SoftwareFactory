@@ -13,7 +13,7 @@
   --accent: #C4005E; --accent-hover: #A8004F; --link: #FF7AB6; --link-hover: #FFA8CF; --brand-pink: #FF5AA5;
   --yellow: #FECD40; --err: #FF8AC0; --err-line: #6E2A4A; --err-bg: #3A1A29; --ok: #B5E07F;
   --font: "Nextory Sans", Figtree, Roboto, Arial, sans-serif; }
-body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var(--fg); }
+body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var(--fg); min-height: 100vh; display: flex; flex-direction: column; }
 [hidden] { display: none !important; }
 header { background: var(--top); border-bottom: 1px solid var(--panel); padding: 12px 24px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
 header .grow { flex: 1; }
@@ -25,7 +25,8 @@ header nav { display: flex; gap: 6px; }
 .brand .wordmark em { font-style: normal; color: var(--brand-pink); }
 .brand .tagline { font-size: 11px; color: var(--muted-strong); letter-spacing: .02em; }
 #updated { color: var(--muted-strong); }
-main { padding: 20px 24px 32px; }
+main { padding: 20px 24px 32px; flex: 1; display: flex; flex-direction: column; box-sizing: border-box; }
+main > div { flex: 1; display: flex; flex-direction: column; }
 input, select, button, textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, .link:focus-visible { outline: 2px solid var(--brand-pink); outline-offset: 2px; }
 input[type=checkbox] { accent-color: var(--accent); padding: 0; }
@@ -50,7 +51,7 @@ a:hover, .link:hover { color: var(--link-hover); }
 button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-height: 1; }
 .toolbar > button.launch { min-height: 40px; padding: 0 18px; font-size: 14px; }
 .toolbar > .muted { margin: 0 4px 0 8px; }
-.board { display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
+.board { flex: 1; display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
 .column { flex: 0 0 280px; background: var(--column); border-radius: 16px; padding: 12px; min-height: 200px; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
 .column h3 { margin: 0; padding: 2px 4px 4px; min-height: 28px; display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; }
 .column h3 .side { display: flex; gap: 6px; align-items: center; }
@@ -808,6 +809,14 @@ function openDelete(entry) {
     button("Delete", async () => { await api("/api/backlog/remove", { id: entry.id }); closeModal(); await refresh(true); }, { cls: "danger" })));
 }
 
+byId("main").addEventListener("wheel", (e) => {
+  const board = byId("main").querySelector(".board");
+  if (!board || board.contains(e.target) || modalOpen()) return;
+  const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
+  if (!dx || Math.abs(dx) < Math.abs(e.shiftKey ? 0 : e.deltaY)) return;
+  e.preventDefault();
+  board.scrollLeft += dx;
+}, { passive: false });
 function setView(view) { state.view = view; render(); }
 byId("tab-tasks").addEventListener("click", () => setView("tasks"));
 byId("tab-backlog").addEventListener("click", () => setView("backlog"));
