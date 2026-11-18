@@ -92,7 +92,7 @@ workspaces:
 4. The current route functions in `api.py` receive the runtime in place of the server. They use `server.ctx`, `server.adapter`, `server.capabilities`, `server.jobs`, `server.start_job`, and `server.next_poll`. The runtime gives the same names, so the route bodies stay the same.
 5. A lock protects the runtimes map. Readers (routes, poll loop) take a copy of the map under the lock and then work on the copy. Writers (add, remove, reload) replace the map under the lock. A runtime removed during a poll finishes its current poll step.
 6. A runtime holds no state. Jobs and `next_poll` stay on the server. A reload builds all runtimes again, so a workspace that broke or was fixed gets its new state.
-7. A runtime keeps the modification time of its `factory.yaml` (None if missing). Before a workspace route runs, the server compares it with the file. If it changed, the server builds that runtime again. `GET /api/workspaces` also reloads when a runtime has an error.
+7. A runtime keeps the modification time of its `factory.yaml` (None if missing). Before a workspace route runs, the server compares it with the file. If it changed, the server builds that runtime again. `GET /api/workspaces` also reloads when a runtime has an error, and it builds each stale runtime again under the lock. The cost is one file check per workspace every 5 seconds.
 
 ### Poll loop
 
