@@ -52,3 +52,26 @@ def test_version_report_states(origin_repo):
     f.mkdir()
     (f / "factory.yaml").write_text(yaml.safe_dump({"version": 2}))
     assert version.report(repo.load_ctx(cwd=origin_repo))["state"] == "same"
+
+
+def test_not_initialized_names_init(origin_repo):
+    ctx = repo.load_ctx(cwd=origin_repo)
+    with pytest.raises(FactoryError) as e:
+        version.require_repo(ctx)
+    assert str(e.value) == "The factory is not initialized in this repository. Run `factory init --library <path>`."
+
+
+def test_old_repo_names_migrate(origin_repo):
+    fdir = origin_repo / ".factory"
+    fdir.mkdir()
+    (fdir / "factory.yaml").write_text(yaml.safe_dump({"version": 1}))
+    with pytest.raises(FactoryError) as e:
+        version.require_repo(repo.load_ctx(cwd=origin_repo))
+    assert str(e.value).endswith("Run `factory migrate`, or run the install script again to update the factory.")
+
+
+def test_old_library_names_migrate(tmp_path):
+    (tmp_path / "factory.yaml").write_text(yaml.safe_dump({"version": 1}))
+    with pytest.raises(FactoryError) as e:
+        version.require_library(tmp_path)
+    assert str(e.value).endswith("Run `factory migrate`, or run the install script again to update the factory.")

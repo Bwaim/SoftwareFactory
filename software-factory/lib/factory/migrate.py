@@ -41,7 +41,7 @@ def plan(ctx):
     lib = ctx.library()
     lv = version.library_version(lib)
     if (rv or 0) > current or (lv or 0) > current:
-        raise FactoryError("The data is newer than this factory. Please update the factory plugin.")
+        raise FactoryError("The data is newer than this factory. Run the install script again to update it.")
     return {
         "current": current,
         "repo": {"from": rv, "migrate": rv is not None and rv < current},

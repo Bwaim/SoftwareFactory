@@ -34,22 +34,39 @@ You need:
 - Claude Code.
 - Optional: `gh` or `glab`, for the forge steps of the catalog.
 
-Install the plugin. In Claude Code, run:
+Install the factory with this command:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Bwaim/SoftwareFactory/main/install.sh | sh
+```
+
+The script downloads the latest release into `~/.local/share/software-factory` and makes sure that its SHA-256 matches the release. It creates the link `~/.local/bin/factory`. If `~/.local/bin` is not in your `PATH`, add it.
+
+To update the factory, run the same command again.
+
+If you used the plugin before, uninstall it in Claude Code:
 
 ```
-/plugin marketplace add <path to the SoftwareFactory folder>
-/plugin install software-factory@software-factory
+/plugin uninstall software-factory@software-factory
 ```
 
-Start the orchestrator:
+Hooks run the installed copy through `~/.local/bin/factory`, and the plugin skill runs its own copy. Two code versions on the same `.factory` data are not supported. Older plugin copies also move the link back to the plugin.
 
-1. Open a Herdr pane in the main repository.
-2. Start `claude`.
-3. Run `/software-factory:software-factory`.
+Start the factory:
+
+1. In the main repository, run `factory init --library <path>`. The library folder holds the generic steps and pipelines.
+2. Run `factory dashboard`. The dashboard launches and manages tasks.
+
+Some actions exist only in the CLI:
+
+- `factory init`: add the factory to a repository.
+- `factory migrate`: migrate the data after an update.
+- `factory catalog install`: install a step or pipeline from the catalog.
+- `factory library commit`: commit changes in the library.
+- `factory pipeline edit`: open the pipeline editor.
+- `factory step edit`: open the step form.
 
 To write pipelines and steps with an agent, call `/factory-authoring` in any Claude session. See "Authoring skill" in the reference.
-
-The first run creates the link `~/.local/bin/factory`. Make sure `~/.local/bin` is in your `PATH`.
 
 ### Bash allowlist
 

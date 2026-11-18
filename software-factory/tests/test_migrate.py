@@ -76,4 +76,4 @@ def test_newer_refused(v2):
     (inited.fdir / "factory.yaml").write_text(yaml.safe_dump({**data, "version": 3}))
     assert inited.factory.json("version", "check", env=env)["state"] == "newer"
     r = inited.factory("migrate", env=env, check=False)
-    assert r.returncode == 1 and "update the factory" in r.stderr
+    assert r.returncode == 1 and "Run the install script again to update it." in r.stderr

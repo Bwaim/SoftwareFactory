@@ -30,8 +30,11 @@ def ensure_link():
     link = d / "factory"
     target = cli_path()
     changed = False
-    if link.is_symlink():
-        if Path(os.path.realpath(link)) != target:
+    current = Path(os.path.realpath(link))
+    if link.is_symlink() and (current.parent.parent / ".installed-by-script").exists():
+        target = current
+    elif link.is_symlink():
+        if current != target:
             link.unlink()
             changed = True
     elif link.exists():

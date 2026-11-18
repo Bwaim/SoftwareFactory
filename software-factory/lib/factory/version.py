@@ -24,12 +24,12 @@ def library_version(lib):
 
 def require_repo(ctx):
     if not ctx.initialized():
-        raise FactoryError("The factory is not initialized in this repository. Run Init from the orchestrator.")
+        raise FactoryError("The factory is not initialized in this repository. Run `factory init --library <path>`.")
     v = repo_version(ctx)
     if v != DATA_VERSION:
         raise FactoryError(
             f"The repository data version is {v}, and this factory uses version {DATA_VERSION}. "
-            "Start the orchestrator to migrate, or update the factory."
+            "Run `factory migrate`, or run the install script again to update the factory."
         )
 
 
@@ -38,7 +38,7 @@ def require_library(lib):
     if v is not None and v != DATA_VERSION:
         raise FactoryError(
             f"The library data version is {v}, and this factory uses version {DATA_VERSION}. "
-            "Start the orchestrator to migrate, or update the factory."
+            "Run `factory migrate`, or run the install script again to update the factory."
         )
 
 
