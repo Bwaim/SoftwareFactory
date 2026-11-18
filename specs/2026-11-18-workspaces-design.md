@@ -104,7 +104,7 @@ workspaces:
    - `POST /api/shutdown`
    - `GET /api/jobs/<id>`
    - `GET /api/workspaces`: the list with `id`, `name`, `path`, `needs_you`, and `error`.
-   - `POST /api/workspaces/add` with `{path, init, library}`. `init` (default false) and `library` (default empty) are optional. It returns the new workspace. Without a factory and without `init: true`, it returns HTTP 400 with `{error, code: "no_factory", main}`. If init fails, it returns HTTP 400 with `{error, checks}`, where `checks` is the list of failed checks.
+   - `POST /api/workspaces/add` with `{path, init, library}`. `init` (default false) and `library` (default empty) are optional. It returns the new workspace. Without a factory and without `init: true`, it returns HTTP 400 with `{error, code: "no_factory", main}`. If init fails, it returns HTTP 400 with `{error, checks}`, where `checks` is the list of failed checks. If init fails for another reason (for example a missing library folder), `checks` is an empty list and the dashboard shows only `error`.
    - `POST /api/workspaces/<id>/rename` with `{name}`.
    - `POST /api/workspaces/<id>/delete`.
    - `POST /api/workspaces/pick-folder`: runs `osascript -e 'POSIX path of (choose folder)'` and returns `{path}`. If the user cancels, it returns `{path: null}`. On other platforms it returns an error.
@@ -190,7 +190,7 @@ These CLI changes are part of the same work.
 - Python standard library and `pyyaml` only, as today.
 - The server listens only on `127.0.0.1`. The token, Host, and Origin checks stay.
 - No browser `alert`, `confirm`, or `prompt`.
-- Tests use `FACTORY_HOME` in a temporary folder. They never write to the real `~/.config`.
+- Tests use `FACTORY_HOME` in a temporary folder. They never write to the real `~/.config`. Add `FACTORY_HOME` to the CLI env dict in `tests/conftest.py` (next to `FACTORY_LINK_DIR` and `FACTORY_TERMINAL`). In-process tests that call `workspaces.py` or the server set the same override.
 
 ## Left to the builder
 
