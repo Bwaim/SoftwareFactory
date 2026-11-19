@@ -3,7 +3,7 @@ import re
 
 from ..errors import FactoryError
 
-OPTIONAL = ("send_prompt", "focus", "state", "wait_idle", "notify", "rename", "focused", "read_screen", "type_input", "attach")
+OPTIONAL = ("send_prompt", "focus", "state", "wait_idle", "notify", "rename", "focused", "attach")
 HERDR_NAME_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 HERDR_NAME_MAX = 32
 HASH_CHARS = 4
@@ -55,15 +55,6 @@ class Adapter:
 
     def focus(self, handle):
         self.unsupported("focus")
-
-    def read_screen(self, handle, lines):
-        self.unsupported("read-screen")
-
-    def send_text(self, handle, text):
-        self.unsupported("type-input")
-
-    def send_keys(self, handle, keys):
-        self.unsupported("type-input")
 
     def attach_command(self, handle):
         self.unsupported("attach")

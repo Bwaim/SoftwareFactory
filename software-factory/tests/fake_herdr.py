@@ -107,7 +107,7 @@ elif args[:2] == ["agent", "get"]:
     if not tab_id:
         pane_id = started[-1][started[-1].index("--pane") + 1] if started else "w9:p1"
         tab_id = pane_id.replace(":p", ":t")
-    print(json.dumps({"result": {"agent": {"name": name, "agent_status": "idle", "tab_id": tab_id, "workspace_id": tab_id.split(":")[0], "pane_id": tab_id.replace(":t", ":p"), "focused": os.environ.get("FAKE_HERDR_FOCUSED") == "1"}}}))
+    print(json.dumps({"result": {"agent": {"name": name, "agent_status": "idle", "tab_id": tab_id, "workspace_id": tab_id.split(":")[0], "focused": os.environ.get("FAKE_HERDR_FOCUSED") == "1"}}}))
 else:
     if args[:2] == ["workspace", "close"]:
         with open(closed_log, "a") as f:

@@ -279,40 +279,6 @@ def test_existing_main_workspace_is_never_closed(herdr_env, origin_repo, monkeyp
     assert "w5" not in recorded(origin_repo)
 
 
-def test_herdr_read_screen_reads_recent_lines_with_colors(herdr_env, monkeypatch):
-    adapter, calls = herdr_env
-    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
-    monkeypatch.setenv("FAKE_HERDR_SCREEN", "Working on it")
-    assert {"read_screen", "type_input"} <= adapter.capabilities()
-    assert adapter.read_screen({"agent": "t1", "tab": "w9:t1"}, 120).strip() == "Working on it"
-    assert ["agent", "read", "t1", "--source", "recent-unwrapped", "--lines", "120", "--format", "ansi"] in calls()
-
-
-def test_herdr_send_text_types_in_the_agent_pane(herdr_env, monkeypatch):
-    adapter, calls = herdr_env
-    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
-    adapter.send_text({"agent": "t1", "tab": "w9:t1"}, "yes")
-    assert ["pane", "send-text", "w9:p1", "yes"] in calls()
-
-
-def test_herdr_send_keys_presses_keys_on_the_agent(herdr_env, monkeypatch):
-    adapter, calls = herdr_env
-    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
-    adapter.send_keys({"agent": "t1", "tab": "w9:t1"}, ["down", "enter"])
-    assert ["agent", "send-keys", "t1", "down", "enter"] in calls()
-
-
-def test_herdr_typing_refused_when_agent_in_other_tab(herdr_env, monkeypatch):
-    adapter, calls = herdr_env
-    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
-    monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w3:t4")
-    with pytest.raises(AdapterError, match="does not belong"):
-        adapter.send_text({"agent": "t1", "tab": "w9:t1"}, "yes")
-    with pytest.raises(AdapterError, match="does not belong"):
-        adapter.send_keys({"agent": "t1", "tab": "w9:t1"}, ["enter"])
-    assert not any(c[:2] in (["pane", "send-text"], ["agent", "send-keys"]) for c in calls())
-
-
 def test_herdr_attach_command_attaches_to_the_agent(herdr_env, monkeypatch):
     adapter, _ = herdr_env
     monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")

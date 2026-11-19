@@ -269,18 +269,6 @@ class HerdrAdapter(Adapter):
         self.require_owned(handle)
         run(["agent", "focus", handle["agent"]])
 
-    def read_screen(self, handle, lines):
-        self.require_owned(handle)
-        return run(["agent", "read", handle["agent"], "--source", "recent-unwrapped", "--lines", str(lines), "--format", "ansi"]).stdout
-
-    def send_text(self, handle, text):
-        agent = self.require_owned(handle)
-        run(["pane", "send-text", agent["pane_id"], text])
-
-    def send_keys(self, handle, keys):
-        self.require_owned(handle)
-        run(["agent", "send-keys", handle["agent"], *keys])
-
     def attach_command(self, handle):
         self.require_owned(handle)
         return ["herdr", "agent", "attach", handle["agent"]]

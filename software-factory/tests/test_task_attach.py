@@ -148,7 +148,7 @@ def test_too_many_terminals_are_refused(registry, monkeypatch):
 
 
 def test_open_terminal_needs_a_live_session_and_the_capability(ctx, inited, clean_registry):
-    fake_config(inited.fdir, capabilities=["read_screen"])
+    fake_config(inited.fdir, capabilities=["focus"])
     make_task(ctx, tid="t1")
     make_task(ctx, tid="t2", terminal_handle=LIVE)
     with pytest.raises(FactoryError, match="no live session"):
@@ -211,5 +211,16 @@ def test_server_serves_the_vendored_terminal_files(inited):
 
 
 def test_dashboard_page_has_the_live_terminal():
-    for text in ('id="live-host"', "/static/xterm.js", "/attach/stream`", "/attach/input`", "/attach/resize`", 'data-mode="live"', "LIVE_KEYS", "factory.terminalMode"):
+    for text in ('id="live-host"', "/static/xterm.js", "/attach/stream`", "/attach/input`", "/attach/resize`", "LIVE_KEYS", 'data-key="ctrl+c"'):
         assert text in PAGE
+
+
+def test_dashboard_page_has_the_terminal_tab_and_resize_handles():
+    for text in ('id="term-tab"', 'aria-controls="detail-term"', 'id="resize-detail"', 'id="resize-term"', 'role="separator"', "factory.detailWidth", "factory.terminalWidth", "--detail-w", "--term-w"):
+        assert text in PAGE
+    assert "term-toggle" not in PAGE
+
+
+def test_dashboard_page_has_no_snapshot_mode():
+    for text in ("/screen`", "/type`", "Snapshot", "ansiNodes", "term-text", 'data-mode="live"', "factory.terminalMode"):
+        assert text not in PAGE

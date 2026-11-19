@@ -189,20 +189,12 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
 #detail-term .tstatus { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 #detail-term .tstatus i { width: 8px; height: 8px; border-radius: 50%; background: var(--paused-dot); display: block; }
 #detail-term .tstatus.live i { background: var(--active-dot); }
-#detail-term .screen { flex: 1; min-height: 0; margin: 0 16px; overflow: auto; background: #0E0908; color: #E6DFDC; border: 1px solid #2E2322; border-radius: 8px; padding: 10px 12px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-#detail-term .screen .reason { color: #B3A8A4; font-family: var(--font); }
 #live-host { flex: 1; min-height: 0; margin: 0 16px; background: #0E0908; border: 1px solid #2E2322; border-radius: 8px; padding: 6px 4px 6px 8px; overflow: hidden; }
 #live-host .xterm, #live-host .xterm-viewport { background-color: #0E0908 !important; }
-#detail-term .tmode { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 16px; }
-#detail-term .tmode button { min-height: 26px; font-size: 12px; padding: 0 10px; border: 0; border-radius: 14px; background: transparent; }
-#detail-term .tmode button[aria-pressed="true"] { background: var(--accent); color: #FFFFFF; }
 #detail-term .reconnect { min-height: 28px; font-size: 12px; padding: 0 10px; }
 #detail-term .tinput { padding: 10px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
 #detail-term .keys { display: flex; gap: 4px; flex-wrap: wrap; }
 #detail-term .keys button { min-height: 28px; min-width: 32px; font-size: 12px; padding: 0 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-#detail-term .typeline { display: flex; gap: 6px; }
-#detail-term .typeline input { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-#detail-term .hint { font-size: 11px; color: var(--muted); }
 #detail .dhead { display: flex; gap: 8px; align-items: flex-start; }
 #detail .dhead .names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 #detail .dhead .ticket { font-size: 13px; font-weight: 700; }
@@ -317,16 +309,11 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
         <div class="resizer" id="resize-term" role="separator" aria-orientation="vertical" aria-label="Resize the terminal" tabindex="0"></div>
         <div class="thead">
           <h3>Terminal</h3>
-          <div class="tmode" role="group" aria-label="Terminal mode">
-            <button type="button" data-mode="live" aria-pressed="false" title="A real terminal attached to the session">Live</button>
-            <button type="button" data-mode="snapshot" aria-pressed="false" title="A copy of the screen, read every second">Snapshot</button>
-          </div>
           <span class="tstatus" aria-live="polite"><i aria-hidden="true"></i><span class="tstatus-text">Loading…</span></span>
           <button type="button" class="reconnect" id="term-reconnect" hidden>Reconnect</button>
           <button type="button" class="close" id="term-close" aria-label="Close terminal" title="Close terminal">✕</button>
         </div>
-        <pre class="screen" tabindex="0" aria-label="Last lines of the session"></pre>
-        <div id="live-host" hidden aria-label="Live terminal of the session"></div>
+        <div id="live-host" aria-label="Live terminal of the session"></div>
         <div class="tinput">
           <div class="keys" role="group" aria-label="Keys to press">
             <button type="button" data-key="esc" aria-label="Press Escape">Esc</button>
@@ -340,12 +327,6 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
             <button type="button" data-key="enter" aria-label="Press Enter">Enter</button>
             <button type="button" data-key="ctrl+c" class="danger" aria-label="Press Control C">Ctrl+C</button>
           </div>
-          <form class="typeline" data-snapshot-only="1">
-            <label class="visually-hidden" for="term-text">Text to type in the session</label>
-            <input id="term-text" type="text" autocomplete="off" spellcheck="false" placeholder="Type for the session">
-            <button type="submit" class="primary">Send</button>
-          </form>
-          <div class="hint" data-snapshot-only="1">Enter sends the text, then Enter. With an empty field, ↑ and ↓ move in menus.</div>
         </div>
       </div>
     </aside>
@@ -1186,20 +1167,19 @@ const EVENT_LABELS = {
   config_asked: "Asked for a config value", migrated: "Migrated", approval_requested: "Approval requested",
   exclusive_wait: "Waiting for a shared resource", exclusive_start: "Started with a shared resource",
   exclusive_released: "Released a shared resource", exclusive_forced: "Shared resource released by force",
-  terminal_input: "Typed in the terminal", terminal_input_failed: "Typing in the terminal failed", terminal_attached: "Opened the live terminal",
+  terminal_attached: "Opened the live terminal",
 };
 const EVENT_TONES = {
   step_done: "ok", task_finished: "ok", approved: "ok", task_unblocked: "ok", task_resumed: "ok",
   task_blocked: "bad", done_check_failed: "bad", prompt_failed: "bad", hook_failed: "bad", rename_failed: "bad", loop_limit: "bad", task_cancelled: "bad", attention: "bad",
   waiting_started: "wait", changes_requested: "wait", task_paused: "wait", loop_back: "wait", approval_requested: "wait", exclusive_wait: "wait",
-  exclusive_forced: "bad", terminal_input_failed: "bad",
+  exclusive_forced: "bad",
 };
 const EXTRA_MAX = 300;
 function detailHashId() { return location.hash.startsWith(DETAIL_HASH) ? decodeURIComponent(location.hash.slice(DETAIL_HASH.length)) : null; }
 function openDetail(id) {
   if (state.detail && state.detail.id === id) return;
   state.detail = { id, data: null, key: null };
-  resetScreen();
   history.replaceState(null, "", location.pathname + location.search + DETAIL_HASH + encodeURIComponent(id));
   render();
   loadDetail();
@@ -1346,7 +1326,6 @@ window.addEventListener("hashchange", () => { const id = detailHashId(); if (id)
 setInterval(() => { if (state.detail && !document.hidden) loadDetail(); }, DETAIL_REFRESH_MS);
 
 const TERM_KEY = "factory.terminal";
-const TERM_MODE_KEY = "factory.terminalMode";
 const LIVE_KEYS = { esc: "\x1b", tab: "\t", up: "\x1b[A", down: "\x1b[B", right: "\x1b[C", left: "\x1b[D", backspace: "\x7f", space: " ", enter: "\r", "ctrl+c": "\x03" };
 const LIVE_INPUT_MAX = 8000;
 const LIVE_FIT_DELAY_MS = 150;
@@ -1355,50 +1334,19 @@ const LIVE_THEME = {
   black: "#2E2322", red: "#FF6B6B", green: "#7CC63A", yellow: "#FECD40", blue: "#6CA8FF", magenta: "#D58BFF", cyan: "#4FD1C5", white: "#E6DFDC",
   brightBlack: "#7A6E6A", brightRed: "#FF8A8A", brightGreen: "#A8E07F", brightYellow: "#FFE07A", brightBlue: "#9CC4FF", brightMagenta: "#E5B3FF", brightCyan: "#81E6D9", brightWhite: "#FFFFFF",
 };
-const SCREEN_REFRESH_MS = 1000;
-const SCREEN_AFTER_SEND_MS = 200;
-const TERM_FG = "#E6DFDC";
-const TERM_BG = "#0E0908";
-const ANSI_16 = ["#2E2322", "#FF6B6B", "#7CC63A", "#FECD40", "#6CA8FF", "#D58BFF", "#4FD1C5", "#E6DFDC",
-  "#7A6E6A", "#FF8A8A", "#A8E07F", "#FFE07A", "#9CC4FF", "#E5B3FF", "#81E6D9", "#FFFFFF"];
-const ANSI_SEQUENCE = /\x1b(?:\[([0-9;:?]*)[ -\/]*([@-~])|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])/g;
-state.term = { open: loadTermOpen(), mode: loadTermMode(), tab: "details", text: null, inflight: false, sending: false, canType: false, reason: "" };
+state.term = { open: loadTermOpen(), tab: "details" };
 function loadTermOpen() { try { return localStorage.getItem(TERM_KEY) === "1"; } catch (e) { return false; } }
-function loadTermMode() { try { return localStorage.getItem(TERM_MODE_KEY) || "live"; } catch (e) { return "live"; } }
-function termMode() { return state.term.mode === "live" && can("attach") ? "live" : "snapshot"; }
-function setTermMode(mode) {
-  state.term.mode = mode;
-  try { localStorage.setItem(TERM_MODE_KEY, mode); } catch (e) {}
-  renderTerminalShell();
-  if (termMode() === "snapshot") { resetScreen(); loadScreen(); }
-}
 function setTerminalOpen(open) {
   state.term.open = open;
   state.term.tab = open ? "terminal" : "details";
   try { localStorage.setItem(TERM_KEY, open ? "1" : "0"); } catch (e) {}
   renderDetail();
-  if (open) { resetScreen(); loadScreen(); }
-}
-function resetScreen() {
-  Object.assign(state.term, { text: null, canType: false, reason: "" });
-  const screen = document.querySelector("#detail-term .screen");
-  if (screen) clear(screen);
-  setTermStatus(false, "Loading…");
-  updateTypeControls();
 }
 function renderTerminalShell() {
   const aside = byId("detail");
   const show = !!state.detail && state.term.open;
-  const live = show && termMode() === "live";
-  byId("live-host").hidden = !live;
-  document.querySelector("#detail-term .screen").hidden = live;
-  for (const n of document.querySelectorAll("#detail-term [data-snapshot-only]")) n.hidden = live;
-  for (const b of document.querySelectorAll("#detail-term .tmode button")) {
-    b.setAttribute("aria-pressed", b.dataset.mode === termMode() ? "true" : "false");
-    if (b.dataset.mode === "live") b.disabled = !can("attach");
-  }
-  if (live && state.live.id !== state.detail.id) startLive();
-  if (!live && state.live.id) stopLive();
+  if (show && state.live.id !== state.detail.id) startLive();
+  if (!show && state.live.id) stopLive();
   byId("detail-term").hidden = !show;
   const tab = byId("term-tab");
   tab.setAttribute("aria-expanded", show ? "true" : "false");
@@ -1414,127 +1362,8 @@ function setTermStatus(live, text) {
   status.classList.toggle("live", live);
   status.querySelector(".tstatus-text").textContent = text;
 }
-function ansi256(n) {
-  if (n < 16) return ANSI_16[n];
-  if (n < 232) {
-    const v = n - 16, level = (c) => (c ? 55 + c * 40 : 0);
-    return `rgb(${level(Math.floor(v / 36))}, ${level(Math.floor(v / 6) % 6)}, ${level(v % 6)})`;
-  }
-  const g = 8 + (n - 232) * 10;
-  return `rgb(${g}, ${g}, ${g})`;
-}
-function sgr(style, params) {
-  const next = { ...style };
-  const codes = (params || "0").split(/[;:]/).map((x) => (x === "" ? 0 : Number(x)));
-  for (let i = 0; i < codes.length; i++) {
-    const c = codes[i];
-    if (c === 0) { for (const k of Object.keys(next)) delete next[k]; }
-    else if (c === 1) next.bold = true;
-    else if (c === 2) next.dim = true;
-    else if (c === 3) next.italic = true;
-    else if (c === 4) next.underline = true;
-    else if (c === 7) next.inverse = true;
-    else if (c === 22) { delete next.bold; delete next.dim; }
-    else if (c === 23) delete next.italic;
-    else if (c === 24) delete next.underline;
-    else if (c === 27) delete next.inverse;
-    else if (c >= 30 && c <= 37) next.fg = ANSI_16[c - 30];
-    else if (c >= 90 && c <= 97) next.fg = ANSI_16[c - 82];
-    else if (c >= 40 && c <= 47) next.bg = ANSI_16[c - 40];
-    else if (c >= 100 && c <= 107) next.bg = ANSI_16[c - 92];
-    else if (c === 39) delete next.fg;
-    else if (c === 49) delete next.bg;
-    else if ((c === 38 || c === 48) && codes[i + 1] === 5) { next[c === 38 ? "fg" : "bg"] = ansi256(codes[i + 2] || 0); i += 2; }
-    else if ((c === 38 || c === 48) && codes[i + 1] === 2) { next[c === 38 ? "fg" : "bg"] = `rgb(${codes[i + 2] || 0}, ${codes[i + 3] || 0}, ${codes[i + 4] || 0})`; i += 4; }
-  }
-  return next;
-}
-function styledSpan(style, text) {
-  const span = document.createElement("span");
-  span.textContent = text;
-  const fg = style.inverse ? style.bg || TERM_BG : style.fg;
-  const bg = style.inverse ? style.fg || TERM_FG : style.bg;
-  if (fg) span.style.color = fg;
-  if (bg) span.style.backgroundColor = bg;
-  if (style.bold) span.style.fontWeight = "700";
-  if (style.dim) span.style.opacity = "0.7";
-  if (style.italic) span.style.fontStyle = "italic";
-  if (style.underline) span.style.textDecoration = "underline";
-  return span;
-}
-/** ANSI text to colored spans. Only colors and text styles are kept; cursor moves and other control sequences are dropped. */
-function ansiNodes(text) {
-  const frag = document.createDocumentFragment();
-  const clean = text.replace(/\r/g, "").replace(/\s+$/, "");
-  let style = {}, last = 0, m;
-  ANSI_SEQUENCE.lastIndex = 0;
-  while ((m = ANSI_SEQUENCE.exec(clean))) {
-    if (m.index > last) frag.append(styledSpan(style, clean.slice(last, m.index)));
-    last = ANSI_SEQUENCE.lastIndex;
-    if (m[2] === "m") style = sgr(style, m[1]);
-  }
-  if (last < clean.length) frag.append(styledSpan(style, clean.slice(last)));
-  return frag;
-}
-async function loadScreen() {
-  const d = state.detail, t = state.term;
-  if (!d || !t.open || t.inflight || termMode() === "live") return;
-  t.inflight = true;
-  let res;
-  try { res = await api(`/api/tasks/${d.id}/screen`, undefined, true, true); } catch (e) { t.inflight = false; return; }
-  t.inflight = false;
-  if (state.detail !== d || !t.open) return;
-  const screen = document.querySelector("#detail-term .screen");
-  t.canType = !!(res.available && res.can_type);
-  t.reason = res.available ? (res.can_type ? "" : "This terminal adapter cannot type in the session.") : res.reason;
-  if (res.available) {
-    setTermStatus(true, `Read at ${new Date().toLocaleTimeString()}`);
-    if (res.text !== t.text) {
-      const atEnd = t.text === null || screen.scrollHeight - screen.scrollTop - screen.clientHeight < 24;
-      const top = screen.scrollTop;
-      t.text = res.text;
-      screen.replaceChildren(res.text.trim() ? ansiNodes(res.text) : "(empty)");
-      screen.scrollTop = atEnd ? screen.scrollHeight : top;
-    }
-  } else {
-    t.text = null;
-    setTermStatus(false, "Not live");
-    screen.replaceChildren(el("span", { class: "reason" }, res.reason));
-  }
-  updateTypeControls();
-}
 function updateTypeControls() {
-  const t = state.term;
-  if (termMode() === "live") {
-    const L = state.live;
-    for (const b of document.querySelectorAll("#detail-term .keys button")) { b.disabled = !L.connected; b.title = ""; }
-    return;
-  }
-  const off = !t.canType || t.sending;
-  for (const b of document.querySelectorAll("#detail-term .tinput button")) {
-    b.disabled = off;
-    b.title = !t.canType && t.reason ? t.reason : "";
-  }
-  const input = byId("term-text");
-  input.disabled = !t.canType;
-  input.placeholder = t.canType ? "Type for the session" : t.reason || "Loading…";
-}
-async function sendInput(text, keys) {
-  const d = state.detail, t = state.term;
-  if (!d || !t.canType || t.sending) return false;
-  t.sending = true;
-  updateTypeControls();
-  try {
-    await api(`/api/tasks/${d.id}/type`, { text, keys });
-    return true;
-  } catch (e) {
-    return false;
-  } finally {
-    t.sending = false;
-    updateTypeControls();
-    setTimeout(loadScreen, SCREEN_AFTER_SEND_MS);
-    loadDetail();
-  }
+  for (const b of document.querySelectorAll("#detail-term .keys button")) b.disabled = !state.live.connected;
 }
 
 state.live = { id: null, term: null, fit: null, abort: null, observer: null, queue: "", sending: false, connected: false, size: "", fitTimer: null };
@@ -1711,28 +1540,12 @@ byId("term-tab").addEventListener("click", () => setTerminalOpen(!state.term.ope
 restorePaneWidths();
 byId("term-close").addEventListener("click", () => setTerminalOpen(false));
 byId("tab-details").addEventListener("click", () => { state.term.tab = "details"; renderTerminalShell(); });
-byId("tab-terminal").addEventListener("click", () => { state.term.tab = "terminal"; renderTerminalShell(); loadScreen(); });
+byId("tab-terminal").addEventListener("click", () => { state.term.tab = "terminal"; renderTerminalShell(); });
 for (const b of document.querySelectorAll("#detail-term .keys button")) b.addEventListener("click", () => {
-  if (termMode() === "live") { queueLive(LIVE_KEYS[b.dataset.key]); if (state.live.term) state.live.term.focus(); }
-  else sendInput("", [b.dataset.key]);
+  queueLive(LIVE_KEYS[b.dataset.key]);
+  if (state.live.term) state.live.term.focus();
 });
-for (const b of document.querySelectorAll("#detail-term .tmode button")) b.addEventListener("click", () => setTermMode(b.dataset.mode));
 byId("term-reconnect").addEventListener("click", () => { stopLive(); renderTerminalShell(); });
-document.querySelector("#detail-term .typeline").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const input = byId("term-text");
-  if (await sendInput(input.value, ["enter"])) input.value = "";
-  input.focus();
-});
-byId("term-text").addEventListener("keydown", (e) => {
-  const input = e.target;
-  if (e.key === "Escape") { e.preventDefault(); input.blur(); return; }
-  if (!input.value && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
-    e.preventDefault();
-    sendInput("", [e.key === "ArrowUp" ? "up" : "down"]);
-  }
-});
-setInterval(() => { if (!document.hidden) loadScreen(); }, SCREEN_REFRESH_MS);
 function setView(view) { state.view = view; render(); }
 byId("tab-tasks").addEventListener("click", () => setView("tasks"));
 byId("tab-backlog").addEventListener("click", () => setView("backlog"));

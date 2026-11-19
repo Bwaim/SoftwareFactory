@@ -60,29 +60,11 @@ class FakeAdapter(Adapter):
         self.require("focus")
         self.record("focus", handle=handle)
 
-    def read_screen(self, handle, lines):
-        self.require("read_screen")
-        cfg = self.cfg()
-        if cfg.get("read_screen_fails"):
-            raise AdapterError("The fake adapter failed to read the screen.")
-        return cfg.get("screen", "")
-
-    def send_text(self, handle, text):
-        self.require("type_input")
-        if self.cfg().get("type_fails"):
-            raise AdapterError("The fake adapter failed to type.")
-        self.record("send_text", handle=handle, text=text)
-
     def attach_command(self, handle):
         self.require("attach")
         self.record("attach_command", handle=handle)
         return list(self.cfg().get("attach_command", ["cat"]))
 
-    def send_keys(self, handle, keys):
-        self.require("type_input")
-        if self.cfg().get("type_fails"):
-            raise AdapterError("The fake adapter failed to type.")
-        self.record("send_keys", handle=handle, keys=list(keys))
 
     def rename(self, handle, name):
         self.require("rename")
