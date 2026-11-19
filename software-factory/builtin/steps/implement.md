@@ -9,7 +9,6 @@ config:
     description: What to implement. With `none`, the step asks the user.
     default: none
 required: false
-column: Implementation
 ---
 
 Request: {{config.request}}
