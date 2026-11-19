@@ -13,12 +13,13 @@ def test_poll_loop_applies_pending_renames(inited, monkeypatch, capsys):
     sleeps = []
     applied = []
 
-    def fake_sleep(seconds):
+    def fake_wait(seconds):
         sleeps.append(seconds)
         if len(sleeps) == 2:
             raise StopLoop
+        return False
 
-    monkeypatch.setattr(server.time, "sleep", fake_sleep)
+    monkeypatch.setattr(srv.wake, "wait", fake_wait)
     monkeypatch.setattr("factory.engine.poll", lambda c: None)
     monkeypatch.setattr(rename, "apply_all_pending", lambda c: applied.append(c))
     try:
