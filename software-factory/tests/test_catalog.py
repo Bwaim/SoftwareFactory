@@ -15,7 +15,7 @@ def test_list_and_install_pipeline_with_missing_steps(inited):
     items = by_id(inited.factory.json("catalog", "list"))
     assert items["quick-task"]["status"] == "not installed"
     dry = inited.factory.json("catalog", "install", "quick-task", "--local", "--dry-run")
-    assert sorted(dry["missing_steps"]) == ["commit", "implement"]
+    assert dry["missing_steps"] == ["commit"]
     inited.factory("catalog", "install", "quick-task", "--local", "--with-steps")
     assert (inited.fdir / "pipelines" / "quick-task.yaml").exists()
     assert (inited.fdir / "steps" / "commit.md").exists()
@@ -66,7 +66,7 @@ def test_catalog_is_generic():
 
 def test_catalog_steps_parse_with_registry():
     paths = sorted((SF / "catalog" / "steps").glob("*.md"))
-    assert len(paths) == 13
+    assert len(paths) == 12
     for path in paths:
         manifest, body = parse_step_text(path.read_text(), path)
         assert manifest["id"] == path.stem
@@ -99,7 +99,7 @@ def test_catalog_steps_are_version_2():
 def test_catalog_prompts_use_placeholders():
     expected = {"brainstorm": ["{{description}}", "{{summary}}"], "write-plan": ["{{spec}}", "{{config.plan_style}}"],
                 "execute-plan": ["{{plan}}"], "create-pr": ["{{branch}}", "{{config.forge}}"],
-                "implement": ["{{description}}", "{{summary}}"], "address-review-comments": ["{{mr_url}}"],
+                "address-review-comments": ["{{mr_url}}"],
                 "wait-review": ["{{mr_url}}"]}
     for sid, needles in expected.items():
         text = (SF / "catalog" / "steps" / f"{sid}.md").read_text()

@@ -2,7 +2,7 @@ from conftest import SF
 from factory import step_format
 from factory.registry import parse_step_text
 
-BUILTINS = ["create-task", "create-worktree", "delete-task", "backlog-add", "backlog-remove", "migrate", "user-validation"]
+BUILTINS = ["create-task", "create-worktree", "delete-task", "backlog-add", "backlog-remove", "migrate", "user-validation", "implement"]
 
 
 def test_builtin_steps_are_version_2():
