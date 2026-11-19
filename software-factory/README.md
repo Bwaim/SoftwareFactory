@@ -391,7 +391,7 @@ Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
 #### Task details
 
 Two columns sit on the right of the board: **Details**, then **Terminal**. Each column has a vertical tab on its left edge. A tab opens or closes only its own column; a closed column shows only its tab. The browser remembers which columns are open.
-The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns.
+The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns. When the narrower board would hide the card's column, the board scrolls sideways just enough to show it.
 By default, the two open columns together cover about a third of the page; one open column alone also covers about a third. A width you drag stays.
 Click a column's tab, or press Escape outside the terminal for the details, to close it; the task stays selected.
 Below 900 px, an open column fills the page.

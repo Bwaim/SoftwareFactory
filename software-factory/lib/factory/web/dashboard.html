@@ -366,6 +366,7 @@ const REFRESH_MS = 5000;
 const DETAIL_REFRESH_MS = 3000;
 const DETAIL_HASH = "#task=";
 const DETAILS_KEY = "factory.details";
+const REVEAL_MARGIN = 16;
 const SELECTED_PREFIX = "factory.selectedTask.";
 const JOB_POLL_MS = 1000;
 const HIDDEN_PREFIX = "factory.hiddenColumns.";
@@ -1233,6 +1234,19 @@ function selectTask(id) {
   saveFlag(DETAILS_KEY, true);
   saveFlag(TERM_KEY, true);
   render();
+  revealTaskColumn(id);
+}
+/** Opening the right columns narrows the board, which can push the selected task's column out of view; scroll the board just enough to show it again. */
+function revealTaskColumn(id) {
+  const board = byId("main").querySelector(".board");
+  const card = board && board.querySelector(`.card[data-task="${CSS.escape(id)}"]`);
+  if (!card) return;
+  const column = card.closest(".column") || card;
+  const view = board.getBoundingClientRect(), box = column.getBoundingClientRect();
+  let shift = 0;
+  if (box.left < view.left) shift = box.left - view.left - REVEAL_MARGIN;
+  else if (box.right > view.right) shift = Math.min(box.right - view.right + REVEAL_MARGIN, box.left - view.left - REVEAL_MARGIN);
+  if (shift) board.scrollLeft += shift;
 }
 function setPanelOpen(which, open) {
   if (which === "details") { state.panel.details = open; saveFlag(DETAILS_KEY, open); }

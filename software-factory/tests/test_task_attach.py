@@ -277,3 +277,7 @@ def test_column_titles_share_one_style():
 def test_workspace_column_is_resizable_with_the_same_default():
     for text in ('id="resize-ws"', 'aria-label="Resize the workspaces"', '"factory.workspacesWidth"', "var(--ws-w, 220px)", 'side: "left"', "function grownBy"):
         assert text in PAGE
+
+
+def test_selecting_a_task_keeps_its_board_column_in_view():
+    assert "function revealTaskColumn" in PAGE and "revealTaskColumn(id);" in PAGE and "REVEAL_MARGIN" in PAGE
