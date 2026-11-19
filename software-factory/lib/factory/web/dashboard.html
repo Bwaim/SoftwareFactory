@@ -46,7 +46,7 @@ header nav { display: flex; gap: 6px; }
 .brand .wordmark em { font-style: normal; color: var(--brand-pink); }
 .brand .tagline { font-size: 11px; color: var(--muted-strong); letter-spacing: .02em; }
 #updated { color: var(--muted-strong); }
-.workspace { flex: 1; display: flex; min-height: 0; }
+.workspace { flex: 1; display: flex; min-height: 0; min-width: 0; }
 .layout { flex: 1; display: flex; min-height: 0; }
 #sidebar { flex: 0 0 220px; width: 220px; box-sizing: border-box; background: var(--column); border-right: 1px solid var(--panel-line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
 #sidebar .side-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 8px; }
@@ -168,7 +168,24 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .card .name-link { font: inherit; font-weight: 700; color: var(--fg); background: none; border: 0; padding: 0; min-height: 0; border-radius: 4px; text-align: left; }
 .card .name-link:hover { background: none; text-decoration: underline; }
 .card.task { cursor: pointer; }
-#detail { flex: 0 0 480px; max-width: 480px; box-sizing: border-box; position: sticky; top: 0; height: 100vh; overflow: auto; background: var(--column); border-left: 1px solid var(--panel-line); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+#detail { flex: 0 0 auto; display: flex; box-sizing: border-box; position: sticky; top: 0; height: 100vh; background: var(--column); border-left: 1px solid var(--panel-line); }
+#detail-main { width: 480px; box-sizing: border-box; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+#detail-tabs { display: none; }
+#detail .term-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
+#detail-term { width: clamp(420px, 42vw, 760px); box-sizing: border-box; display: flex; flex-direction: column; border-left: 1px solid var(--panel-line); background: var(--column); min-height: 0; }
+#detail-term .thead { display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px; }
+#detail-term .thead h3 { margin: 0; flex: 1; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-strong); }
+#detail-term .tstatus { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+#detail-term .tstatus i { width: 8px; height: 8px; border-radius: 50%; background: var(--paused-dot); display: block; }
+#detail-term .tstatus.live i { background: var(--active-dot); }
+#detail-term .screen { flex: 1; min-height: 0; margin: 0 16px; overflow: auto; background: #0E0908; color: #E6DFDC; border: 1px solid #2E2322; border-radius: 8px; padding: 10px 12px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+#detail-term .screen .reason { color: #B3A8A4; font-family: var(--font); }
+#detail-term .tinput { padding: 10px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+#detail-term .keys { display: flex; gap: 4px; flex-wrap: wrap; }
+#detail-term .keys button { min-height: 28px; min-width: 32px; font-size: 12px; padding: 0 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+#detail-term .typeline { display: flex; gap: 6px; }
+#detail-term .typeline input { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+#detail-term .hint { font-size: 11px; color: var(--muted); }
 #detail .dhead { display: flex; gap: 8px; align-items: flex-start; }
 #detail .dhead .names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 #detail .dhead .ticket { font-size: 13px; font-weight: 700; }
@@ -208,8 +225,16 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .facts code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .facts details summary { cursor: pointer; color: var(--link); font-weight: 600; }
 .facts details pre { margin: 6px 0 0; font-size: 12px; }
+@media (max-width: 1400px) {
+  #detail[data-term="1"] { flex-direction: column; width: 560px; }
+  #detail[data-term="1"] #detail-tabs { display: flex; gap: 6px; padding: 12px 20px 0; }
+  #detail[data-term="1"] #detail-main, #detail[data-term="1"] #detail-term { width: auto; flex: 1; min-height: 0; border-left: 0; }
+  #detail[data-term="1"][data-tab="terminal"] #detail-main, #detail[data-term="1"][data-tab="details"] #detail-term { display: none; }
+  #detail-tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
+}
 @media (max-width: 900px) {
-  #detail { position: fixed; inset: 0; z-index: 15; max-width: none; height: auto; border-left: 0; }
+  #detail, #detail[data-term="1"] { position: fixed; inset: 0; z-index: 15; width: auto; height: auto; border-left: 0; }
+  #detail-main { width: auto; flex: 1; }
 }
 @media (max-width: 600px) {
   header, main { padding-left: 16px; padding-right: 16px; }
@@ -260,7 +285,41 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
   <aside id="sidebar"></aside>
   <div class="workspace">
     <main id="main"></main>
-    <aside id="detail" hidden aria-label="Task details"></aside>
+    <aside id="detail" hidden aria-label="Task details">
+      <div id="detail-tabs" role="tablist" aria-label="Panel view">
+        <button type="button" role="tab" id="tab-details" aria-selected="true">Details</button>
+        <button type="button" role="tab" id="tab-terminal" aria-selected="false">Terminal</button>
+      </div>
+      <div id="detail-main"></div>
+      <div id="detail-term" hidden aria-label="Task terminal">
+        <div class="thead">
+          <h3>Terminal</h3>
+          <span class="tstatus" aria-live="polite"><i aria-hidden="true"></i><span class="tstatus-text">Loading…</span></span>
+          <button type="button" class="close" id="term-close" aria-label="Close terminal" title="Close terminal">✕</button>
+        </div>
+        <pre class="screen" tabindex="0" aria-label="Last lines of the session"></pre>
+        <div class="tinput">
+          <div class="keys" role="group" aria-label="Keys to press">
+            <button type="button" data-key="esc" aria-label="Press Escape">Esc</button>
+            <button type="button" data-key="tab" aria-label="Press Tab">Tab</button>
+            <button type="button" data-key="up" aria-label="Press up arrow">↑</button>
+            <button type="button" data-key="down" aria-label="Press down arrow">↓</button>
+            <button type="button" data-key="left" aria-label="Press left arrow">←</button>
+            <button type="button" data-key="right" aria-label="Press right arrow">→</button>
+            <button type="button" data-key="backspace" aria-label="Press Backspace">⌫</button>
+            <button type="button" data-key="space" aria-label="Press Space">Space</button>
+            <button type="button" data-key="enter" aria-label="Press Enter">Enter</button>
+            <button type="button" data-key="ctrl+c" class="danger" aria-label="Press Control C">Ctrl+C</button>
+          </div>
+          <form class="typeline">
+            <label class="visually-hidden" for="term-text">Text to type in the session</label>
+            <input id="term-text" type="text" autocomplete="off" spellcheck="false" placeholder="Type for the session">
+            <button type="submit" class="primary">Send</button>
+          </form>
+          <div class="hint">Enter sends the text, then Enter. With an empty field, ↑ and ↓ move in menus.</div>
+        </div>
+      </div>
+    </aside>
   </div>
 </div>
 <div id="modal" hidden></div>
@@ -1098,18 +1157,20 @@ const EVENT_LABELS = {
   config_asked: "Asked for a config value", migrated: "Migrated", approval_requested: "Approval requested",
   exclusive_wait: "Waiting for a shared resource", exclusive_start: "Started with a shared resource",
   exclusive_released: "Released a shared resource", exclusive_forced: "Shared resource released by force",
+  terminal_input: "Typed in the terminal", terminal_input_failed: "Typing in the terminal failed",
 };
 const EVENT_TONES = {
   step_done: "ok", task_finished: "ok", approved: "ok", task_unblocked: "ok", task_resumed: "ok",
   task_blocked: "bad", done_check_failed: "bad", prompt_failed: "bad", hook_failed: "bad", rename_failed: "bad", loop_limit: "bad", task_cancelled: "bad", attention: "bad",
   waiting_started: "wait", changes_requested: "wait", task_paused: "wait", loop_back: "wait", approval_requested: "wait", exclusive_wait: "wait",
-  exclusive_forced: "bad",
+  exclusive_forced: "bad", terminal_input_failed: "bad",
 };
 const EXTRA_MAX = 300;
 function detailHashId() { return location.hash.startsWith(DETAIL_HASH) ? decodeURIComponent(location.hash.slice(DETAIL_HASH.length)) : null; }
 function openDetail(id) {
   if (state.detail && state.detail.id === id) return;
   state.detail = { id, data: null, key: null };
+  resetScreen();
   history.replaceState(null, "", location.pathname + location.search + DETAIL_HASH + encodeURIComponent(id));
   render();
   loadDetail();
@@ -1207,22 +1268,33 @@ function infoSection(d) {
   }
   return box;
 }
-function renderDetail() {
+/** #detail is sticky and starts under the header, so a fixed 100vh would push its bottom, with the typing field, off screen. */
+function fitPanel() {
   const aside = byId("detail");
+  if (aside.hidden || getComputedStyle(aside).position !== "sticky") { aside.style.height = ""; return; }
+  aside.style.height = `${window.innerHeight - Math.max(0, aside.getBoundingClientRect().top)}px`;
+}
+window.addEventListener("scroll", () => requestAnimationFrame(fitPanel), { passive: true });
+window.addEventListener("resize", () => requestAnimationFrame(fitPanel));
+function renderDetail() {
   const d = state.detail;
-  aside.hidden = !d;
+  byId("detail").hidden = !d;
+  fitPanel();
+  renderTerminalShell();
+  const aside = byId("detail-main");
   if (!d) { clear(aside); return; }
   const scroll = aside.scrollTop;
   const openValues = new Set([...aside.querySelectorAll(".facts details[open] summary")].map((n) => n.textContent));
   const row = (d.data && d.data.row) || state.tasks.find((x) => x.id === d.id);
   const close = el("button", { type: "button", class: "close", "aria-label": "Close details", title: "Close (Esc)", onclick: closeDetail }, "✕");
+  const termToggle = el("button", { type: "button", class: "term-toggle", "aria-pressed": state.term.open ? "true" : "false", onclick: () => setTerminalOpen(!state.term.open) }, "Terminal");
   const names = el("div", { class: "names" });
   if (row) {
     const ticket = ticketNode(row);
     if (ticket) names.append(el("span", { class: "ticket" }, ticket));
     names.append(el("h2", {}, row.display_name), row.display_name !== row.id ? el("span", { class: "muted" }, row.id) : "");
   } else names.append(el("h2", {}, d.id));
-  clear(aside).append(el("div", { class: "dhead" }, names, close));
+  clear(aside).append(el("div", { class: "dhead" }, names, termToggle, close));
   if (!row) return;
   aside.append(el("p", { class: "desc" }, row.description), el("div", { class: "pills" }, ...statusPills(row)));
   if (row.attention && row.attention.message) aside.append(el("pre", { class: "attention-message" }, row.attention.message));
@@ -1243,6 +1315,181 @@ document.addEventListener("keydown", (e) => {
 });
 window.addEventListener("hashchange", () => { const id = detailHashId(); if (id) openDetail(id); else closeDetail(); });
 setInterval(() => { if (state.detail && !document.hidden) loadDetail(); }, DETAIL_REFRESH_MS);
+
+const TERM_KEY = "factory.terminal";
+const SCREEN_REFRESH_MS = 1000;
+const SCREEN_AFTER_SEND_MS = 200;
+const TERM_FG = "#E6DFDC";
+const TERM_BG = "#0E0908";
+const ANSI_16 = ["#2E2322", "#FF6B6B", "#7CC63A", "#FECD40", "#6CA8FF", "#D58BFF", "#4FD1C5", "#E6DFDC",
+  "#7A6E6A", "#FF8A8A", "#A8E07F", "#FFE07A", "#9CC4FF", "#E5B3FF", "#81E6D9", "#FFFFFF"];
+const ANSI_SEQUENCE = /\x1b(?:\[([0-9;:?]*)[ -\/]*([@-~])|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])/g;
+state.term = { open: loadTermOpen(), tab: "details", text: null, inflight: false, sending: false, canType: false, reason: "" };
+function loadTermOpen() { try { return localStorage.getItem(TERM_KEY) === "1"; } catch (e) { return false; } }
+function setTerminalOpen(open) {
+  state.term.open = open;
+  state.term.tab = open ? "terminal" : "details";
+  try { localStorage.setItem(TERM_KEY, open ? "1" : "0"); } catch (e) {}
+  renderDetail();
+  if (open) { resetScreen(); loadScreen(); }
+}
+function resetScreen() {
+  Object.assign(state.term, { text: null, canType: false, reason: "" });
+  const screen = document.querySelector("#detail-term .screen");
+  if (screen) clear(screen);
+  setTermStatus(false, "Loading…");
+  updateTypeControls();
+}
+function renderTerminalShell() {
+  const aside = byId("detail");
+  const show = !!state.detail && state.term.open;
+  byId("detail-term").hidden = !show;
+  aside.dataset.term = show ? "1" : "";
+  aside.dataset.tab = state.term.tab;
+  byId("tab-details").setAttribute("aria-selected", state.term.tab === "details" ? "true" : "false");
+  byId("tab-terminal").setAttribute("aria-selected", state.term.tab === "terminal" ? "true" : "false");
+}
+function setTermStatus(live, text) {
+  const status = document.querySelector("#detail-term .tstatus");
+  status.classList.toggle("live", live);
+  status.querySelector(".tstatus-text").textContent = text;
+}
+function ansi256(n) {
+  if (n < 16) return ANSI_16[n];
+  if (n < 232) {
+    const v = n - 16, level = (c) => (c ? 55 + c * 40 : 0);
+    return `rgb(${level(Math.floor(v / 36))}, ${level(Math.floor(v / 6) % 6)}, ${level(v % 6)})`;
+  }
+  const g = 8 + (n - 232) * 10;
+  return `rgb(${g}, ${g}, ${g})`;
+}
+function sgr(style, params) {
+  const next = { ...style };
+  const codes = (params || "0").split(/[;:]/).map((x) => (x === "" ? 0 : Number(x)));
+  for (let i = 0; i < codes.length; i++) {
+    const c = codes[i];
+    if (c === 0) { for (const k of Object.keys(next)) delete next[k]; }
+    else if (c === 1) next.bold = true;
+    else if (c === 2) next.dim = true;
+    else if (c === 3) next.italic = true;
+    else if (c === 4) next.underline = true;
+    else if (c === 7) next.inverse = true;
+    else if (c === 22) { delete next.bold; delete next.dim; }
+    else if (c === 23) delete next.italic;
+    else if (c === 24) delete next.underline;
+    else if (c === 27) delete next.inverse;
+    else if (c >= 30 && c <= 37) next.fg = ANSI_16[c - 30];
+    else if (c >= 90 && c <= 97) next.fg = ANSI_16[c - 82];
+    else if (c >= 40 && c <= 47) next.bg = ANSI_16[c - 40];
+    else if (c >= 100 && c <= 107) next.bg = ANSI_16[c - 92];
+    else if (c === 39) delete next.fg;
+    else if (c === 49) delete next.bg;
+    else if ((c === 38 || c === 48) && codes[i + 1] === 5) { next[c === 38 ? "fg" : "bg"] = ansi256(codes[i + 2] || 0); i += 2; }
+    else if ((c === 38 || c === 48) && codes[i + 1] === 2) { next[c === 38 ? "fg" : "bg"] = `rgb(${codes[i + 2] || 0}, ${codes[i + 3] || 0}, ${codes[i + 4] || 0})`; i += 4; }
+  }
+  return next;
+}
+function styledSpan(style, text) {
+  const span = document.createElement("span");
+  span.textContent = text;
+  const fg = style.inverse ? style.bg || TERM_BG : style.fg;
+  const bg = style.inverse ? style.fg || TERM_FG : style.bg;
+  if (fg) span.style.color = fg;
+  if (bg) span.style.backgroundColor = bg;
+  if (style.bold) span.style.fontWeight = "700";
+  if (style.dim) span.style.opacity = "0.7";
+  if (style.italic) span.style.fontStyle = "italic";
+  if (style.underline) span.style.textDecoration = "underline";
+  return span;
+}
+/** ANSI text to colored spans. Only colors and text styles are kept; cursor moves and other control sequences are dropped. */
+function ansiNodes(text) {
+  const frag = document.createDocumentFragment();
+  const clean = text.replace(/\r/g, "").replace(/\s+$/, "");
+  let style = {}, last = 0, m;
+  ANSI_SEQUENCE.lastIndex = 0;
+  while ((m = ANSI_SEQUENCE.exec(clean))) {
+    if (m.index > last) frag.append(styledSpan(style, clean.slice(last, m.index)));
+    last = ANSI_SEQUENCE.lastIndex;
+    if (m[2] === "m") style = sgr(style, m[1]);
+  }
+  if (last < clean.length) frag.append(styledSpan(style, clean.slice(last)));
+  return frag;
+}
+async function loadScreen() {
+  const d = state.detail, t = state.term;
+  if (!d || !t.open || t.inflight) return;
+  t.inflight = true;
+  let res;
+  try { res = await api(`/api/tasks/${d.id}/screen`, undefined, true, true); } catch (e) { t.inflight = false; return; }
+  t.inflight = false;
+  if (state.detail !== d || !t.open) return;
+  const screen = document.querySelector("#detail-term .screen");
+  t.canType = !!(res.available && res.can_type);
+  t.reason = res.available ? (res.can_type ? "" : "This terminal adapter cannot type in the session.") : res.reason;
+  if (res.available) {
+    setTermStatus(true, `Read at ${new Date().toLocaleTimeString()}`);
+    if (res.text !== t.text) {
+      const atEnd = t.text === null || screen.scrollHeight - screen.scrollTop - screen.clientHeight < 24;
+      const top = screen.scrollTop;
+      t.text = res.text;
+      screen.replaceChildren(res.text.trim() ? ansiNodes(res.text) : "(empty)");
+      screen.scrollTop = atEnd ? screen.scrollHeight : top;
+    }
+  } else {
+    t.text = null;
+    setTermStatus(false, "Not live");
+    screen.replaceChildren(el("span", { class: "reason" }, res.reason));
+  }
+  updateTypeControls();
+}
+function updateTypeControls() {
+  const t = state.term;
+  const off = !t.canType || t.sending;
+  for (const b of document.querySelectorAll("#detail-term .tinput button")) {
+    b.disabled = off;
+    b.title = !t.canType && t.reason ? t.reason : "";
+  }
+  const input = byId("term-text");
+  input.disabled = !t.canType;
+  input.placeholder = t.canType ? "Type for the session" : t.reason || "Loading…";
+}
+async function sendInput(text, keys) {
+  const d = state.detail, t = state.term;
+  if (!d || !t.canType || t.sending) return false;
+  t.sending = true;
+  updateTypeControls();
+  try {
+    await api(`/api/tasks/${d.id}/type`, { text, keys });
+    return true;
+  } catch (e) {
+    return false;
+  } finally {
+    t.sending = false;
+    updateTypeControls();
+    setTimeout(loadScreen, SCREEN_AFTER_SEND_MS);
+    loadDetail();
+  }
+}
+byId("term-close").addEventListener("click", () => setTerminalOpen(false));
+byId("tab-details").addEventListener("click", () => { state.term.tab = "details"; renderTerminalShell(); });
+byId("tab-terminal").addEventListener("click", () => { state.term.tab = "terminal"; renderTerminalShell(); loadScreen(); });
+for (const b of document.querySelectorAll("#detail-term .keys button")) b.addEventListener("click", () => sendInput("", [b.dataset.key]));
+document.querySelector("#detail-term .typeline").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = byId("term-text");
+  if (await sendInput(input.value, ["enter"])) input.value = "";
+  input.focus();
+});
+byId("term-text").addEventListener("keydown", (e) => {
+  const input = e.target;
+  if (e.key === "Escape") { e.preventDefault(); input.blur(); return; }
+  if (!input.value && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+    e.preventDefault();
+    sendInput("", [e.key === "ArrowUp" ? "up" : "down"]);
+  }
+});
+setInterval(() => { if (!document.hidden) loadScreen(); }, SCREEN_REFRESH_MS);
 function setView(view) { state.view = view; render(); }
 byId("tab-tasks").addEventListener("click", () => setView("tasks"));
 byId("tab-backlog").addEventListener("click", () => setView("backlog"));

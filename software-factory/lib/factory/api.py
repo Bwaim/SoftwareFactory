@@ -288,6 +288,18 @@ def task_detail(server, tid, query, body):
     return task_detail.detail(server.ctx, tid, server.next_poll)
 
 
+@route("GET", f"/api/tasks/{TASK}/screen")
+def task_screen(server, tid, query, body):
+    from . import task_terminal
+    return task_terminal.screen(server.ctx, tid)
+
+
+@route("POST", f"/api/tasks/{TASK}/type")
+def task_type(server, tid, query, body):
+    from . import task_terminal
+    return task_terminal.send_input(server.ctx, tid, body.get("text", ""), body.get("keys", []))
+
+
 @route("POST", f"/api/tasks/{TASK}/focus")
 def focus(server, tid, query, body):
     from . import session

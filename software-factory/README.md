@@ -90,7 +90,7 @@ Herdr adapter:
 - `herdr worktree open`
 - `herdr tab create`, `herdr tab close`
 - `herdr workspace close`
-- `herdr agent start`, `herdr agent prompt`, `herdr agent get`, `herdr agent read`
+- `herdr agent start`, `herdr agent prompt`, `herdr agent get`, `herdr agent read`, `herdr pane send-text`
 - `herdr agent focus`, `herdr agent wait`, `herdr agent send-keys`
 - `herdr workspace rename`, `herdr tab rename`, `herdr agent rename`
 - `open -a <terminal app>`
@@ -396,6 +396,20 @@ The panel refreshes every 3 seconds. It shows:
 - **Pipeline**: every step of the pipeline. Done steps have a check, the current step says "now" and the loop count.
 - **Timeline**: the events of the task, newest first, from `events.jsonl`. It shows the last 200 events.
 - **Details**: pipeline, ticket, MR, branch, base, worktree, created and updated times, the values of the task state and the artifacts.
+
+#### Task terminal
+
+The "Terminal" button in the task details opens the session terminal on the right of the details. Its ✕ button closes it. The browser remembers if it is open.
+When the window is too narrow for both, "Details" and "Terminal" tabs switch between them.
+
+- The screen shows the last 120 lines of the session, with their colors, read with `herdr agent read --format ansi` every second. It stays at the last line, unless you scrolled up.
+- Type in the field and press Enter or "Send": the text is typed with `herdr pane send-text`, then Enter is pressed.
+- The key buttons press one key with `herdr agent send-keys`: Esc, Tab, the arrows, Backspace, Space, Enter and Ctrl+C. With an empty field, the ↑ and ↓ keys of your keyboard press the arrows too, to move in a menu of the session.
+- Escape in the field leaves the field. It does not close the panel.
+- Typing clears "May wait for you". The timeline shows "Typed in the terminal" with the keys and the number of characters. The text itself is not saved, because a terminal can ask for a password or a token.
+- It needs a live session and a terminal adapter with `read_screen` (to read) and `type_input` (to type). Otherwise the terminal says why.
+
+This is not a full terminal: the screen is a copy that refreshes every second, and the cursor is not shown.
 
 #### Launch form
 
