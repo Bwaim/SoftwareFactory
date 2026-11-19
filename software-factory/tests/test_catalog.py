@@ -13,14 +13,15 @@ def by_id(items):
 
 def test_list_and_install_pipeline_with_missing_steps(inited):
     items = by_id(inited.factory.json("catalog", "list"))
-    assert items["quick-task"]["status"] == "not installed"
-    dry = inited.factory.json("catalog", "install", "quick-task", "--local", "--dry-run")
-    assert dry["missing_steps"] == ["commit"]
-    inited.factory("catalog", "install", "quick-task", "--local", "--with-steps")
-    assert (inited.fdir / "pipelines" / "quick-task.yaml").exists()
+    assert "quick-task" not in items
+    assert items["plan-and-build"]["status"] == "not installed"
+    dry = inited.factory.json("catalog", "install", "plan-and-build", "--local", "--dry-run")
+    assert "commit" in dry["missing_steps"] and "user-validation" not in dry["missing_steps"]
+    inited.factory("catalog", "install", "plan-and-build", "--local", "--with-steps")
+    assert (inited.fdir / "pipelines" / "plan-and-build.yaml").exists()
     assert (inited.fdir / "steps" / "commit.md").exists()
     items = by_id(inited.factory.json("catalog", "list"))
-    assert items["quick-task"]["status"] == "installed" and items["quick-task"]["location"] == "local"
+    assert items["plan-and-build"]["status"] == "installed" and items["plan-and-build"]["location"] == "local"
     (inited.fdir / "steps" / "commit.md").write_text((inited.fdir / "steps" / "commit.md").read_text() + "\nMore.\n")
     assert by_id(inited.factory.json("catalog", "list"))["commit"]["status"] == "changed"
 

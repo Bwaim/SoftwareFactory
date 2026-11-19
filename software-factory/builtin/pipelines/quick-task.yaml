@@ -1,0 +1,8 @@
+id: quick-task
+description: Ask the user for a small change, implement it, and validate it
+steps:
+  - get-user-request
+  - id: implement
+    with:
+      request: The request file is in the task key `request`. Read it with `factory state get request`.
+  - user-validation
