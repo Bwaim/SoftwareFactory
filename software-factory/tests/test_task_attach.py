@@ -233,3 +233,33 @@ def test_dashboard_page_has_the_terminal_tab_and_resize_handles():
 def test_dashboard_page_has_no_snapshot_mode():
     for text in ("/screen`", "/type`", "Snapshot", "ansiNodes", "term-text", 'data-mode="live"', "factory.terminalMode"):
         assert text not in PAGE
+
+
+def test_dashboard_page_keeps_a_selected_task_and_two_panel_tabs():
+    for text in ('id="pcol-details"', 'id="pcol-term"', 'id="details-tab"', 'aria-controls="detail-main"', 'id="term-tab"', 'id="term-task"',
+                 "factory.selectedTask.", "factory.details", "function firstTask", "function ensureSelection", 'data-both="1"', "33.3vw", "16.65vw"):
+        assert text in PAGE
+    for text in ('id="detail-tabs"', 'id="detail-rail"', "setTerminalOpen", "openDetail(", "NARROW_PANEL_PX"):
+        assert text not in PAGE
+
+
+def test_dashboard_page_has_a_workspace_column_tab_open_by_default():
+    for text in ('id="lcol-ws"', 'id="ws-tab"', 'aria-controls="sidebar"', 'loadFlag("factory.workspaces", true)', "function renderWorkspacePanel"):
+        assert text in PAGE
+
+
+def test_panel_columns_close_only_from_their_tabs():
+    for text in ('id="details-close"', 'id="term-close"', "pclose"):
+        assert text not in PAGE
+
+
+def test_browser_tab_title_is_captn_factory():
+    assert "<title>CAPTN Factory</title>" in PAGE and 'PAGE_TITLE = "CAPTN Factory"' in PAGE
+
+
+def test_board_and_panels_scroll_on_their_own():
+    assert "height: 100vh; overflow: hidden;" in PAGE
+    assert "#main, #sidebar, #detail-main, #live-host .xterm-viewport { overscroll-behavior: contain; }" in PAGE
+    assert "main.scrollTop = top;" in PAGE
+    for text in ("fitPanel", "window.scrollTo", "position: sticky; top: 0; height: 100vh"):
+        assert text not in PAGE

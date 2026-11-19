@@ -336,6 +336,9 @@ The server keeps its data in `$FACTORY_HOME`. The default is `~/.config/software
 
 #### Tasks view
 
+The page itself does not scroll: the board, the workspaces, the details and the terminal each scroll on their own, and reaching the end of one does not scroll another.
+The **Workspaces** column on the left has a vertical tab on its right edge, like the task columns. It is open by default; click the tab to hide or show the list. The browser remembers your choice.
+
 The board has one column for each name in `columns` of `.factory/factory.yaml`, plus a `Done` column.
 A finished task is always in `Done`.
 Any other task is in the column of its current step.
@@ -367,7 +370,7 @@ Status pill colors:
 | `finished` | grey, green dot |
 
 The header has a light and dark mode button. The browser remembers your choice, for the dashboard and the pipeline editor.
-The browser tab title shows how many tasks need you, for example "(2) CAPTN". An "Offline" tag shows when the page cannot reach the server.
+The browser tab title shows how many tasks need you, for example "(2) CAPTN Factory". An "Offline" tag shows when the page cannot reach the server.
 
 Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
 
@@ -387,10 +390,12 @@ Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
 
 #### Task details
 
-Click a card, or its name, to open the task details on the right. The board stays usable and scrolls next to it.
-The panel closes with its ✕ button or Escape. The open task is in the address (`#task=<id>`), so a reload keeps it open.
-On a narrow window, the panel fills the page.
-The panel refreshes every 3 seconds. It shows:
+Two columns sit on the right of the board: **Details**, then **Terminal**. Each column has a vertical tab on its left edge. A tab opens or closes only its own column; a closed column shows only its tab. The browser remembers which columns are open.
+The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns.
+By default, the two open columns together cover about a third of the page; one open column alone also covers about a third. A width you drag stays.
+Click a column's tab, or press Escape outside the terminal for the details, to close it; the task stays selected.
+Below 900 px, an open column fills the page.
+The details refresh every 3 seconds while their column is open. They show:
 
 - The name, the ticket, the description, the status and the same buttons as the card.
 - **Pipeline**: every step of the pipeline. Done steps have a check, the current step says "now" and the loop count.
@@ -399,9 +404,8 @@ The panel refreshes every 3 seconds. It shows:
 
 #### Task terminal
 
-The vertical "Terminal" tab on the right edge of the task details opens the session terminal on the right of the details. The same tab, then on the left edge of the terminal, closes it. The browser remembers if it is open.
+The Terminal tab opens the session terminal of the selected task. Its title shows the task name.
 Drag the left edge of the details or of the terminal to change its width. The arrow keys move a focused edge too, and a double click resets it. The browser remembers the widths.
-When the window is too narrow for both, "Details" and "Terminal" tabs switch between them, and the terminal has a ✕ button to close it.
 
 The terminal is a real terminal, attached to the session:
 
