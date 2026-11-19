@@ -18,6 +18,22 @@ def test_block_unblock_and_order(inited):
     assert [e["type"] for e in events(inited.fdir, "b")] == ["task_blocked", "task_unblocked"]
 
 
+def test_finishing_a_blocked_step_logs_unblocked(inited):
+    write_step(inited.fdir, "s1", {})
+    write_step(inited.fdir, "s2", {})
+    write_pipeline(inited.fdir, {"id": "two", "steps": ["s1", "s2"]})
+    ctx = repo.load_ctx(cwd=inited.repo)
+    from factory import engine, launch
+    tid = launch.launch(ctx, "two", "Two steps", {})["id"]
+    engine.next_step(ctx, tid)
+    engine.block(ctx, tid, "why")
+    engine.done(ctx, tid)
+    evs = events(inited.fdir, tid)
+    i = [e["type"] for e in evs].index("task_unblocked")
+    assert evs[i]["reason"] == "step_done" and evs[i + 1]["type"] == "step_done"
+    assert task_json(inited.fdir, tid)["status"] == "active"
+
+
 def test_session_state_column(inited):
     ctx = repo.load_ctx(cwd=inited.repo)
     make_task(ctx, tid="a", terminal_handle={"agent": "a"})
