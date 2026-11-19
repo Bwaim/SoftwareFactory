@@ -7,6 +7,11 @@ def key(ctx, tid):
     return (str(ctx.main), tid)
 
 
+def attached_before(ctx, tid):
+    """A live terminal closes after 30 s without viewers and starts again on the next visit; the timeline keeps only the first."""
+    return any(e.get("type") == "terminal_attached" for e in events.read(ctx, tid))
+
+
 def open_terminal(ctx, tid, cols, rows):
     """Attach a live terminal to the task's session, or reuse the one already attached."""
     task = state.load(ctx, tid)
@@ -17,7 +22,7 @@ def open_terminal(ctx, tid, cols, rows):
     if "attach" not in adapter.capabilities():
         raise FactoryError(f"The {adapter.name} terminal adapter cannot attach a live terminal.")
     _, started = REGISTRY.open(key(ctx, tid), adapter.attach_command(handle), cols, rows)
-    if started:
+    if started and not attached_before(ctx, tid):
         events.log(ctx, tid, "terminal_attached", state.step_path_str(task))
     return {"ok": True, "started": started}
 

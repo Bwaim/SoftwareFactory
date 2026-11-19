@@ -165,6 +165,15 @@ def test_open_terminal_runs_the_adapter_command_and_logs_once(ctx, inited, clean
     assert [e["type"] for e in events(inited.fdir, "t1")].count("terminal_attached") == 1
 
 
+def test_a_restarted_terminal_is_not_logged_again(ctx, inited, clean_registry):
+    fake_config(inited.fdir, capabilities=["attach"], attach_command=ECHO)
+    make_task(ctx, tid="t1", terminal_handle=LIVE)
+    task_attach.open_terminal(ctx, "t1", 80, 24)
+    task_attach.close(ctx, "t1")
+    assert task_attach.open_terminal(ctx, "t1", 80, 24)["started"] is True
+    assert [e["type"] for e in events(inited.fdir, "t1")].count("terminal_attached") == 1
+
+
 def test_typing_in_the_live_terminal_clears_attention(ctx, inited, clean_registry):
     fake_config(inited.fdir, capabilities=["attach"], attach_command=ECHO)
     make_task(ctx, tid="t1", terminal_handle=LIVE, attention={"at": "2026-11-19T10:00:00+00:00", "message": "Which one?"})

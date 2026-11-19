@@ -411,7 +411,7 @@ The terminal is a real terminal, attached to the session:
 - One terminal per task is shared by every open page. A new page gets the last 256 KB of output first.
 - A terminal nobody watches closes after 30 seconds. At most 8 are open at once.
 - "Reconnect" shows when the terminal or the connection ends.
-- Typing clears "May wait for you". The timeline shows "Opened the live terminal", not each key.
+- Typing clears "May wait for you". The timeline shows "Opened the live terminal" once per task, the first time; not each key, and not each restart.
 - It needs a live session and a terminal adapter with `attach`. Otherwise the terminal says why.
 - Escape inside the terminal never closes the panel.
 
