@@ -184,6 +184,20 @@ def host(server, query, body):
     return {"folder_picker": sys.platform == "darwin"}
 
 
+@route("GET", "/api/server-settings", scope="global")
+def server_settings_get(server, query, body):
+    from . import server_settings
+    return server_settings.read()
+
+
+@route("POST", "/api/server-settings/save", scope="global")
+def server_settings_save(server, query, body):
+    from . import server_settings
+    result = server_settings.save(body)
+    server.reschedule()
+    return result
+
+
 def registry(server):
     from .registry import Registry
     return Registry.load(server.ctx)
