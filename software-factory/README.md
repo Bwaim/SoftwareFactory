@@ -344,7 +344,7 @@ Click `⋯` on a workspace, then "Settings". The popup has three sections.
 - "Library folder": an absolute path, or empty for no library. "Create the folder if it is missing" makes the folder on save. A change shows a warning when the workspace has open tasks.
 - "Terminal": the terminal adapter. A change fails when the workspace has open tasks.
 - "Columns": the board columns. Use "↑", "↓" and "✕" to order and remove them, and "Add column" to add one.
-- "Ticket URL": empty, or a `http` or `https` URL with `{key}`. `factory init` writes the Nextory ticket URL as the default `ticket_url`.
+- "Ticket URL": empty, or a `http` or `https` URL with `{key}`. `factory init` writes the Nextory ticket URL `https://nextory.atlassian.net/browse/{key}` as the default `ticket_url`.
 - "Hidden steps": click "Unhide" to show a step again.
 
 "Built-in step settings" edits the section `create-worktree` of `.factory/config.yaml`:
@@ -352,7 +352,7 @@ Click `⋯` on a workspace, then "Settings". The popup has three sections.
 - "Worktree folder" (`worktree_root`): an absolute path. It cannot be empty.
 - "Base branch" (`base_ref`): empty means `main`.
 
-"Server" edits `poll_seconds` in `$FACTORY_HOME/server.yaml`. It is the poll interval in seconds, from 10 to 86400. It applies to all workspaces. If `FACTORY_POLL_SECONDS` is set, the field is disabled. A save applies at once, without a restart.
+"Server" edits `poll_seconds` in `$FACTORY_HOME/server.yaml`. It is the poll interval in seconds, from 10 to 86400. It applies to all workspaces. The order is `FACTORY_POLL_SECONDS`, then `poll_seconds`, then 5 minutes. If `FACTORY_POLL_SECONDS` is set, the field is disabled. A save applies at once, without a restart.
 
 Column rules:
 
@@ -360,7 +360,7 @@ Column rules:
 - A column that a step file or a pipeline file names cannot be removed. The popup lists the files.
 - If an open task is in a removed column, or its snapshot names one, the popup asks for a new column for each removed column. The next "Save" moves these tasks. Finished tasks stay in `Done`.
 
-The dashboard makes sure that all values are valid. If one is not, it writes nothing. A save writes the changed files only. It rewrites `.factory/factory.yaml` and `.factory/config.yaml`, so comments in these files are lost. The popup repeats this note above the buttons. Cancel closes the popup without a save.
+The dashboard makes sure that all values are valid. If one is not, it writes nothing. The popup sends only the changed values. A file without changed values is not written. The popup shows this note above the buttons: "Save rewrites .factory/factory.yaml and .factory/config.yaml. Comments in these files are lost." Cancel closes the popup without a save.
 
 #### Tasks view
 
