@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import workspaces
+from . import settings, workspaces
 from .errors import DetailedError, FactoryError
 from .init import LIBRARY_MISSING
 
@@ -77,6 +77,16 @@ def info(server, query, body):
         "adapter": server.adapter,
         "capabilities": server.capabilities,
     }
+
+
+@route("GET", "/api/settings")
+def settings_read(server, query, body):
+    return settings.read(server.ctx)
+
+
+@route("POST", "/api/settings/save")
+def settings_save(server, query, body):
+    return settings.save(server.ctx, body)
 
 
 @route("POST", "/api/shutdown", scope="global")

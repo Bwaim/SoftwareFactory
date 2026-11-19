@@ -211,7 +211,7 @@ def init(cwd, library=None, create_library=False):
         (f / d).mkdir(parents=True, exist_ok=True)
     factory_data = {
         "version": DATA_VERSION, "library": str(lib) if lib else "", "terminal": adapters.terminal_name(ctx),
-        "columns": list(repo.DEFAULT_COLUMNS), "ticket_url": "",
+        "columns": list(repo.DEFAULT_COLUMNS), "ticket_url": TICKET_DEFAULT,
     }
     write_new(f / "factory.yaml", lambda p: fsio.write_yaml(p, factory_data), report)
     write_new(f / "config.yaml", lambda p: fsio.write_yaml(p, {}), report)

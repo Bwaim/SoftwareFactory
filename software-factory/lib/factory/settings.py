@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from . import adapters, board, config, fsio, hidden, init, repo, state
-from .errors import FactoryError
+from . import adapters, board, config, events, fsio, hidden, init, repo, state
+from .errors import DetailedError, FactoryError
 from .registry import CREATE_WORKTREE, level_roots, parse_step_text
 
 TERMINALS = ("herdr",)
@@ -261,3 +261,91 @@ def check(ctx, changes):
     errors += lib_errors + terminal_check(ctx, changes) + column_errors
     errors += ticket_check(changes) + unhide_check(ctx, changes) + steps_check(ctx, changes)
     return {"errors": errors, "warnings": warnings, "moves_needed": needed, "library": library}
+
+
+def factory_updates(changes, library):
+    updates = {}
+    if "library" in changes:
+        updates["library"] = str(library) if library else ""
+    if "terminal" in changes:
+        updates["terminal"] = changes["terminal"]
+    if "columns" in changes:
+        updates["columns"] = [c.strip() for c in changes["columns"]]
+    if "ticket_url" in changes:
+        updates["ticket_url"] = changes["ticket_url"].strip()
+    return updates
+
+
+def write_factory(ctx, changes, library):
+    updates = factory_updates(changes, library)
+    unhide = set(changes.get("unhide", []))
+    if not updates and not unhide:
+        return
+
+    def change(data):
+        data.update(updates)
+        for sid in unhide:
+            hidden.remove(data, sid)
+
+    fsio.update_yaml(ctx.fdir / "factory.yaml", change)
+
+
+def write_config(ctx, changes):
+    if "steps" not in changes:
+        return
+
+    def change(data):
+        fsio.require_map(config.config_path(ctx), data)
+        for sid, values in changes["steps"].items():
+            section = data.get(sid) or {}
+            section.update({k: v.strip() for k, v in values.items()})
+            if section.get("base_ref") == "":
+                section.pop("base_ref")
+            if section:
+                data[sid] = section
+            else:
+                data.pop(sid, None)
+
+    fsio.update_yaml(config.config_path(ctx), change)
+
+
+def move_task(ctx, tid, targets):
+    moved = []
+
+    def change(task):
+        for entry in task.get("steps", []):
+            entry["column"] = targets.get(entry.get("column"), entry.get("column"))
+        if task.get("column") in targets:
+            moved.append(task["column"])
+            task["column"] = targets[task["column"]]
+
+    try:
+        state.update(ctx, tid, change)
+    except FactoryError:
+        return
+    if moved:
+        events.log(ctx, tid, "column_changed", None, **{"from": moved[0], "to": targets[moved[0]]})
+
+
+def move_tasks(ctx, found, moves):
+    targets = {c: moves[c] for c in found}
+    for tid in sorted({t for ids in found.values() for t in ids}):
+        move_task(ctx, tid, targets)
+
+
+def save(ctx, changes):
+    result = check(ctx, changes)
+    if result["errors"]:
+        raise DetailedError("Settings not saved.", errors=result["errors"])
+    if result["moves_needed"]:
+        raise DetailedError(
+            "Choose a column for the tasks in removed columns.", code="moves_needed", moves_needed=result["moves_needed"]
+        )
+    library = result["library"]
+    if changes.get("create_library") and library and not library.exists():
+        init.create_library_folder(library)
+    found = tasks_in(ctx, set(ctx.columns()) - {c.strip() for c in changes["columns"]}) if "columns" in changes else {}
+    write_factory(ctx, changes, library)
+    write_config(ctx, changes)
+    move_tasks(ctx, found, changes.get("moves", {}))
+    return {"settings": read(ctx), "warnings": result["warnings"]}

@@ -1,7 +1,9 @@
 import pytest
+import yaml
 
-from conftest import make_task, write_pipeline, write_step
-from factory import repo, settings
+from conftest import events, make_task, task_json, write_pipeline, write_step
+from factory import config, hidden, repo, settings
+from factory.errors import DetailedError
 
 
 def ctx(inited):
@@ -126,3 +128,71 @@ def test_worktree_rules(inited, value, text):
 def test_bad_config_file(inited):
     (inited.fdir / "config.yaml").write_text("a: [")
     assert len(errors(inited, {"steps": {"create-worktree": {"base_ref": "b"}}})) == 1
+
+
+def test_save_writes_only_changed_keys(inited):
+    before = yaml.safe_load((inited.fdir / "factory.yaml").read_text())
+    settings.save(ctx(inited), {"ticket_url": "https://x/{key}"})
+    after = yaml.safe_load((inited.fdir / "factory.yaml").read_text())
+    assert after == {**before, "ticket_url": "https://x/{key}"}
+
+
+def test_save_moves_tasks_and_logs(inited):
+    make_task(ctx(inited), tid="t1", column="QA")
+    settings.save(ctx(inited), {"columns": repo.DEFAULT_COLUMNS[:-1], "moves": {"QA": "Review"}})
+    assert task_json(inited.fdir, "t1")["column"] == "Review"
+    ev = events(inited.fdir, "t1")[-1]
+    assert (ev["type"], ev["from"], ev["to"]) == ("column_changed", "QA", "Review")
+
+
+def test_save_step_keys(inited, tmp_path):
+    settings.save(ctx(inited), {"steps": {"create-worktree": {"base_ref": "develop", "worktree_root": str(tmp_path / "wt")}}})
+    assert config.get_value(ctx(inited), "create-worktree", "base_ref") == "develop"
+    assert config.get_value(ctx(inited), "create-worktree", "worktree_root") == str(tmp_path / "wt")
+    settings.save(ctx(inited), {"steps": {"create-worktree": {"base_ref": ""}}})
+    assert config.get_value(ctx(inited), "create-worktree", "base_ref") is None
+
+
+def test_save_replaces_snapshot_column(inited):
+    step = {"id": "s", "path": ["s"], "with": {}, "column": "QA", "model": None, "effort": None}
+    make_task(ctx(inited), tid="t1", column="Plan", steps=[step])
+    settings.save(ctx(inited), {"columns": repo.DEFAULT_COLUMNS[:-1], "moves": {"QA": "Review"}})
+    task = task_json(inited.fdir, "t1")
+    assert task["column"] == "Plan" and task["steps"][0]["column"] == "Review"
+
+
+def test_save_unhide_keeps_other_hidden(inited):
+    hidden.hide(ctx(inited), "create-task")
+    hidden.hide(ctx(inited), "delete-task")
+    settings.save(ctx(inited), {"unhide": ["create-task"]})
+    assert hidden.ids(ctx(inited)) == ["delete-task"]
+    settings.save(ctx(inited), {"unhide": ["delete-task"]})
+    assert "hidden_steps" not in yaml.safe_load((inited.fdir / "factory.yaml").read_text())
+
+
+def test_save_skips_unchanged_file(inited):
+    path = inited.fdir / "factory.yaml"
+    path.write_text("# keep\n" + path.read_text())
+    settings.save(ctx(inited), {"steps": {"create-worktree": {"base_ref": "develop"}}})
+    assert path.read_text().startswith("# keep")
+
+
+def test_save_creates_library(inited, tmp_path):
+    settings.save(ctx(inited), {"library": str(tmp_path / "new"), "create_library": True})
+    assert (tmp_path / "new" / "factory.yaml").exists() and ctx(inited).library() == (tmp_path / "new").resolve()
+
+
+def test_failed_check_writes_nothing(inited):
+    paths = [inited.fdir / "factory.yaml", inited.fdir / "config.yaml"]
+    before = [p.read_text() for p in paths]
+    with pytest.raises(DetailedError) as e:
+        settings.save(ctx(inited), {"ticket_url": "https://x/{key}", "steps": {"create-worktree": {"base_ref": "b"}}, "columns": []})
+    assert e.value.details["errors"] == ["Add at least one column."]
+    assert [p.read_text() for p in paths] == before
+
+
+def test_save_moves_needed(inited):
+    make_task(ctx(inited), tid="t1", column="QA")
+    with pytest.raises(DetailedError) as e:
+        settings.save(ctx(inited), {"columns": repo.DEFAULT_COLUMNS[:-1]})
+    assert e.value.details == {"code": "moves_needed", "moves_needed": {"QA": ["t1"]}}

@@ -14,6 +14,7 @@ def test_init_creates_files_and_exclude(factory, origin_repo, library_path, work
     f = origin_repo / ".factory"
     data = yaml.safe_load((f / "factory.yaml").read_text())
     assert data["version"] == 2 and data["library"] == str(library_path) and data["terminal"] == "fake"
+    assert data["ticket_url"] == "https://nextory.atlassian.net/browse/{key}"
     for name in ("config.yaml", "backlog.md", "claude-settings.json", "steps", "pipelines", "tasks/archive"):
         assert (f / name).exists()
     assert json.loads((f / "claude-settings.json").read_text())["permissions"] == init.SETTINGS["permissions"]
