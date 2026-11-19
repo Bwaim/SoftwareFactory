@@ -4,7 +4,6 @@ import time
 import pytest
 import yaml
 
-from conftest import *
 from factory import server, server_settings
 from factory.errors import FactoryError
 from serverutil import info, request
@@ -58,7 +57,7 @@ def test_reschedule_wakes_loop_without_poll(monkeypatch):
     monkeypatch.delenv("FACTORY_POLL_SECONDS", raising=False)
     s = server.Server()
     polls = []
-    monkeypatch.setattr(s, "poll_all", lambda: polls.append(1))
+    s.poll_all = lambda: polls.append(1)
     threading.Thread(target=s.poll_loop, daemon=True).start()
     wait_until(lambda: s.next_poll is not None)
     first = s.next_poll
@@ -76,3 +75,17 @@ def test_routes(inited):
     assert request(i, "GET", "/api/server-settings")[1]["saved_poll_seconds"] == 120
     status, body = request(i, "POST", "/api/server-settings/save", {"poll_seconds": 5})
     assert status == 400 and "whole number" in body["error"]
+
+
+@pytest.mark.parametrize("value", ["0", "-5"])
+def test_nonpositive_env_falls_back(monkeypatch, value):
+    server_settings.save({"poll_seconds": 45})
+    monkeypatch.setenv("FACTORY_POLL_SECONDS", value)
+    assert server_settings.poll_seconds() == 45 and server_settings.env_poll() is None
+
+
+def test_save_non_map_file():
+    server_settings.path().parent.mkdir(parents=True, exist_ok=True)
+    server_settings.path().write_text("- a\n")
+    with pytest.raises(FactoryError, match="must be a map"):
+        server_settings.save({"poll_seconds": 60})

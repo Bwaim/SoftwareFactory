@@ -231,9 +231,12 @@ def step_values_check(sid, values):
 def config_file_check(ctx):
     path = config.config_path(ctx)
     try:
-        fsio.require_map(path, fsio.read_yaml(path, {}))
+        data = fsio.require_map(path, fsio.read_yaml(path, {}))
     except FactoryError as e:
         return [str(e)]
+    section = data.get(WORKTREE_STEP)
+    if section is not None and not isinstance(section, dict):
+        return [wrong_type(f"steps.{WORKTREE_STEP}")]
     return []
 
 
@@ -314,7 +317,8 @@ def move_task(ctx, tid, targets):
 
     def change(task):
         for entry in task.get("steps", []):
-            entry["column"] = targets.get(entry.get("column"), entry.get("column"))
+            if entry.get("column") in targets:
+                entry["column"] = targets[entry["column"]]
         if task.get("column") in targets:
             moved.append(task["column"])
             task["column"] = targets[task["column"]]
@@ -328,7 +332,7 @@ def move_task(ctx, tid, targets):
 
 
 def move_tasks(ctx, found, moves):
-    targets = {c: moves[c] for c in found}
+    targets = {c: moves[c] for c in found if c in moves}
     for tid in sorted({t for ids in found.values() for t in ids}):
         move_task(ctx, tid, targets)
 

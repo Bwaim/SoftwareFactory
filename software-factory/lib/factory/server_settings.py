@@ -19,9 +19,10 @@ def valid_poll(value):
 
 def env_poll():
     try:
-        return int(os.environ.get("FACTORY_POLL_SECONDS") or "")
+        value = int(os.environ.get("FACTORY_POLL_SECONDS") or "")
     except ValueError:
         return None
+    return value if value > 0 else None
 
 
 def saved_poll():
@@ -55,6 +56,7 @@ def save(body):
         raise FactoryError(POLL_RANGE)
 
     def apply(data):
+        fsio.require_map(path(), data)
         if value in (None, ""):
             data.pop("poll_seconds", None)
         else:

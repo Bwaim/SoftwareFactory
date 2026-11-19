@@ -196,3 +196,21 @@ def test_save_moves_needed(inited):
     with pytest.raises(DetailedError) as e:
         settings.save(ctx(inited), {"columns": repo.DEFAULT_COLUMNS[:-1]})
     assert e.value.details == {"code": "moves_needed", "moves_needed": {"QA": ["t1"]}}
+
+
+def test_config_step_not_a_map(inited):
+    (inited.fdir / "config.yaml").write_text("create-worktree: x\n")
+    before = (inited.fdir / "factory.yaml").read_text()
+    with pytest.raises(DetailedError) as e:
+        settings.save(ctx(inited), {"ticket_url": "https://x/{key}", "steps": {"create-worktree": {"base_ref": "b"}}})
+    assert e.value.details["errors"] == ["The setting `steps.create-worktree` has a wrong type."]
+    assert (inited.fdir / "factory.yaml").read_text() == before
+
+
+def test_move_skips_entry_without_column(inited):
+    step = {"id": "s", "path": ["s"], "with": {}, "column": "QA", "model": None, "effort": None}
+    bare = {"id": "b", "path": ["b"], "with": {}, "model": None, "effort": None}
+    make_task(ctx(inited), tid="t1", column="Plan", steps=[step, bare])
+    settings.move_task(ctx(inited), "t1", {"QA": "Review"})
+    task = task_json(inited.fdir, "t1")
+    assert task["steps"][0]["column"] == "Review" and "column" not in task["steps"][1]

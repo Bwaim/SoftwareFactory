@@ -714,8 +714,10 @@ function settingsForm(data, server, picker) {
   const columns = columnsEditor(data.columns);
   const ticket = textInput(data.ticket_url, { placeholder: data.ticket_default || "https://nextory.atlassian.net/browse/{key}" });
   const unhide = new Set();
+  const hiddenRows = new Map();
   const hiddenRow = (id) => {
     const row = el("div", { class: "row" }, el("code", {}, id));
+    hiddenRows.set(id, row);
     const b = el("button", { type: "button", onclick: () => {
       if (unhide.has(id)) unhide.delete(id); else unhide.add(id);
       row.classList.toggle("marked", unhide.has(id));
@@ -731,7 +733,7 @@ function settingsForm(data, server, picker) {
   const env = server.env_poll_seconds;
   const poll = textInput(env !== null ? String(env) : server.saved_poll_seconds === null ? "" : String(server.saved_poll_seconds), { inputmode: "numeric", placeholder: String(server.default_poll_seconds), disabled: env !== null });
   const stepHint = "Used by the built-in step `create-worktree` only.";
-  const form = { out, movesBox, create, unhide, moves: null,
+  const form = { out, movesBox, create, unhide, hiddenRows, moves: null,
     values: () => ({ library: library.value.trim(), terminal: terminal.value, columns: columns.names(), ticket_url: ticket.value.trim(), worktree_root: root.value.trim(), base_ref: base.value.trim(), poll: poll.value.trim() }) };
   form.start = form.values();
   return [
@@ -795,6 +797,7 @@ async function saveSettings(form) {
     }
     Object.assign(form, { start: { ...now, poll: was.poll }, moves: null });
     form.movesBox.replaceChildren();
+    for (const id of form.unhide) form.hiddenRows.get(id).remove();
     form.unhide.clear();
   }
   if (now.poll !== was.poll) {
