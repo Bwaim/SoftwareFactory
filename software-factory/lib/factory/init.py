@@ -16,6 +16,8 @@ SETTINGS = {"permissions": {"allow": ["Bash(factory:*)", "Bash(factory *)"]}}
 HOOK_EVENTS = {"Stop": "hook stop", "UserPromptSubmit": "hook prompt"}
 EXCLUDES = [".factory/", ".factory.backup-*/"]
 BACKLOG_HEADER = "# Backlog\n"
+TICKET_DEFAULT = "https://nextory.atlassian.net/browse/{key}"
+LIBRARY_MISSING = "The library folder does not exist. Create it, or leave the field blank."
 
 
 class InitChecksError(FactoryError):

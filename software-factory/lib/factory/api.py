@@ -5,10 +5,10 @@ import sys
 from pathlib import Path
 
 from . import workspaces
-from .errors import FactoryError
+from .errors import DetailedError, FactoryError
+from .init import LIBRARY_MISSING
 
 NO_FACTORY = "This repository has no factory. Run `factory init` in it first."
-LIBRARY_MISSING = "The library folder does not exist. Create it, or leave the field blank."
 PICKER_ONLY_MACOS = "The folder picker works only on macOS."
 FULL_PATH = "Give the full path of the repository folder."
 PICKER_TIMEOUT = 300
@@ -30,12 +30,6 @@ class Stream:
 
     def __init__(self, lines):
         self.lines = lines
-
-
-class DetailedError(FactoryError):
-    def __init__(self, message, **details):
-        super().__init__(message)
-        self.details = details
 
 
 def route(method, pattern, scope="workspace"):
