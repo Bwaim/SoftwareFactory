@@ -337,7 +337,7 @@ The server keeps its data in `$FACTORY_HOME`. The default is `~/.config/software
 #### Tasks view
 
 The page itself does not scroll: the board, the workspaces, the details and the terminal each scroll on their own, and reaching the end of one does not scroll another.
-The **Workspaces** column on the left has a vertical tab on its right edge, like the task columns. It is open by default; click the tab to hide or show the list. The browser remembers your choice.
+The **Workspaces** column on the left has a vertical tab on its right edge, like the task columns. It is open by default; click the tab to hide or show the list. Drag its right edge to change its width (220 px by default); the arrow keys work on a focused edge and a double click resets it. The browser remembers your choices.
 
 The board has one column for each name in `columns` of `.factory/factory.yaml`, plus a `Done` column.
 A finished task is always in `Done`.

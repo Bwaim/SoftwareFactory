@@ -263,3 +263,17 @@ def test_board_and_panels_scroll_on_their_own():
     assert "main.scrollTop = top;" in PAGE
     for text in ("fitPanel", "window.scrollTo", "position: sticky; top: 0; height: 100vh"):
         assert text not in PAGE
+
+
+def test_open_column_tabs_have_a_purple_title():
+    assert '.rail-tab[aria-expanded="true"] { box-shadow: inset 3px 0 0 var(--accent); color: var(--tab-on);' in PAGE
+    assert "--tab-on: #C9A2E6;" in PAGE and "--tab-on: #673888;" in PAGE
+
+
+def test_column_titles_share_one_style():
+    assert "#sidebar h2, #detail h2, #detail-term .thead h3 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.2; color: var(--muted-strong); }" in PAGE
+
+
+def test_workspace_column_is_resizable_with_the_same_default():
+    for text in ('id="resize-ws"', 'aria-label="Resize the workspaces"', '"factory.workspacesWidth"', "var(--ws-w, 220px)", 'side: "left"', "function grownBy"):
+        assert text in PAGE

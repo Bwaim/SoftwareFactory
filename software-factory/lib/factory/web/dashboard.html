@@ -19,7 +19,7 @@ try { if (localStorage.getItem("factory.theme") === "light") document.documentEl
   --approval-bg: #423410; --approval-fg: #FECD40; --approval-dot: #FECD40;
   --attn-bg: #4A1430; --attn-fg: #FF9CC8; --attn-dot: #FF5AA5; --attn-line: #5C2441;
   --wait-bg: #352448; --wait-fg: #D6BCEB; --wait-dot: #B98BDB;
-  --neutral-fg: #D8D0CC; --paused-dot: #A99E9A;
+  --neutral-fg: #D8D0CC; --paused-dot: #A99E9A; --tab-on: #C9A2E6;
   --shadow: rgba(0, 0, 0, 0.5); --bot-band: #FFFFFF; --bot-eye: #1A1110;
   --font: "Nextory Sans", Figtree, Roboto, Arial, sans-serif; }
 :root[data-theme="light"] { color-scheme: light;
@@ -31,7 +31,7 @@ try { if (localStorage.getItem("factory.theme") === "light") document.documentEl
   --approval-bg: #FFF3CC; --approval-fg: #6E5100; --approval-dot: #E0A800;
   --attn-bg: #FDE3EF; --attn-fg: #A3004E; --attn-dot: #E0337F; --attn-line: #F5C2D9;
   --wait-bg: #EFE6F7; --wait-fg: #5B2D80; --wait-dot: #8A55B5;
-  --neutral-fg: #4A3F3B; --paused-dot: #8C817D;
+  --neutral-fg: #4A3F3B; --paused-dot: #8C817D; --tab-on: #673888;
   --shadow: rgba(26, 17, 16, 0.15); --bot-band: #1A1110; --bot-eye: #FFFFFF; }
 body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var(--fg); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 [hidden] { display: none !important; }
@@ -52,9 +52,12 @@ header nav { display: flex; gap: 6px; }
 #lcol-ws { flex: none; display: flex; min-height: 0; }
 #lcol-ws .rail-tab { border-right: 1px solid var(--panel-line); }
 #sidebar[hidden] { display: none !important; }
-#sidebar { flex: 0 0 220px; width: 220px; box-sizing: border-box; overflow-y: auto; min-height: 0; background: var(--column); border-right: 1px solid var(--panel-line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+#ws-pane { position: relative; display: flex; min-height: 0; }
+#ws-pane .resizer { left: auto; right: -4px; }
+#sidebar[hidden] + .resizer { display: none; }
+#sidebar { flex: 0 0 var(--ws-w, 220px); width: var(--ws-w, 220px); box-sizing: border-box; overflow-y: auto; min-height: 0; background: var(--column); border-right: 1px solid var(--panel-line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
 #sidebar .side-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 8px; }
-#sidebar h2 { margin: 0; font-size: 15px; font-weight: 700; }
+#sidebar h2, #detail h2, #detail-term .thead h3 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.2; color: var(--muted-strong); }
 #sidebar .add { min-height: 28px; min-width: 28px; padding: 0; font-size: 16px; }
 .ws { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 12px; }
 .ws.on { background: var(--raised); }
@@ -184,8 +187,8 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .rail-tab:hover { background: var(--raised); color: var(--fg); }
 .rail-tab .label { writing-mode: vertical-rl; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .rail-tab .chev { font-size: 14px; line-height: 1; }
-.rail-tab[aria-expanded="true"] { box-shadow: inset 3px 0 0 var(--accent); color: var(--fg); background: var(--raised); }
-#detail-term .thead h3 .tname { margin-left: 8px; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--fg); }
+.rail-tab[aria-expanded="true"] { box-shadow: inset 3px 0 0 var(--accent); color: var(--tab-on); background: var(--raised); }
+#detail-term .thead h3 .tname { margin-left: 6px; }
 .resizer { position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; cursor: col-resize; z-index: 3; touch-action: none; }
 .resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background .15s; }
 .resizer:hover::after, .resizer:focus-visible::after, body.resizing .resizer.active::after { background: var(--brand-pink); }
@@ -194,7 +197,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 body.resizing iframe, body.resizing .xterm { pointer-events: none; }
 #detail-term { width: var(--term-w, var(--term-auto)); box-sizing: border-box; display: flex; flex-direction: column; background: var(--column); min-height: 0; }
 #detail-term .thead { display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px; min-height: 36px; }
-#detail-term .thead h3 { margin: 0; flex: 1; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-strong); }
+#detail-term .thead h3 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #detail-term .tstatus { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 #detail-term .tstatus i { width: 8px; height: 8px; border-radius: 50%; background: var(--paused-dot); display: block; }
 #detail-term .tstatus.live i { background: var(--active-dot); }
@@ -207,7 +210,7 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
 #detail .dhead { display: flex; gap: 8px; align-items: flex-start; }
 #detail .dhead .names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 #detail .dhead .ticket { font-size: 13px; font-weight: 700; }
-#detail h2 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+#detail h2 { overflow-wrap: anywhere; }
 #detail .close { width: 36px; padding: 0; border-radius: 50%; flex: none; font-size: 16px; }
 #detail .desc { margin: 0; font-size: 15px; font-weight: 600; }
 #detail .pills { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -256,6 +259,8 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
   .layout { flex-direction: column; }
   #lcol-ws { flex-direction: column; }
   #lcol-ws #ws-tab { display: none; }
+  #ws-pane { width: 100%; }
+  #ws-pane #sidebar { flex: 1; }
   #sidebar, #sidebar[hidden] { display: flex !important; flex: none; width: auto; border-right: 0; border-bottom: 1px solid var(--panel-line); }
   .field { grid-template-columns: 1fr; }
   .field > label { padding-top: 0; }
@@ -300,7 +305,10 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
 </header>
 <div class="layout">
   <div id="lcol-ws">
-    <aside id="sidebar" aria-label="Workspaces"></aside>
+    <div id="ws-pane">
+      <aside id="sidebar" aria-label="Workspaces"></aside>
+      <div class="resizer" id="resize-ws" role="separator" aria-orientation="vertical" aria-label="Resize the workspaces" tabindex="0"></div>
+    </div>
     <button type="button" class="rail-tab" id="ws-tab" aria-controls="sidebar" aria-expanded="true"><span class="label">Workspaces</span><span class="chev" aria-hidden="true">◂</span></button>
   </div>
   <div class="workspace">
@@ -1536,13 +1544,16 @@ function stopLive() {
 
 const WIDTH_STEP = 16;
 const PANES = {
-  "resize-detail": { key: "factory.detailWidth", prop: "--detail-w", target: () => byId("detail-main"), min: 260, max: () => Math.min(900, window.innerWidth * 0.6) },
-  "resize-term": { key: "factory.terminalWidth", prop: "--term-w", target: () => byId("detail-term"), min: 260, max: () => Math.min(1400, window.innerWidth * 0.7) },
+  "resize-detail": { key: "factory.detailWidth", prop: "--detail-w", host: () => byId("detail"), target: () => byId("detail-main"), side: "right", min: 260, max: () => Math.min(900, window.innerWidth * 0.6) },
+  "resize-term": { key: "factory.terminalWidth", prop: "--term-w", host: () => byId("detail"), target: () => byId("detail-term"), side: "right", min: 260, max: () => Math.min(1400, window.innerWidth * 0.7) },
+  "resize-ws": { key: "factory.workspacesWidth", prop: "--ws-w", host: () => byId("lcol-ws"), target: () => byId("sidebar"), side: "left", min: 160, max: () => Math.min(480, window.innerWidth * 0.35) },
 };
+/** A pane on the right grows when its handle moves left; the workspace pane on the left grows when it moves right. */
+function grownBy(pane, dx) { return pane.side === "right" ? -dx : dx; }
 function clampWidth(pane, w) { return Math.round(Math.max(pane.min, Math.min(pane.max(), w))); }
 function setPaneWidth(pane, w, save) {
   const width = clampWidth(pane, w);
-  byId("detail").style.setProperty(pane.prop, `${width}px`);
+  pane.host().style.setProperty(pane.prop, `${width}px`);
   if (save) { try { localStorage.setItem(pane.key, String(width)); } catch (e) {} }
   return width;
 }
@@ -1553,7 +1564,6 @@ function restorePaneWidths() {
     if (saved) setPaneWidth(pane, saved, false);
   }
 }
-/** The panel is anchored on the right, so dragging a handle to the left makes its pane wider. */
 for (const [id, pane] of Object.entries(PANES)) {
   const handle = byId(id);
   handle.addEventListener("pointerdown", (e) => {
@@ -1563,9 +1573,9 @@ for (const [id, pane] of Object.entries(PANES)) {
     handle.setPointerCapture(e.pointerId);
     handle.classList.add("active");
     document.body.classList.add("resizing");
-    const move = (ev) => setPaneWidth(pane, startW + (startX - ev.clientX), false);
+    const move = (ev) => setPaneWidth(pane, startW + grownBy(pane, ev.clientX - startX), false);
     const up = (ev) => {
-      setPaneWidth(pane, startW + (startX - ev.clientX), true);
+      setPaneWidth(pane, startW + grownBy(pane, ev.clientX - startX), true);
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", up);
       handle.removeEventListener("pointercancel", up);
@@ -1580,10 +1590,10 @@ for (const [id, pane] of Object.entries(PANES)) {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
     const now = pane.target().getBoundingClientRect().width;
-    setPaneWidth(pane, now + (e.key === "ArrowLeft" ? WIDTH_STEP : -WIDTH_STEP), true);
+    setPaneWidth(pane, now + grownBy(pane, e.key === "ArrowRight" ? WIDTH_STEP : -WIDTH_STEP), true);
   });
   handle.addEventListener("dblclick", () => {
-    byId("detail").style.removeProperty(pane.prop);
+    pane.host().style.removeProperty(pane.prop);
     try { localStorage.removeItem(pane.key); } catch (e) {}
   });
 }
