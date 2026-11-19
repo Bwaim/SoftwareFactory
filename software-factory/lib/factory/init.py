@@ -16,6 +16,8 @@ SETTINGS = {"permissions": {"allow": ["Bash(factory:*)", "Bash(factory *)"]}}
 HOOK_EVENTS = {"Stop": "hook stop", "UserPromptSubmit": "hook prompt"}
 EXCLUDES = [".factory/", ".factory.backup-*/"]
 BACKLOG_HEADER = "# Backlog\n"
+TICKET_DEFAULT = "https://nextory.atlassian.net/browse/{key}"
+LIBRARY_MISSING = "The library folder does not exist. Create it, or leave the field blank."
 
 
 class InitChecksError(FactoryError):
@@ -209,7 +211,7 @@ def init(cwd, library=None, create_library=False):
         (f / d).mkdir(parents=True, exist_ok=True)
     factory_data = {
         "version": DATA_VERSION, "library": str(lib) if lib else "", "terminal": adapters.terminal_name(ctx),
-        "columns": list(repo.DEFAULT_COLUMNS), "ticket_url": "",
+        "columns": list(repo.DEFAULT_COLUMNS), "ticket_url": TICKET_DEFAULT,
     }
     write_new(f / "factory.yaml", lambda p: fsio.write_yaml(p, factory_data), report)
     write_new(f / "config.yaml", lambda p: fsio.write_yaml(p, {}), report)

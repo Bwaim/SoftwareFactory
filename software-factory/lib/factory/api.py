@@ -4,11 +4,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import workspaces
-from .errors import FactoryError
+from . import settings, workspaces
+from .errors import DetailedError, FactoryError
+from .init import LIBRARY_MISSING
 
 NO_FACTORY = "This repository has no factory. Run `factory init` in it first."
-LIBRARY_MISSING = "The library folder does not exist. Create it, or leave the field blank."
 PICKER_ONLY_MACOS = "The folder picker works only on macOS."
 FULL_PATH = "Give the full path of the repository folder."
 PICKER_TIMEOUT = 300
@@ -30,12 +30,6 @@ class Stream:
 
     def __init__(self, lines):
         self.lines = lines
-
-
-class DetailedError(FactoryError):
-    def __init__(self, message, **details):
-        super().__init__(message)
-        self.details = details
 
 
 def route(method, pattern, scope="workspace"):
@@ -83,6 +77,16 @@ def info(server, query, body):
         "adapter": server.adapter,
         "capabilities": server.capabilities,
     }
+
+
+@route("GET", "/api/settings")
+def settings_read(server, query, body):
+    return settings.read(server.ctx)
+
+
+@route("POST", "/api/settings/save")
+def settings_save(server, query, body):
+    return settings.save(server.ctx, body)
 
 
 @route("POST", "/api/shutdown", scope="global")
@@ -182,6 +186,20 @@ def pick_folder(server, query, body):
 @route("GET", "/api/host", scope="global")
 def host(server, query, body):
     return {"folder_picker": sys.platform == "darwin"}
+
+
+@route("GET", "/api/server-settings", scope="global")
+def server_settings_get(server, query, body):
+    from . import server_settings
+    return server_settings.read()
+
+
+@route("POST", "/api/server-settings/save", scope="global")
+def server_settings_save(server, query, body):
+    from . import server_settings
+    result = server_settings.save(body)
+    server.reschedule()
+    return result
 
 
 def registry(server):

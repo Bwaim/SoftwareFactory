@@ -60,3 +60,13 @@ def test_editor_page_uses_workspace_routes():
 def test_refresh_ignores_stale_responses():
     assert "generation: state.generation + 1" in PAGE
     assert PAGE.count("state.generation !== ") == 2
+
+
+def test_settings_popup():
+    for text in ['button("Settings"', "openSettings", "/api/settings", "/api/settings/save", "/api/server-settings",
+                 "Repository", "Built-in step settings", "Server", "Add column", "moves_needed", "Unhide",
+                 "Create the folder if it is missing", "No hidden steps.", "Used by the built-in step `create-worktree` only.",
+                 "Applies to all workspaces.", "Set by FACTORY_POLL_SECONDS (", "https://nextory.atlassian.net/browse/{key}",
+                 "Save rewrites .factory/factory.yaml and .factory/config.yaml. Comments in these files are lost."]:
+        assert text in PAGE
+    assert "server-settings" in PAGE[PAGE.index("const GLOBAL_API"):PAGE.index("\n", PAGE.index("const GLOBAL_API"))]

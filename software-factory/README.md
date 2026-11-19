@@ -332,7 +332,35 @@ The server keeps its data in `$FACTORY_HOME`. The default is `~/.config/software
 
 - `workspaces.yaml`: the list of workspaces.
 - `server.json`: the port and the token.
+- `server.yaml`: the server settings, for all workspaces. Today it has `poll_seconds`.
 - `server.log`: the server log.
+
+#### Settings
+
+Click `⋯` on a workspace, then "Settings". The popup has three sections.
+
+"Repository" edits `.factory/factory.yaml`:
+
+- "Library folder": an absolute path, or empty for no library. "Create the folder if it is missing" makes the folder on save. A change shows a warning when the workspace has open tasks.
+- "Terminal": the terminal adapter. A change fails when the workspace has open tasks.
+- "Columns": the board columns. Use "↑", "↓" and "✕" to order and remove them, and "Add column" to add one.
+- "Ticket URL": empty, or a `http` or `https` URL with `{key}`. `factory init` writes the Nextory ticket URL `https://nextory.atlassian.net/browse/{key}` as the default `ticket_url`.
+- "Hidden steps": click "Unhide" to show a step again.
+
+"Built-in step settings" edits the section `create-worktree` of `.factory/config.yaml`:
+
+- "Worktree folder" (`worktree_root`): an absolute path. It cannot be empty.
+- "Base branch" (`base_ref`): empty means `main`.
+
+"Server" edits `poll_seconds` in `$FACTORY_HOME/server.yaml`. It is the poll interval in seconds, from 10 to 86400. It applies to all workspaces. The order is `FACTORY_POLL_SECONDS`, then `poll_seconds`, then 5 minutes. If `FACTORY_POLL_SECONDS` is set, the field is disabled. A save applies at once, without a restart.
+
+Column rules:
+
+- A column name cannot be empty, cannot be `Done`, cannot have more than 40 characters, and cannot appear two times.
+- A column that a step file or a pipeline file names cannot be removed. The popup lists the files.
+- If an open task is in a removed column, or its snapshot names one, the popup asks for a new column for each removed column. The next "Save" moves these tasks. Finished tasks stay in `Done`.
+
+The dashboard makes sure that all values are valid. If one is not, it writes nothing. The popup sends only the changed values. A file without changed values is not written. The popup shows this note above the buttons: "Save rewrites .factory/factory.yaml and .factory/config.yaml. Comments in these files are lost." Cancel closes the popup without a save.
 
 #### Tasks view
 
@@ -471,6 +499,7 @@ To clear the banner, fix the terminal problem (see Troubleshooting). Then run `f
 Set `ticket_url` in `.factory/factory.yaml` to make tickets links.
 Use `{key}` where the ticket goes. Example: `ticket_url: https://example.atlassian.net/browse/{key}`.
 Only `http` and `https` URLs are used.
+You can also set it in the "Settings" popup.
 
 #### Security
 
@@ -569,7 +598,7 @@ Renames add `task_renamed` (`name`), `rename_failed` (`name`, `reason`) and `cla
 
 `version`, `library`, `terminal`, `columns`, `ticket_url`, `hidden_steps` (optional: the ids of hidden steps).
 
-The key `poll_minutes` is not used any more. The poll interval is 5 minutes, or `FACTORY_POLL_SECONDS` seconds.
+The key `poll_minutes` is not used any more. The poll interval is `FACTORY_POLL_SECONDS`, else `poll_seconds` in `$FACTORY_HOME/server.yaml`, else 5 minutes.
 
 When `factory.yaml` or `config.yaml` is not valid YAML, every command prints `Error: <path>: <problem>, line <n>.` and exits with code 1.
 

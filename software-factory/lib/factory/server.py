@@ -11,12 +11,11 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
-from . import api, fsio, repo, runtime, workspaces
+from . import api, fsio, repo, runtime, server_settings, workspaces
 from .errors import ExistsError, FactoryError
 
 IDLE_SECONDS = int(os.environ.get("FACTORY_SERVER_IDLE_SECONDS", "1800"))
 START_TIMEOUT = 30
-POLL_SECONDS = 300
 MAX_BODY_BYTES = 1024 * 1024
 SERVER_INFO_MODE = 0o600
 WEB_DIR = Path(__file__).resolve().parent / "web"
@@ -50,10 +49,7 @@ def log(text):
 
 
 def poll_interval():
-    try:
-        return int(os.environ.get("FACTORY_POLL_SECONDS") or POLL_SECONDS)
-    except ValueError:
-        return POLL_SECONDS
+    return server_settings.poll_seconds()
 
 
 class Server:
@@ -62,6 +58,7 @@ class Server:
         self.last = time.time()
         self.jobs = {}
         self.next_poll = None
+        self.wake = threading.Event()
         self.lock = threading.Lock()
         self.runtimes = {}
         self.list_mtime = None
@@ -157,8 +154,13 @@ class Server:
         while True:
             interval = poll_interval()
             self.next_poll = time.time() + interval
-            time.sleep(interval)
+            if self.wake.wait(interval):
+                self.wake.clear()
+                continue
             self.poll_all()
+
+    def reschedule(self):
+        self.wake.set()
 
     def poll_all(self):
         try:

@@ -4,7 +4,7 @@ import os
 import time
 from pathlib import Path
 
-GLOBAL = ("/api/ping", "/api/shutdown", "/api/jobs/", "/api/workspaces", "/api/host")
+GLOBAL = ("/api/ping", "/api/shutdown", "/api/jobs/", "/api/workspaces", "/api/host", "/api/server-settings")
 
 
 def home():

@@ -167,6 +167,13 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .field > label { padding-top: 7px; font-weight: 600; color: var(--soft); }
 .field input, .field select { width: 100%; box-sizing: border-box; }
 .row { display: flex; gap: 6px; margin: 4px 0; align-items: center; flex-wrap: wrap; }
+.field .row input[type=text] { flex: 1; width: auto; min-width: 0; }
+.field input[type=checkbox] { width: auto; }
+.field .hint { margin: 4px 0 0; }
+#modal h4 { margin: 20px 0 4px; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-strong); }
+#modal h4:first-child { margin-top: 0; }
+.row.marked code { text-decoration: line-through; color: var(--muted); }
+.warning { margin: 4px 0 0; color: var(--err); font-size: 12px; }
 .report { border: 1px solid var(--panel-line); border-radius: 12px; padding: 10px 12px; margin: 8px 0; background: var(--panel); }
 .report .bad { color: var(--err); }
 .report .good { color: var(--ok); font-weight: 600; }
@@ -371,7 +378,7 @@ const SELECTED_PREFIX = "factory.selectedTask.";
 const JOB_POLL_MS = 1000;
 const HIDDEN_PREFIX = "factory.hiddenColumns.";
 const WORKSPACE_KEY = "factory.workspace";
-const GLOBAL_API = /^\/api\/(ping|shutdown|jobs\/|workspaces|host)/;
+const GLOBAL_API = /^\/api\/(ping|shutdown|jobs\/|workspaces|host|server-settings)/;
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
 const state = { generation: 0, view: "tasks", ws: new URLSearchParams(location.search).get("ws"), workspaces: [], renaming: null, info: emptyInfo(), tasks: [], backlog: [], hidden: loadHidden(new URLSearchParams(location.search).get("ws")), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null, panel: { details: loadFlag(DETAILS_KEY, true), workspaces: loadFlag("factory.workspaces", true) } };
 const byId = (id) => document.getElementById(id);
@@ -585,7 +592,7 @@ function closeOnClick(menu) {
   for (const b of menu.querySelectorAll("button")) b.addEventListener("click", () => { const d = b.closest("details"); if (d) d.open = false; });
 }
 function workspaceMenu(ws) {
-  const menu = el("div", { class: "menu" }, button("Rename", () => startRename(ws)), button("Delete", () => openDeleteWorkspace(ws), { cls: "danger" }));
+  const menu = el("div", { class: "menu" }, button("Settings", async () => { await selectWorkspace(ws.id); await openSettings(ws); }), button("Rename", () => startRename(ws)), button("Delete", () => openDeleteWorkspace(ws), { cls: "danger" }));
   closeOnClick(menu);
   return el("details", { class: "more" }, el("summary", { "aria-label": `More actions for ${ws.name}`, title: "More actions" }, "⋯"), menu);
 }
@@ -636,19 +643,30 @@ function failureBox(e) {
   const box = el("div", { class: "report" }, el("pre", { class: "bad" }, e.message));
   const checks = (e.data && e.data.checks) || [];
   if (checks.length) box.append(el("ul", { class: "ws-list" }, ...checks.filter((c) => !c.ok).map((c) => el("li", {}, `${c.name}: ${c.message}`))));
+  const errors = (e.data && e.data.errors) || [];
+  if (errors.length) box.append(el("ul", { class: "ws-list" }, ...errors.map((text) => el("li", {}, text))));
   return box;
 }
-async function openAddWorkspace() {
-  let picker = false;
-  try { picker = !!(await api("/api/host", undefined, true, true)).folder_picker; } catch (e) {}
-  const path = el("input", { type: "text", placeholder: "/path/to/repository" });
-  const out = el("div");
-  const row = el("div", { class: "row" }, path);
+async function folderPicker() {
+  try { return !!(await api("/api/host", undefined, true, true)).folder_picker; } catch (e) { return false; }
+}
+function folderRow(input, out, picker) {
+  const row = el("div", { class: "row" }, input);
   if (picker) {
     row.append(button("Choose folder…", async () => {
-      try { const res = await api("/api/workspaces/pick-folder", {}, true, true); if (res.path) path.value = res.path; } catch (e) { out.replaceChildren(failureBox(e)); }
+      try {
+        const res = await api("/api/workspaces/pick-folder", {}, true, true);
+        if (res.path) { input.value = res.path; input.dispatchEvent(new Event("input")); }
+      } catch (e) { out.replaceChildren(failureBox(e)); }
     }));
   }
+  return row;
+}
+async function openAddWorkspace() {
+  const picker = await folderPicker();
+  const path = el("input", { type: "text", placeholder: "/path/to/repository" });
+  const out = el("div");
+  const row = folderRow(path, out, picker);
   const add = button("Add", async () => {
     out.replaceChildren();
     try { await finishAdd(await api("/api/workspaces/add", { path: path.value.trim() }, true, true)); } catch (e) {
@@ -671,6 +689,124 @@ function openSetup(path, main) {
     el("ul", { class: "ws-list" }, el("li", {}, `${main}/.factory/`), el("li", {}, "two lines in .git/info/exclude")),
     el("p", { class: "muted" }, "Git does not track these files. Init keeps files that exist."),
     field("Library folder", library), out, el("div", { class: "footer" }, closeButton("Cancel"), go)] });
+}
+function textInput(value, attrs = {}) {
+  const n = el("input", { type: "text", ...attrs });
+  n.value = value;
+  return n;
+}
+function hinted(node, hint) { return el("div", {}, node, el("p", { class: "muted hint" }, hint)); }
+async function openSettings(ws) {
+  let data, server, picker;
+  try { [data, server, picker] = await Promise.all([api("/api/settings", undefined, true), api("/api/server-settings", undefined, true), folderPicker()]); } catch (e) { return; }
+  if (state.ws !== ws.id) return;
+  showModal({ title: `Settings of ${ws.name}`, content: settingsForm(data, server, picker), dismissable: false });
+}
+function settingsForm(data, server, picker) {
+  const out = el("div");
+  const movesBox = el("div");
+  const library = textInput(data.library, { placeholder: "No library" });
+  const create = el("input", { type: "checkbox" });
+  const warn = el("p", { class: "warning", hidden: true }, `Tasks not finished: ${data.open_tasks}. Steps and pipelines from the old library can disappear.`);
+  library.addEventListener("input", () => { warn.hidden = !(data.open_tasks > 0 && library.value.trim() !== data.library); });
+  const terminal = el("select", {}, ...data.terminals.map((t) => el("option", { value: t }, t)));
+  terminal.value = data.terminal;
+  const columns = columnsEditor(data.columns);
+  const ticket = textInput(data.ticket_url, { placeholder: data.ticket_default || "https://nextory.atlassian.net/browse/{key}" });
+  const unhide = new Set();
+  const hiddenRows = new Map();
+  const hiddenRow = (id) => {
+    const row = el("div", { class: "row" }, el("code", {}, id));
+    hiddenRows.set(id, row);
+    const b = el("button", { type: "button", onclick: () => {
+      if (unhide.has(id)) unhide.delete(id); else unhide.add(id);
+      row.classList.toggle("marked", unhide.has(id));
+      b.textContent = unhide.has(id) ? "Undo" : "Unhide";
+    } }, "Unhide");
+    row.append(b);
+    return row;
+  };
+  const hiddenSteps = data.hidden_steps.length ? el("div", {}, ...data.hidden_steps.map(hiddenRow)) : el("p", { class: "muted" }, "No hidden steps.");
+  const step = data.steps["create-worktree"];
+  const root = textInput(step.worktree_root);
+  const base = textInput(step.base_ref, { placeholder: "main" });
+  const env = server.env_poll_seconds;
+  const poll = textInput(env !== null ? String(env) : server.saved_poll_seconds === null ? "" : String(server.saved_poll_seconds), { inputmode: "numeric", placeholder: String(server.default_poll_seconds), disabled: env !== null });
+  const stepHint = "Used by the built-in step `create-worktree` only.";
+  const form = { out, movesBox, create, unhide, hiddenRows, moves: null,
+    values: () => ({ library: library.value.trim(), terminal: terminal.value, columns: columns.names(), ticket_url: ticket.value.trim(), worktree_root: root.value.trim(), base_ref: base.value.trim(), poll: poll.value.trim() }) };
+  form.start = form.values();
+  return [
+    el("h4", {}, "Repository"),
+    field("Library folder", el("div", {}, folderRow(library, out, picker), el("label", {}, create, " Create the folder if it is missing"), warn)),
+    field("Terminal", terminal),
+    field("Columns", columns.node),
+    field("Ticket URL", ticket),
+    field("Hidden steps", hiddenSteps),
+    el("h4", {}, "Built-in step settings"),
+    field("Worktree folder", hinted(root, stepHint)),
+    field("Base branch", hinted(base, stepHint)),
+    el("h4", {}, "Server"),
+    field("Poll interval in seconds", hinted(poll, env !== null ? `Set by FACTORY_POLL_SECONDS (${env} seconds).` : "Applies to all workspaces.")),
+    movesBox,
+    out,
+    el("p", { class: "muted" }, "Save rewrites .factory/factory.yaml and .factory/config.yaml. Comments in these files are lost."),
+    el("div", { class: "footer" }, closeButton("Cancel"), button("Save", () => saveSettings(form), { cls: "primary" })),
+  ];
+}
+function columnsEditor(columns) {
+  const list = el("div");
+  const row = (name) => {
+    const r = el("div", { class: "row" }, textInput(name, { "aria-label": "Column name" }),
+      el("button", { type: "button", title: "Move up", onclick: () => { if (r.previousElementSibling) r.previousElementSibling.before(r); } }, "↑"),
+      el("button", { type: "button", title: "Move down", onclick: () => { if (r.nextElementSibling) r.nextElementSibling.after(r); } }, "↓"),
+      el("button", { type: "button", title: "Remove", onclick: () => r.remove() }, "✕"));
+    return r;
+  };
+  list.append(...columns.map(row));
+  const add = el("button", { type: "button", onclick: () => { const r = row(""); list.append(r); r.querySelector("input").focus(); } }, "Add column");
+  return { node: el("div", {}, list, add), names: () => [...list.querySelectorAll("input")].map((n) => n.value.trim()) };
+}
+function movesBlock(movesNeeded, columns) {
+  const choices = Object.entries(movesNeeded).map(([name, ids]) => [name, ids, el("select", {}, ...columns.map((c) => el("option", { value: c }, c)))]);
+  const node = el("div", { class: "report" }, el("p", {}, "Choose a column for the tasks in removed columns."),
+    ...choices.map(([name, ids, select]) => field(`${name} (${ids.length} tasks)`, select)));
+  return { node, moves: () => Object.fromEntries(choices.map(([name, , select]) => [name, select.value])) };
+}
+async function saveSettings(form) {
+  const now = form.values();
+  const was = form.start;
+  const body = {};
+  for (const k of ["library", "terminal", "ticket_url"]) if (now[k] !== was[k]) body[k] = now[k];
+  if ("library" in body && form.create.checked) body.create_library = true;
+  if (JSON.stringify(now.columns) !== JSON.stringify(was.columns)) body.columns = now.columns;
+  if (form.moves) body.moves = form.moves();
+  if (form.unhide.size) body.unhide = [...form.unhide];
+  const step = {};
+  for (const k of ["worktree_root", "base_ref"]) if (now[k] !== was[k]) step[k] = now[k];
+  if (Object.keys(step).length) body.steps = { "create-worktree": step };
+  form.out.replaceChildren();
+  if (Object.keys(body).length) {
+    try { await api("/api/settings/save", body, true, true); } catch (e) {
+      if (e.data && e.data.code === "moves_needed") {
+        const block = movesBlock(e.data.moves_needed, now.columns.filter(Boolean));
+        form.moves = block.moves;
+        form.movesBox.replaceChildren(block.node);
+      } else form.out.replaceChildren(failureBox(e));
+      return;
+    }
+    Object.assign(form, { start: { ...now, poll: was.poll }, moves: null });
+    form.movesBox.replaceChildren();
+    for (const id of form.unhide) form.hiddenRows.get(id).remove();
+    form.unhide.clear();
+  }
+  if (now.poll !== was.poll) {
+    const value = /^\d+$/.test(now.poll) ? Number(now.poll) : now.poll || null;
+    try { await api("/api/server-settings/save", { poll_seconds: value }, true, true); } catch (e) { form.out.replaceChildren(failureBox(e)); return; }
+  }
+  closeModal();
+  state.lastKey = null;
+  await refresh(true);
 }
 function allColumns() { return [...state.info.columns, "Done"]; }
 function columnOf(t) {
