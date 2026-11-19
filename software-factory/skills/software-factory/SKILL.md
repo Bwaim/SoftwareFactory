@@ -52,6 +52,8 @@ Before any command that changes something, show what it will do and wait for the
 - **Release a shared resource** (`exclusive-release`): run `factory exclusive status --json`. List each resource that has a holder, with its holder, the status of the holder and the waiting tasks. Ask which one. Show the holder and its status. Tell the user that the session of the holder loses the resource. Release it only after the user confirms: `factory exclusive release <name> --force`. Then run `factory exclusive status --json` and report who holds it now.
 - **Create or edit a pipeline** (`pipeline-edit`): ask for an id to edit, or nothing for a new one. Run `factory pipeline edit [<id>]`. Tell the user the editor is open in the browser.
 - **Create a new step** (`new-step`): run `factory step edit`. Tell the user the step form is open in the pipeline editor in the browser. To change an existing step, run `factory step edit <id>`.
+- **Create or edit a pipeline in this session** (`edit-pipeline`): follow the built-in step `edit-pipeline`.
+- **Create or edit a step in this session** (`edit-step`): follow the built-in step `edit-step`.
 - **Delete a step** (`step-delete`):
   1. Run `factory step list --all --json`. List the local and generic steps with their level and category. Mark hidden steps `hidden`. Do not list built-in steps.
   2. Ask which one. Run `factory step delete <id> --level <level> --dry-run --json`. Show the files, the step that replaces it, the users and the warnings.

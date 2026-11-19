@@ -12,6 +12,8 @@ ACTIONS = [
     ("Tasks", "exclusive-release", "Release a shared resource", None),
     ("Pipelines and steps", "pipeline-edit", "Create or edit a pipeline", None),
     ("Pipelines and steps", "new-step", "Create a new step", None),
+    ("Pipelines and steps", "edit-pipeline", "Create or edit a pipeline in this session", None),
+    ("Pipelines and steps", "edit-step", "Create or edit a step in this session", None),
     ("Pipelines and steps", "step-delete", "Delete a step", None),
     ("Pipelines and steps", "catalog", "Browse the catalog", None),
     ("Backlog", "backlog-add", "Add a backlog entry", None),

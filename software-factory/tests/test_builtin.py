@@ -4,7 +4,7 @@ from conftest import SF
 from factory import step_format
 from factory.registry import parse_step_text
 
-BUILTINS = ["create-task", "create-worktree", "delete-task", "backlog-add", "backlog-remove", "migrate", "user-validation", "implement", "get-user-request"]
+BUILTINS = ["create-task", "create-worktree", "delete-task", "backlog-add", "backlog-remove", "migrate", "user-validation", "implement", "get-user-request", "edit-step", "edit-pipeline"]
 
 
 def test_builtin_steps_are_version_2():
@@ -29,5 +29,13 @@ def test_quick_task_is_builtin():
 
 
 def test_quick_task_check_has_no_problem(inited):
-    out = inited.factory.json("pipeline", "check", "quick-task")
-    assert out == [], out
+    assert inited.factory.json("pipeline", "check", "quick-task") == []
+
+
+def test_edit_steps_run_in_the_orchestrator():
+    assert sorted(p.stem for p in (SF / "builtin" / "pipelines").glob("*.yaml")) == ["quick-task"]
+    skill = (SF / "skills" / "software-factory" / "SKILL.md").read_text()
+    for sid in ("edit-step", "edit-pipeline"):
+        _, body = parse_step_text((SF / "builtin" / "steps" / f"{sid}.md").read_text(), sid)
+        assert "Run in the orchestrator session." in body and "factory block" not in body
+        assert f"(`{sid}`): follow the built-in step `{sid}`." in skill
