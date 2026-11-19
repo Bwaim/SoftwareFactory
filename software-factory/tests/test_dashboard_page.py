@@ -70,3 +70,10 @@ def test_settings_popup():
                  "Save rewrites .factory/factory.yaml and .factory/config.yaml. Comments in these files are lost."]:
         assert text in PAGE
     assert "server-settings" in PAGE[PAGE.index("const GLOBAL_API"):PAGE.index("\n", PAGE.index("const GLOBAL_API"))]
+
+
+def test_launch_popup_opens_editor_on_a_new_pipeline():
+    assert 'button("Create a pipeline"' in PAGE
+    assert 'new_pipeline: "1"' in PAGE and "createPipelineButton, closeButton(\"Cancel\")" in PAGE
+    editor = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
+    assert 'else if (params.get("new_pipeline")) openModel(emptyModel(), null);' in editor

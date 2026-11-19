@@ -967,6 +967,7 @@ async function init() {
   state.pipelines = await api("/api/pipelines");
   renderStart();
   if (failure) showError(failure);
+  else if (params.get("new_pipeline")) openModel(emptyModel(), null);
 }
 const THEME_KEY = "factory.theme";
 function themeLabel() {
