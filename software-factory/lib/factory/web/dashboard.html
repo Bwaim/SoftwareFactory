@@ -180,6 +180,12 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 #detail-term .tstatus.live i { background: var(--active-dot); }
 #detail-term .screen { flex: 1; min-height: 0; margin: 0 16px; overflow: auto; background: #0E0908; color: #E6DFDC; border: 1px solid #2E2322; border-radius: 8px; padding: 10px 12px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 #detail-term .screen .reason { color: #B3A8A4; font-family: var(--font); }
+#live-host { flex: 1; min-height: 0; margin: 0 16px; background: #0E0908; border: 1px solid #2E2322; border-radius: 8px; padding: 6px 4px 6px 8px; overflow: hidden; }
+#live-host .xterm, #live-host .xterm-viewport { background-color: #0E0908 !important; }
+#detail-term .tmode { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 16px; }
+#detail-term .tmode button { min-height: 26px; font-size: 12px; padding: 0 10px; border: 0; border-radius: 14px; background: transparent; }
+#detail-term .tmode button[aria-pressed="true"] { background: var(--accent); color: #FFFFFF; }
+#detail-term .reconnect { min-height: 28px; font-size: 12px; padding: 0 10px; }
 #detail-term .tinput { padding: 10px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
 #detail-term .keys { display: flex; gap: 4px; flex-wrap: wrap; }
 #detail-term .keys button { min-height: 28px; min-width: 32px; font-size: 12px; padding: 0 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -294,10 +300,16 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
       <div id="detail-term" hidden aria-label="Task terminal">
         <div class="thead">
           <h3>Terminal</h3>
+          <div class="tmode" role="group" aria-label="Terminal mode">
+            <button type="button" data-mode="live" aria-pressed="false" title="A real terminal attached to the session">Live</button>
+            <button type="button" data-mode="snapshot" aria-pressed="false" title="A copy of the screen, read every second">Snapshot</button>
+          </div>
           <span class="tstatus" aria-live="polite"><i aria-hidden="true"></i><span class="tstatus-text">Loading…</span></span>
+          <button type="button" class="reconnect" id="term-reconnect" hidden>Reconnect</button>
           <button type="button" class="close" id="term-close" aria-label="Close terminal" title="Close terminal">✕</button>
         </div>
         <pre class="screen" tabindex="0" aria-label="Last lines of the session"></pre>
+        <div id="live-host" hidden aria-label="Live terminal of the session"></div>
         <div class="tinput">
           <div class="keys" role="group" aria-label="Keys to press">
             <button type="button" data-key="esc" aria-label="Press Escape">Esc</button>
@@ -311,12 +323,12 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
             <button type="button" data-key="enter" aria-label="Press Enter">Enter</button>
             <button type="button" data-key="ctrl+c" class="danger" aria-label="Press Control C">Ctrl+C</button>
           </div>
-          <form class="typeline">
+          <form class="typeline" data-snapshot-only="1">
             <label class="visually-hidden" for="term-text">Text to type in the session</label>
             <input id="term-text" type="text" autocomplete="off" spellcheck="false" placeholder="Type for the session">
             <button type="submit" class="primary">Send</button>
           </form>
-          <div class="hint">Enter sends the text, then Enter. With an empty field, ↑ and ↓ move in menus.</div>
+          <div class="hint" data-snapshot-only="1">Enter sends the text, then Enter. With an empty field, ↑ and ↓ move in menus.</div>
         </div>
       </div>
     </aside>
@@ -1157,7 +1169,7 @@ const EVENT_LABELS = {
   config_asked: "Asked for a config value", migrated: "Migrated", approval_requested: "Approval requested",
   exclusive_wait: "Waiting for a shared resource", exclusive_start: "Started with a shared resource",
   exclusive_released: "Released a shared resource", exclusive_forced: "Shared resource released by force",
-  terminal_input: "Typed in the terminal", terminal_input_failed: "Typing in the terminal failed",
+  terminal_input: "Typed in the terminal", terminal_input_failed: "Typing in the terminal failed", terminal_attached: "Opened the live terminal",
 };
 const EVENT_TONES = {
   step_done: "ok", task_finished: "ok", approved: "ok", task_unblocked: "ok", task_resumed: "ok",
@@ -1311,12 +1323,22 @@ function renderDetail() {
 }
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape" || e.defaultPrevented || modalOpen() || menuOpen() || !state.detail) return;
+  if (e.target.closest && e.target.closest("#detail-term")) return;
   closeDetail();
 });
 window.addEventListener("hashchange", () => { const id = detailHashId(); if (id) openDetail(id); else closeDetail(); });
 setInterval(() => { if (state.detail && !document.hidden) loadDetail(); }, DETAIL_REFRESH_MS);
 
 const TERM_KEY = "factory.terminal";
+const TERM_MODE_KEY = "factory.terminalMode";
+const LIVE_KEYS = { esc: "\x1b", tab: "\t", up: "\x1b[A", down: "\x1b[B", right: "\x1b[C", left: "\x1b[D", backspace: "\x7f", space: " ", enter: "\r", "ctrl+c": "\x03" };
+const LIVE_INPUT_MAX = 8000;
+const LIVE_FIT_DELAY_MS = 150;
+const LIVE_THEME = {
+  background: "#0E0908", foreground: "#E6DFDC", cursor: "#FF5AA5", cursorAccent: "#0E0908", selectionBackground: "#67388899",
+  black: "#2E2322", red: "#FF6B6B", green: "#7CC63A", yellow: "#FECD40", blue: "#6CA8FF", magenta: "#D58BFF", cyan: "#4FD1C5", white: "#E6DFDC",
+  brightBlack: "#7A6E6A", brightRed: "#FF8A8A", brightGreen: "#A8E07F", brightYellow: "#FFE07A", brightBlue: "#9CC4FF", brightMagenta: "#E5B3FF", brightCyan: "#81E6D9", brightWhite: "#FFFFFF",
+};
 const SCREEN_REFRESH_MS = 1000;
 const SCREEN_AFTER_SEND_MS = 200;
 const TERM_FG = "#E6DFDC";
@@ -1324,8 +1346,16 @@ const TERM_BG = "#0E0908";
 const ANSI_16 = ["#2E2322", "#FF6B6B", "#7CC63A", "#FECD40", "#6CA8FF", "#D58BFF", "#4FD1C5", "#E6DFDC",
   "#7A6E6A", "#FF8A8A", "#A8E07F", "#FFE07A", "#9CC4FF", "#E5B3FF", "#81E6D9", "#FFFFFF"];
 const ANSI_SEQUENCE = /\x1b(?:\[([0-9;:?]*)[ -\/]*([@-~])|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])/g;
-state.term = { open: loadTermOpen(), tab: "details", text: null, inflight: false, sending: false, canType: false, reason: "" };
+state.term = { open: loadTermOpen(), mode: loadTermMode(), tab: "details", text: null, inflight: false, sending: false, canType: false, reason: "" };
 function loadTermOpen() { try { return localStorage.getItem(TERM_KEY) === "1"; } catch (e) { return false; } }
+function loadTermMode() { try { return localStorage.getItem(TERM_MODE_KEY) || "live"; } catch (e) { return "live"; } }
+function termMode() { return state.term.mode === "live" && can("attach") ? "live" : "snapshot"; }
+function setTermMode(mode) {
+  state.term.mode = mode;
+  try { localStorage.setItem(TERM_MODE_KEY, mode); } catch (e) {}
+  renderTerminalShell();
+  if (termMode() === "snapshot") { resetScreen(); loadScreen(); }
+}
 function setTerminalOpen(open) {
   state.term.open = open;
   state.term.tab = open ? "terminal" : "details";
@@ -1343,6 +1373,16 @@ function resetScreen() {
 function renderTerminalShell() {
   const aside = byId("detail");
   const show = !!state.detail && state.term.open;
+  const live = show && termMode() === "live";
+  byId("live-host").hidden = !live;
+  document.querySelector("#detail-term .screen").hidden = live;
+  for (const n of document.querySelectorAll("#detail-term [data-snapshot-only]")) n.hidden = live;
+  for (const b of document.querySelectorAll("#detail-term .tmode button")) {
+    b.setAttribute("aria-pressed", b.dataset.mode === termMode() ? "true" : "false");
+    if (b.dataset.mode === "live") b.disabled = !can("attach");
+  }
+  if (live && state.live.id !== state.detail.id) startLive();
+  if (!live && state.live.id) stopLive();
   byId("detail-term").hidden = !show;
   aside.dataset.term = show ? "1" : "";
   aside.dataset.tab = state.term.tab;
@@ -1418,7 +1458,7 @@ function ansiNodes(text) {
 }
 async function loadScreen() {
   const d = state.detail, t = state.term;
-  if (!d || !t.open || t.inflight) return;
+  if (!d || !t.open || t.inflight || termMode() === "live") return;
   t.inflight = true;
   let res;
   try { res = await api(`/api/tasks/${d.id}/screen`, undefined, true, true); } catch (e) { t.inflight = false; return; }
@@ -1445,6 +1485,11 @@ async function loadScreen() {
 }
 function updateTypeControls() {
   const t = state.term;
+  if (termMode() === "live") {
+    const L = state.live;
+    for (const b of document.querySelectorAll("#detail-term .keys button")) { b.disabled = !L.connected; b.title = ""; }
+    return;
+  }
   const off = !t.canType || t.sending;
   for (const b of document.querySelectorAll("#detail-term .tinput button")) {
     b.disabled = off;
@@ -1471,10 +1516,132 @@ async function sendInput(text, keys) {
     loadDetail();
   }
 }
+
+state.live = { id: null, term: null, fit: null, abort: null, observer: null, queue: "", sending: false, connected: false, size: "", fitTimer: null };
+let xtermLoading = null;
+function loadXterm() {
+  if (window.Terminal && window.FitAddon) return Promise.resolve();
+  const load = (tag, attrs) => new Promise((ok, ko) => document.head.append(el(tag, { ...attrs, onload: ok, onerror: () => ko(new Error("Could not load the terminal component.")) })));
+  if (!xtermLoading) {
+    xtermLoading = Promise.all([load("link", { rel: "stylesheet", href: "/static/xterm.css" }), load("script", { src: "/static/xterm.js" })])
+      .then(() => load("script", { src: "/static/addon-fit.js" }))
+      .catch((e) => { xtermLoading = null; throw e; });
+  }
+  return xtermLoading;
+}
+function liveEnded(reason) {
+  const L = state.live;
+  L.connected = false;
+  setTermStatus(false, reason);
+  byId("term-reconnect").hidden = false;
+  updateTypeControls();
+}
+async function startLive() {
+  const d = state.detail, L = state.live;
+  stopLive();
+  L.id = d.id;
+  byId("term-reconnect").hidden = true;
+  setTermStatus(false, "Connecting…");
+  updateTypeControls();
+  try { await loadXterm(); } catch (e) { return liveEnded(e.message); }
+  if (state.live.id !== d.id || L.term) return;
+  const term = new window.Terminal({ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, cursorBlink: true, scrollback: 5000, theme: LIVE_THEME });
+  const fit = new window.FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(clear(byId("live-host")));
+  fit.fit();
+  Object.assign(L, { term, fit, size: `${term.cols}x${term.rows}` });
+  term.onData(queueLive);
+  L.observer = new ResizeObserver(scheduleFit);
+  L.observer.observe(byId("live-host"));
+  try {
+    await api(`/api/tasks/${d.id}/attach`, { cols: term.cols, rows: term.rows }, true);
+  } catch (e) {
+    term.write(`\r\n${e.message}\r\n`);
+    return liveEnded("Not live");
+  }
+  if (L.term === term) streamLive(d.id, term);
+}
+async function streamLive(id, term) {
+  const L = state.live, ctrl = new AbortController();
+  L.abort = ctrl;
+  let res;
+  try {
+    res = await fetch(apiUrl(`/api/tasks/${id}/attach/stream`), { headers: { "X-Factory-Token": TOKEN }, signal: ctrl.signal });
+  } catch (e) { if (!ctrl.signal.aborted) liveEnded("The connection failed."); return; }
+  if (!res.ok) {
+    let message = res.statusText;
+    try { message = (await res.json()).error || message; } catch (e) {}
+    term.write(`\r\n${message}\r\n`);
+    return liveEnded("Not live");
+  }
+  L.connected = true;
+  setTermStatus(true, "Live");
+  updateTypeControls();
+  term.focus();
+  const reader = res.body.getReader(), decoder = new TextDecoder();
+  let pending = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      pending += decoder.decode(value, { stream: true });
+      for (let nl = pending.indexOf("\n"); nl >= 0; nl = pending.indexOf("\n")) {
+        const msg = JSON.parse(pending.slice(0, nl));
+        pending = pending.slice(nl + 1);
+        if (msg.d) term.write(Uint8Array.from(atob(msg.d), (c) => c.charCodeAt(0)));
+        if (msg.closed) return liveEnded("The session terminal ended.");
+      }
+    }
+  } catch (e) { if (ctrl.signal.aborted) return; }
+  if (!ctrl.signal.aborted) liveEnded("The connection closed.");
+}
+function queueLive(data) {
+  const L = state.live;
+  if (!L.connected || !data) return;
+  L.queue += data;
+  if (!L.sending) flushLive();
+}
+/** Keys go out in order, one request at a time; keys typed meanwhile wait in the queue and leave together. */
+async function flushLive() {
+  const L = state.live, id = L.id;
+  L.sending = true;
+  while (L.queue && L.id === id) {
+    const data = L.queue.slice(0, LIVE_INPUT_MAX);
+    L.queue = L.queue.slice(data.length);
+    try { await api(`/api/tasks/${id}/attach/input`, { data }, true); } catch (e) { L.queue = ""; }
+  }
+  L.sending = false;
+}
+function scheduleFit() {
+  const L = state.live;
+  clearTimeout(L.fitTimer);
+  L.fitTimer = setTimeout(() => {
+    if (!L.term || byId("live-host").hidden) return;
+    L.fit.fit();
+    const size = `${L.term.cols}x${L.term.rows}`;
+    if (size === L.size || !L.connected) return;
+    L.size = size;
+    api(`/api/tasks/${L.id}/attach/resize`, { cols: L.term.cols, rows: L.term.rows }, true).catch(() => {});
+  }, LIVE_FIT_DELAY_MS);
+}
+function stopLive() {
+  const L = state.live;
+  if (L.abort) L.abort.abort();
+  if (L.observer) L.observer.disconnect();
+  if (L.term) L.term.dispose();
+  clearTimeout(L.fitTimer);
+  Object.assign(L, { id: null, term: null, fit: null, abort: null, observer: null, queue: "", connected: false, size: "" });
+}
 byId("term-close").addEventListener("click", () => setTerminalOpen(false));
 byId("tab-details").addEventListener("click", () => { state.term.tab = "details"; renderTerminalShell(); });
 byId("tab-terminal").addEventListener("click", () => { state.term.tab = "terminal"; renderTerminalShell(); loadScreen(); });
-for (const b of document.querySelectorAll("#detail-term .keys button")) b.addEventListener("click", () => sendInput("", [b.dataset.key]));
+for (const b of document.querySelectorAll("#detail-term .keys button")) b.addEventListener("click", () => {
+  if (termMode() === "live") { queueLive(LIVE_KEYS[b.dataset.key]); if (state.live.term) state.live.term.focus(); }
+  else sendInput("", [b.dataset.key]);
+});
+for (const b of document.querySelectorAll("#detail-term .tmode button")) b.addEventListener("click", () => setTermMode(b.dataset.mode));
+byId("term-reconnect").addEventListener("click", () => { stopLive(); renderTerminalShell(); });
 document.querySelector("#detail-term .typeline").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = byId("term-text");

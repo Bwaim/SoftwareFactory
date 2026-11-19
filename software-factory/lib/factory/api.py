@@ -25,6 +25,13 @@ class NotFound(Exception):
     pass
 
 
+class Stream:
+    """A route result sent as a long streamed response of JSON lines, not as one JSON body."""
+
+    def __init__(self, lines):
+        self.lines = lines
+
+
 class DetailedError(FactoryError):
     def __init__(self, message, **details):
         super().__init__(message)
@@ -298,6 +305,36 @@ def task_screen(server, tid, query, body):
 def task_type(server, tid, query, body):
     from . import task_terminal
     return task_terminal.send_input(server.ctx, tid, body.get("text", ""), body.get("keys", []))
+
+
+@route("POST", f"/api/tasks/{TASK}/attach")
+def task_attach_open(server, tid, query, body):
+    from . import task_attach
+    return task_attach.open_terminal(server.ctx, tid, body.get("cols"), body.get("rows"))
+
+
+@route("GET", f"/api/tasks/{TASK}/attach/stream")
+def task_attach_stream(server, tid, query, body):
+    from . import task_attach
+    return Stream(task_attach.stream(server.ctx, tid))
+
+
+@route("POST", f"/api/tasks/{TASK}/attach/input")
+def task_attach_input(server, tid, query, body):
+    from . import task_attach
+    return task_attach.write(server.ctx, tid, body.get("data"))
+
+
+@route("POST", f"/api/tasks/{TASK}/attach/resize")
+def task_attach_resize(server, tid, query, body):
+    from . import task_attach
+    return task_attach.resize(server.ctx, tid, body.get("cols"), body.get("rows"))
+
+
+@route("POST", f"/api/tasks/{TASK}/attach/close")
+def task_attach_close(server, tid, query, body):
+    from . import task_attach
+    return task_attach.close(server.ctx, tid)
 
 
 @route("POST", f"/api/tasks/{TASK}/focus")

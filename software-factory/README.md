@@ -90,7 +90,7 @@ Herdr adapter:
 - `herdr worktree open`
 - `herdr tab create`, `herdr tab close`
 - `herdr workspace close`
-- `herdr agent start`, `herdr agent prompt`, `herdr agent get`, `herdr agent read`, `herdr pane send-text`
+- `herdr agent start`, `herdr agent prompt`, `herdr agent get`, `herdr agent read`, `herdr agent attach`, `herdr pane send-text`
 - `herdr agent focus`, `herdr agent wait`, `herdr agent send-keys`
 - `herdr workspace rename`, `herdr tab rename`, `herdr agent rename`
 - `open -a <terminal app>`
@@ -401,15 +401,27 @@ The panel refreshes every 3 seconds. It shows:
 
 The "Terminal" button in the task details opens the session terminal on the right of the details. Its ✕ button closes it. The browser remembers if it is open.
 When the window is too narrow for both, "Details" and "Terminal" tabs switch between them.
+The terminal has two modes. The browser remembers the last one.
+
+**Live** (default, when the terminal adapter has `attach`): a real terminal, attached to the session.
+
+- The server runs `herdr agent attach <agent>` in a pseudo-terminal and streams it to the page. The page shows it with xterm.js, served by the local server from `lib/factory/web/vendor/xterm` (no CDN).
+- Click in the terminal and type: every key goes to the session as you press it. The key buttons send the same keys.
+- The terminal follows the size of the panel.
+- One live terminal per task is shared by every open page. A new page gets the last 256 KB of output first.
+- A live terminal nobody watches closes after 30 seconds. At most 8 are open at once.
+- "Reconnect" shows when the terminal or the connection ends.
+- Typing clears "May wait for you". The timeline shows "Opened the live terminal", not each key.
+
+**Snapshot**: a copy of the screen, for adapters without `attach`.
 
 - The screen shows the last 120 lines of the session, with their colors, read with `herdr agent read --format ansi` every second. It stays at the last line, unless you scrolled up.
 - Type in the field and press Enter or "Send": the text is typed with `herdr pane send-text`, then Enter is pressed.
 - The key buttons press one key with `herdr agent send-keys`: Esc, Tab, the arrows, Backspace, Space, Enter and Ctrl+C. With an empty field, the ↑ and ↓ keys of your keyboard press the arrows too, to move in a menu of the session.
-- Escape in the field leaves the field. It does not close the panel.
 - Typing clears "May wait for you". The timeline shows "Typed in the terminal" with the keys and the number of characters. The text itself is not saved, because a terminal can ask for a password or a token.
 - It needs a live session and a terminal adapter with `read_screen` (to read) and `type_input` (to type). Otherwise the terminal says why.
 
-This is not a full terminal: the screen is a copy that refreshes every second, and the cursor is not shown.
+Escape inside the terminal never closes the panel.
 
 #### Launch form
 

@@ -311,3 +311,18 @@ def test_herdr_typing_refused_when_agent_in_other_tab(herdr_env, monkeypatch):
     with pytest.raises(AdapterError, match="does not belong"):
         adapter.send_keys({"agent": "t1", "tab": "w9:t1"}, ["enter"])
     assert not any(c[:2] in (["pane", "send-text"], ["agent", "send-keys"]) for c in calls())
+
+
+def test_herdr_attach_command_attaches_to_the_agent(herdr_env, monkeypatch):
+    adapter, _ = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    assert "attach" in adapter.capabilities()
+    assert adapter.attach_command({"agent": "t1", "tab": "w9:t1"}) == ["herdr", "agent", "attach", "t1"]
+
+
+def test_herdr_attach_refused_when_agent_in_other_tab(herdr_env, monkeypatch):
+    adapter, _ = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w3:t4")
+    with pytest.raises(AdapterError, match="does not belong"):
+        adapter.attach_command({"agent": "t1", "tab": "w9:t1"})
