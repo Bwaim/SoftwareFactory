@@ -269,6 +269,10 @@ class HerdrAdapter(Adapter):
         self.require_owned(handle)
         run(["agent", "focus", handle["agent"]])
 
+    def attach_command(self, handle):
+        self.require_owned(handle)
+        return ["herdr", "agent", "attach", handle["agent"]]
+
     def rename(self, handle, name):
         self.require_owned(handle)
         run(["agent", "rename", handle["agent"], name])

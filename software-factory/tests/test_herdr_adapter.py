@@ -277,3 +277,18 @@ def test_existing_main_workspace_is_never_closed(herdr_env, origin_repo, monkeyp
     assert adapter.close(handle) == []
     assert "w5" not in closed(calls())
     assert "w5" not in recorded(origin_repo)
+
+
+def test_herdr_attach_command_attaches_to_the_agent(herdr_env, monkeypatch):
+    adapter, _ = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    assert "attach" in adapter.capabilities()
+    assert adapter.attach_command({"agent": "t1", "tab": "w9:t1"}) == ["herdr", "agent", "attach", "t1"]
+
+
+def test_herdr_attach_refused_when_agent_in_other_tab(herdr_env, monkeypatch):
+    adapter, _ = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_PRESENT", "1")
+    monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w3:t4")
+    with pytest.raises(AdapterError, match="does not belong"):
+        adapter.attach_command({"agent": "t1", "tab": "w9:t1"})

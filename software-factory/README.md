@@ -90,7 +90,7 @@ Herdr adapter:
 - `herdr worktree open`
 - `herdr tab create`, `herdr tab close`
 - `herdr workspace close`
-- `herdr agent start`, `herdr agent prompt`, `herdr agent get`, `herdr agent read`
+- `herdr agent start`, `herdr agent prompt`, `herdr agent get`, `herdr agent read`, `herdr agent attach`
 - `herdr agent focus`, `herdr agent wait`, `herdr agent send-keys`
 - `herdr workspace rename`, `herdr tab rename`, `herdr agent rename`
 - `open -a <terminal app>`
@@ -336,6 +336,9 @@ The server keeps its data in `$FACTORY_HOME`. The default is `~/.config/software
 
 #### Tasks view
 
+The page itself does not scroll: the board, the workspaces, the details and the terminal each scroll on their own, and reaching the end of one does not scroll another.
+The **Workspaces** column on the left has a vertical tab on its right edge, like the task columns. It is open by default; click the tab to hide or show the list. Drag its right edge to change its width (220 px by default); the arrow keys work on a focused edge and a double click resets it. The browser remembers your choices.
+
 The board has one column for each name in `columns` of `.factory/factory.yaml`, plus a `Done` column.
 A finished task is always in `Done`.
 Any other task is in the column of its current step.
@@ -367,7 +370,7 @@ Status pill colors:
 | `finished` | grey, green dot |
 
 The header has a light and dark mode button. The browser remembers your choice, for the dashboard and the pipeline editor.
-The browser tab title shows how many tasks need you, for example "(2) CAPTN". An "Offline" tag shows when the page cannot reach the server.
+The browser tab title shows how many tasks need you, for example "(2) CAPTN Factory". An "Offline" tag shows when the page cannot reach the server.
 
 Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
 
@@ -387,15 +390,34 @@ Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
 
 #### Task details
 
-Click a card, or its name, to open the task details on the right. The board stays usable and scrolls next to it.
-The panel closes with its ✕ button or Escape. The open task is in the address (`#task=<id>`), so a reload keeps it open.
-On a narrow window, the panel fills the page.
-The panel refreshes every 3 seconds. It shows:
+Two columns sit on the right of the board: **Details**, then **Terminal**. Each column has a vertical tab on its left edge. A tab opens or closes only its own column; a closed column shows only its tab. The browser remembers which columns are open.
+The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns. When the narrower board would hide the card's column, the board scrolls sideways just enough to show it.
+By default, the two open columns together cover about a third of the page; one open column alone also covers about a third. A width you drag stays.
+Click a column's tab, or press Escape outside the terminal for the details, to close it; the task stays selected.
+Below 900 px, an open column fills the page.
+The details refresh every 3 seconds while their column is open. They show:
 
 - The name, the ticket, the description, the status and the same buttons as the card.
 - **Pipeline**: every step of the pipeline. Done steps have a check, the current step says "now" and the loop count.
 - **Timeline**: the events of the task, newest first, from `events.jsonl`. It shows the last 200 events.
 - **Details**: pipeline, ticket, MR, branch, base, worktree, created and updated times, the values of the task state and the artifacts.
+
+#### Task terminal
+
+The Terminal tab opens the session terminal of the selected task. Its title shows the task name.
+Drag the left edge of the details or of the terminal to change its width. The arrow keys move a focused edge too, and a double click resets it. The browser remembers the widths.
+
+The terminal is a real terminal, attached to the session:
+
+- The server runs `herdr agent attach <agent>` in a pseudo-terminal and streams it to the page. The page shows it with xterm.js, served by the local server from `lib/factory/web/vendor/xterm` (no CDN).
+- Click in the terminal and type: every key goes to the session as you press it. The key buttons (Esc, Tab, the arrows, Backspace, Space, Enter, Ctrl+C) send the same keys.
+- The terminal follows the size of its column.
+- One terminal per task is shared by every open page. A new page gets the last 256 KB of output first.
+- A terminal nobody watches closes after 30 seconds. At most 8 are open at once.
+- "Reconnect" shows when the terminal or the connection ends.
+- Typing clears "May wait for you". The timeline shows "Opened the live terminal" once per task, the first time; not each key, and not each restart.
+- It needs a live session and a terminal adapter with `attach`. Otherwise the terminal says why.
+- Escape inside the terminal never closes the panel.
 
 #### Launch form
 

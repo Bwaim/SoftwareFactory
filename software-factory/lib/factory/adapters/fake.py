@@ -60,6 +60,12 @@ class FakeAdapter(Adapter):
         self.require("focus")
         self.record("focus", handle=handle)
 
+    def attach_command(self, handle):
+        self.require("attach")
+        self.record("attach_command", handle=handle)
+        return list(self.cfg().get("attach_command", ["cat"]))
+
+
     def rename(self, handle, name):
         self.require("rename")
         self.record("rename", handle=handle, name=name)

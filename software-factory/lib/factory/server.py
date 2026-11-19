@@ -22,6 +22,11 @@ SERVER_INFO_MODE = 0o600
 WEB_DIR = Path(__file__).resolve().parent / "web"
 START_WARNING = "Warning: the local server did not start, so done checks do not run. See {log}."
 PAGES = {"/editor": "editor.html", "/dashboard": "dashboard.html"}
+STATIC = {
+    "/static/xterm.js": ("vendor/xterm/xterm.js", "text/javascript; charset=utf-8"),
+    "/static/xterm.css": ("vendor/xterm/xterm.css", "text/css; charset=utf-8"),
+    "/static/addon-fit.js": ("vendor/xterm/addon-fit.js", "text/javascript; charset=utf-8"),
+}
 
 
 def info_path():
@@ -119,6 +124,8 @@ class Server:
         try:
             self.httpd.serve_forever()
         finally:
+            from .pty_sessions import REGISTRY
+            REGISTRY.close_all()
             info = read_info()
             if info and info.get("pid") == os.getpid():
                 info_path().unlink(missing_ok=True)
@@ -203,6 +210,22 @@ def make_handler(server):
             self.end_headers()
             self.wfile.write(data)
 
+        def stream(self, lines):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            try:
+                for chunk in lines:
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+                    server.last = time.time()
+            except OSError:
+                pass
+            finally:
+                lines.close()
+
         def token_ok(self):
             supplied = self.headers.get("X-Factory-Token", "")
             try:
@@ -243,6 +266,9 @@ def make_handler(server):
             if method == "GET" and url.path in PAGES:
                 server.last = time.time()
                 return self.reply(200, (WEB_DIR / PAGES[url.path]).read_bytes(), "text/html; charset=utf-8")
+            if method == "GET" and url.path in STATIC:
+                path, content_type = STATIC[url.path]
+                return self.reply(200, (WEB_DIR / path).read_bytes(), content_type)
             if not url.path.startswith("/api/"):
                 return self.reply(404, {"error": "Not found."})
             if not self.token_ok():
@@ -250,7 +276,10 @@ def make_handler(server):
             server.last = time.time()
             try:
                 body = self.read_body() if method == "POST" else {}
-                self.reply(200, api.dispatch(server, method, url.path, parse_qs(url.query), body))
+                result = api.dispatch(server, method, url.path, parse_qs(url.query), body)
+                if isinstance(result, api.Stream):
+                    return self.stream(result.lines)
+                self.reply(200, result)
             except api.NotFound:
                 self.reply(404, {"error": "Not found."})
             except KeyError as e:

@@ -66,9 +66,6 @@ def test_detail_route(served):
 
 
 def test_dashboard_page_has_the_detail_panel():
-    for text in ('id="detail"', "/detail`", "#task=", "Close details", "Pipeline", "Timeline", "closeDetail", "DETAIL_REFRESH_MS"):
+    for text in ('id="detail"', "/detail`", "#task=", "Hide the ", "Pipeline", "Timeline", "closeDetail", "DETAIL_REFRESH_MS"):
         assert text in PAGE
 
-
-def test_dashboard_page_has_no_terminal_section():
-    assert "/screen`" not in PAGE and "terminalSection" not in PAGE

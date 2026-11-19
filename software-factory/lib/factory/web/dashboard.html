@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CAPTN</title>
+<title>CAPTN Factory</title>
 <script>
 try { if (localStorage.getItem("factory.theme") === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}
 </script>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect x='18' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E%3Crect x='94' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E%3Crect x='26' y='50' width='68' height='56' rx='18' fill='%23673888'/%3E%3Cpath d='M30 48 L22 28 Q60 10 98 28 L90 48 Z' fill='%23C4005E'/%3E%3Crect x='20' y='44' width='80' height='11' rx='5.5' fill='%231A1110'/%3E%3Ccircle cx='60' cy='32' r='7' fill='%23FECD40'/%3E%3Ccircle cx='46' cy='76' r='8' fill='%23FFFFFF'/%3E%3Ccircle cx='47.5' cy='77' r='3.5' fill='%231A1110'/%3E%3Ccircle cx='74' cy='76' r='9' fill='%231A1110'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='17 17 86 90'%3E%3Crect x='18' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E%3Crect x='94' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E %3Crect x='26' y='50' width='68' height='56' rx='18' fill='%23673888'/%3E %3Cpath d='M30 48 L22 28 Q60 10 98 28 L90 48 Z' fill='%23C4005E'/%3E %3Crect x='20' y='44' width='80' height='11' rx='5.5' fill='%231A1110'/%3E %3Ccircle cx='60' cy='32' r='7' fill='%23FECD40'/%3E %3Ccircle cx='46' cy='76' r='8' fill='%23FFFFFF'/%3E%3Ccircle cx='47.5' cy='77' r='3.5' fill='%231A1110'/%3E %3Cline x1='66' y1='64' x2='94' y2='58' stroke='%231A1110' stroke-width='3' stroke-linecap='round'/%3E %3Ccircle cx='74' cy='76' r='9' fill='%231A1110'/%3E %3Cpath d='M50 92 Q60 99 70 92' fill='none' stroke='%23FFFFFF' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
 <style>
 :root { color-scheme: dark;
@@ -19,7 +19,7 @@ try { if (localStorage.getItem("factory.theme") === "light") document.documentEl
   --approval-bg: #423410; --approval-fg: #FECD40; --approval-dot: #FECD40;
   --attn-bg: #4A1430; --attn-fg: #FF9CC8; --attn-dot: #FF5AA5; --attn-line: #5C2441;
   --wait-bg: #352448; --wait-fg: #D6BCEB; --wait-dot: #B98BDB;
-  --neutral-fg: #D8D0CC; --paused-dot: #A99E9A;
+  --neutral-fg: #D8D0CC; --paused-dot: #A99E9A; --tab-on: #C9A2E6;
   --shadow: rgba(0, 0, 0, 0.5); --bot-band: #FFFFFF; --bot-eye: #1A1110;
   --font: "Nextory Sans", Figtree, Roboto, Arial, sans-serif; }
 :root[data-theme="light"] { color-scheme: light;
@@ -31,9 +31,9 @@ try { if (localStorage.getItem("factory.theme") === "light") document.documentEl
   --approval-bg: #FFF3CC; --approval-fg: #6E5100; --approval-dot: #E0A800;
   --attn-bg: #FDE3EF; --attn-fg: #A3004E; --attn-dot: #E0337F; --attn-line: #F5C2D9;
   --wait-bg: #EFE6F7; --wait-fg: #5B2D80; --wait-dot: #8A55B5;
-  --neutral-fg: #4A3F3B; --paused-dot: #8C817D;
+  --neutral-fg: #4A3F3B; --paused-dot: #8C817D; --tab-on: #673888;
   --shadow: rgba(26, 17, 16, 0.15); --bot-band: #1A1110; --bot-eye: #FFFFFF; }
-body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var(--fg); min-height: 100vh; display: flex; flex-direction: column; }
+body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var(--fg); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 [hidden] { display: none !important; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 header { background: var(--top); border-bottom: 1px solid var(--panel-line); padding: 12px 24px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
@@ -46,11 +46,18 @@ header nav { display: flex; gap: 6px; }
 .brand .wordmark em { font-style: normal; color: var(--brand-pink); }
 .brand .tagline { font-size: 11px; color: var(--muted-strong); letter-spacing: .02em; }
 #updated { color: var(--muted-strong); }
-.workspace { flex: 1; display: flex; min-height: 0; }
+.workspace { flex: 1; display: flex; min-height: 0; min-width: 0; }
 .layout { flex: 1; display: flex; min-height: 0; }
-#sidebar { flex: 0 0 220px; width: 220px; box-sizing: border-box; background: var(--column); border-right: 1px solid var(--panel-line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+#main, #sidebar, #detail-main, #live-host .xterm-viewport { overscroll-behavior: contain; }
+#lcol-ws { flex: none; display: flex; min-height: 0; }
+#lcol-ws .rail-tab { border-right: 1px solid var(--panel-line); }
+#sidebar[hidden] { display: none !important; }
+#ws-pane { position: relative; display: flex; min-height: 0; }
+#ws-pane .resizer { left: auto; right: -4px; }
+#sidebar[hidden] + .resizer { display: none; }
+#sidebar { flex: 0 0 var(--ws-w, 220px); width: var(--ws-w, 220px); box-sizing: border-box; overflow-y: auto; min-height: 0; background: var(--column); border-right: 1px solid var(--panel-line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
 #sidebar .side-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 8px; }
-#sidebar h2 { margin: 0; font-size: 15px; font-weight: 700; }
+#sidebar h2, #detail h2, #detail-term .thead h3 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.2; color: var(--muted-strong); }
 #sidebar .add { min-height: 28px; min-width: 28px; padding: 0; font-size: 16px; }
 .ws { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 12px; }
 .ws.on { background: var(--raised); }
@@ -62,7 +69,7 @@ header nav { display: flex; gap: 6px; }
 .count.badge { background: var(--accent); color: #FFFFFF; }
 .ws-error { color: var(--err); background: var(--err-bg); border: 1px solid var(--err-line); border-radius: 12px; padding: 12px 16px; margin: 0; }
 .ws-list { margin: 8px 0; padding-left: 20px; }
-main { padding: 20px 24px 32px; flex: 1; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; }
+main { padding: 20px 24px 32px; flex: 1; min-width: 0; min-height: 0; overflow: auto; display: flex; flex-direction: column; box-sizing: border-box; }
 main > div { flex: 1; display: flex; flex-direction: column; }
 input, select, button, textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, .link:focus-visible { outline: 2px solid var(--brand-pink); outline-offset: 2px; }
@@ -82,14 +89,14 @@ a, .link { color: var(--link); cursor: pointer; font-weight: 600; }
 a:hover, .link:hover { color: var(--link-hover); }
 .muted { color: var(--muted); font-size: 12px; }
 .rename-error { color: var(--err); font-size: 12px; margin: 2px 0; }
-#error { display: none; position: sticky; top: 0; z-index: 20; background: var(--accent); color: #FFFFFF; font-weight: 600; padding: 10px 24px; }
+#error { display: none; flex: none; z-index: 20; background: var(--accent); color: #FFFFFF; font-weight: 600; padding: 10px 24px; }
 #banner { background: var(--yellow); color: #1A1110; font-weight: 600; padding: 10px 24px; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
 button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-height: 1; }
 .toolbar > button.launch { min-height: 40px; padding: 0 18px; font-size: 14px; }
 .toolbar > .muted { margin: 0 4px 0 8px; }
 .board { flex: 1; display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
-.column { flex: 0 0 280px; background: var(--column); border-radius: 16px; padding: 12px; min-height: 200px; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
+.column { flex: 1 0 280px; background: var(--column); border-radius: 16px; padding: 12px; min-height: 200px; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
 .column h3 { margin: 0; padding: 2px 4px 4px; min-height: 28px; display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; }
 .column h3 .side { display: flex; gap: 6px; align-items: center; }
 .column h3 button { min-height: 28px; font-size: 12px; padding: 0 10px; }
@@ -168,11 +175,42 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .card .name-link { font: inherit; font-weight: 700; color: var(--fg); background: none; border: 0; padding: 0; min-height: 0; border-radius: 4px; text-align: left; }
 .card .name-link:hover { background: none; text-decoration: underline; }
 .card.task { cursor: pointer; }
-#detail { flex: 0 0 480px; max-width: 480px; box-sizing: border-box; position: sticky; top: 0; height: 100vh; overflow: auto; background: var(--column); border-left: 1px solid var(--panel-line); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+#detail { flex: 0 0 auto; display: flex; box-sizing: border-box; min-height: 0; background: var(--column); border-left: 1px solid var(--panel-line); }
+#detail-main { width: var(--detail-w, var(--detail-auto)); box-sizing: border-box; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+#detail-main[hidden], #detail-term[hidden] { display: none !important; }
+#detail { --detail-auto: max(300px, calc(33.3vw - 30px)); --term-auto: max(300px, calc(33.3vw - 30px)); }
+#detail[data-both="1"] { --detail-auto: max(260px, calc(16.65vw - 30px)); --term-auto: max(260px, calc(16.65vw - 30px)); }
+.pcol { position: relative; display: flex; min-height: 0; border-left: 1px solid var(--panel-line); }
+.pcol:first-child { border-left: 0; }
+.pcol:not([data-open="1"]) .resizer { display: none; }
+.rail-tab { flex: none; width: 30px; min-height: 0; padding: 14px 0; border: 0; border-right: 1px solid var(--panel-line); border-radius: 0; background: transparent; justify-content: flex-start; color: var(--muted-strong); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.rail-tab:hover { background: var(--raised); color: var(--fg); }
+.rail-tab .label { writing-mode: vertical-rl; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.rail-tab .chev { font-size: 14px; line-height: 1; }
+.rail-tab[aria-expanded="true"] { box-shadow: inset 3px 0 0 var(--accent); color: var(--tab-on); background: var(--raised); }
+#detail-term .thead h3 .tname { margin-left: 6px; }
+.resizer { position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; cursor: col-resize; z-index: 3; touch-action: none; }
+.resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background .15s; }
+.resizer:hover::after, .resizer:focus-visible::after, body.resizing .resizer.active::after { background: var(--brand-pink); }
+.resizer:focus-visible { outline: none; }
+body.resizing { cursor: col-resize; user-select: none; }
+body.resizing iframe, body.resizing .xterm { pointer-events: none; }
+#detail-term { width: var(--term-w, var(--term-auto)); box-sizing: border-box; display: flex; flex-direction: column; background: var(--column); min-height: 0; }
+#detail-term .thead { display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px; min-height: 36px; }
+#detail-term .thead h3 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#detail-term .tstatus { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+#detail-term .tstatus i { width: 8px; height: 8px; border-radius: 50%; background: var(--paused-dot); display: block; }
+#detail-term .tstatus.live i { background: var(--active-dot); }
+#live-host { flex: 1; min-height: 0; margin: 0 16px; background: #0E0908; border: 1px solid #2E2322; border-radius: 8px; padding: 6px 4px 6px 8px; overflow: hidden; }
+#live-host .xterm, #live-host .xterm-viewport { background-color: #0E0908 !important; }
+#detail-term .reconnect { min-height: 28px; font-size: 12px; padding: 0 10px; }
+#detail-term .tinput { padding: 10px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+#detail-term .keys { display: flex; gap: 4px; flex-wrap: wrap; }
+#detail-term .keys button { min-height: 28px; min-width: 32px; font-size: 12px; padding: 0 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 #detail .dhead { display: flex; gap: 8px; align-items: flex-start; }
 #detail .dhead .names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 #detail .dhead .ticket { font-size: 13px; font-weight: 700; }
-#detail h2 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+#detail h2 { overflow-wrap: anywhere; }
 #detail .close { width: 36px; padding: 0; border-radius: 50%; flex: none; font-size: 16px; }
 #detail .desc { margin: 0; font-size: 15px; font-weight: 600; }
 #detail .pills { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -209,12 +247,21 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .facts details summary { cursor: pointer; color: var(--link); font-weight: 600; }
 .facts details pre { margin: 6px 0 0; font-size: 12px; }
 @media (max-width: 900px) {
-  #detail { position: fixed; inset: 0; z-index: 15; max-width: none; height: auto; border-left: 0; }
+  #detail { position: fixed; top: 0; right: 0; bottom: 0; z-index: 15; height: auto; }
+  #detail[data-open="1"] { left: 0; border-left: 0; }
+  .resizer { display: none; }
+  .pcol[data-open="1"], #detail-main, #detail-term { width: auto; flex: 1; }
 }
 @media (max-width: 600px) {
+  body { height: auto; overflow: visible; }
+  main { overflow: visible; }
   header, main { padding-left: 16px; padding-right: 16px; }
   .layout { flex-direction: column; }
-  #sidebar { flex: none; width: auto; border-right: 0; border-bottom: 1px solid var(--panel-line); }
+  #lcol-ws { flex-direction: column; }
+  #lcol-ws #ws-tab { display: none; }
+  #ws-pane { width: 100%; }
+  #ws-pane #sidebar { flex: 1; }
+  #sidebar, #sidebar[hidden] { display: flex !important; flex: none; width: auto; border-right: 0; border-bottom: 1px solid var(--panel-line); }
   .field { grid-template-columns: 1fr; }
   .field > label { padding-top: 0; }
 }
@@ -257,10 +304,48 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
   </button>
 </header>
 <div class="layout">
-  <aside id="sidebar"></aside>
+  <div id="lcol-ws">
+    <div id="ws-pane">
+      <aside id="sidebar" aria-label="Workspaces"></aside>
+      <div class="resizer" id="resize-ws" role="separator" aria-orientation="vertical" aria-label="Resize the workspaces" tabindex="0"></div>
+    </div>
+    <button type="button" class="rail-tab" id="ws-tab" aria-controls="sidebar" aria-expanded="true"><span class="label">Workspaces</span><span class="chev" aria-hidden="true">◂</span></button>
+  </div>
   <div class="workspace">
     <main id="main"></main>
-    <aside id="detail" hidden aria-label="Task details"></aside>
+    <aside id="detail" hidden aria-label="Task details">
+      <div class="pcol" id="pcol-details" role="group" aria-label="Task details">
+        <div class="resizer" id="resize-detail" role="separator" aria-orientation="vertical" aria-label="Resize the task details" tabindex="0"></div>
+        <button type="button" class="rail-tab" id="details-tab" aria-controls="detail-main" aria-expanded="false"><span class="label">Details</span><span class="chev" aria-hidden="true">◂</span></button>
+        <div id="detail-main" hidden></div>
+      </div>
+      <div class="pcol" id="pcol-term" role="group" aria-label="Task terminal">
+      <div class="resizer" id="resize-term" role="separator" aria-orientation="vertical" aria-label="Resize the terminal" tabindex="0"></div>
+      <button type="button" class="rail-tab" id="term-tab" aria-controls="detail-term" aria-expanded="false"><span class="label">Terminal</span><span class="chev" aria-hidden="true">◂</span></button>
+      <div id="detail-term" hidden>
+        <div class="thead">
+          <h3>Terminal<span class="tname" id="term-task"></span></h3>
+          <span class="tstatus" aria-live="polite"><i aria-hidden="true"></i><span class="tstatus-text">Loading…</span></span>
+          <button type="button" class="reconnect" id="term-reconnect" hidden>Reconnect</button>
+        </div>
+        <div id="live-host" aria-label="Live terminal of the session"></div>
+        <div class="tinput">
+          <div class="keys" role="group" aria-label="Keys to press">
+            <button type="button" data-key="esc" aria-label="Press Escape">Esc</button>
+            <button type="button" data-key="tab" aria-label="Press Tab">Tab</button>
+            <button type="button" data-key="up" aria-label="Press up arrow">↑</button>
+            <button type="button" data-key="down" aria-label="Press down arrow">↓</button>
+            <button type="button" data-key="left" aria-label="Press left arrow">←</button>
+            <button type="button" data-key="right" aria-label="Press right arrow">→</button>
+            <button type="button" data-key="backspace" aria-label="Press Backspace">⌫</button>
+            <button type="button" data-key="space" aria-label="Press Space">Space</button>
+            <button type="button" data-key="enter" aria-label="Press Enter">Enter</button>
+            <button type="button" data-key="ctrl+c" class="danger" aria-label="Press Control C">Ctrl+C</button>
+          </div>
+        </div>
+      </div>
+      </div>
+    </aside>
   </div>
 </div>
 <div id="modal" hidden></div>
@@ -280,12 +365,15 @@ const TOKEN = new URLSearchParams(location.search).get("token");
 const REFRESH_MS = 5000;
 const DETAIL_REFRESH_MS = 3000;
 const DETAIL_HASH = "#task=";
+const DETAILS_KEY = "factory.details";
+const REVEAL_MARGIN = 16;
+const SELECTED_PREFIX = "factory.selectedTask.";
 const JOB_POLL_MS = 1000;
 const HIDDEN_PREFIX = "factory.hiddenColumns.";
 const WORKSPACE_KEY = "factory.workspace";
 const GLOBAL_API = /^\/api\/(ping|shutdown|jobs\/|workspaces|host)/;
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
-const state = { generation: 0, view: "tasks", ws: new URLSearchParams(location.search).get("ws"), workspaces: [], renaming: null, info: emptyInfo(), tasks: [], backlog: [], hidden: loadHidden(new URLSearchParams(location.search).get("ws")), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null };
+const state = { generation: 0, view: "tasks", ws: new URLSearchParams(location.search).get("ws"), workspaces: [], renaming: null, info: emptyInfo(), tasks: [], backlog: [], hidden: loadHidden(new URLSearchParams(location.search).get("ws")), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null, panel: { details: loadFlag(DETAILS_KEY, true), workspaces: loadFlag("factory.workspaces", true) } };
 const byId = (id) => document.getElementById(id);
 function emptyInfo() { return { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }; }
 
@@ -445,16 +533,17 @@ async function refresh(force) {
     for (const id of [...state.removed]) if (!tasks.some((x) => x.id === id)) state.removed.delete(id);
     Object.assign(state, { info, tasks: tasks.filter((x) => !state.removed.has(x.id)), backlog, lastKey: key });
     updateTitle();
-    if (state.detail && !state.tasks.some((x) => x.id === state.detail.id)) closeDetail();
-    else if (state.detail && force) loadDetail();
-    if (!changed || modalOpen() || state.dragging || (!force && menuOpen())) return;
+    const reselected = ensureSelection();
+    if (!reselected && state.detail && force) loadDetail();
+    if ((!changed && !reselected) || modalOpen() || state.dragging || (!force && menuOpen())) return;
   } catch (e) { if (!e.stale) { state.pollFailed = true; byId("offline").hidden = false; } return; }
   render();
 }
 function needsYou(t) { return t.attention || t.status === "blocked" || t.status === "awaiting_approval"; }
+const PAGE_TITLE = "CAPTN Factory";
 function updateTitle() {
   const n = state.tasks.filter((t) => !state.removed.has(t.id) && needsYou(t)).length;
-  document.title = n ? `(${n}) CAPTN` : "CAPTN";
+  document.title = n ? `(${n}) ${PAGE_TITLE}` : PAGE_TITLE;
 }
 function menuOpen() { return !!document.querySelector("details.more[open]"); }
 function closeMenus(except) { for (const d of document.querySelectorAll("details.more[open]")) if (d !== except) d.open = false; }
@@ -478,11 +567,11 @@ function render() {
   const main = byId("main");
   const oldBoard = main.querySelector(".board");
   const left = oldBoard ? oldBoard.scrollLeft : 0;
-  const top = window.scrollY;
+  const top = main.scrollTop;
   clear(main).append(mainView());
   const board = main.querySelector(".board");
   if (board) board.scrollLeft = left;
-  window.scrollTo(window.scrollX, top);
+  main.scrollTop = top;
   renderDetail();
 }
 
@@ -683,12 +772,12 @@ function taskCard(t) {
   const card = el("div", { class: "card task s-" + (t.attention ? "blocked" : t.status) + (selected ? " selected" : ""), "data-task": t.id });
   card.addEventListener("click", (e) => {
     if (e.target.closest("button, a, .link, details, pre, input, textarea, select") || String(window.getSelection())) return;
-    openDetail(t.id);
+    selectTask(t.id);
   });
   const top = el("div", { class: "row" });
   const ticket = ticketNode(t);
   if (ticket) top.append(ticket);
-  top.append(el("button", { type: "button", class: "name-link", "aria-label": `Show details of ${t.display_name}`, "aria-expanded": selected ? "true" : "false", onclick: () => openDetail(t.id) }, t.display_name));
+  top.append(el("button", { type: "button", class: "name-link", "aria-label": `Show details of ${t.display_name}`, "aria-expanded": selected && state.panel.details ? "true" : "false", onclick: () => selectTask(t.id) }, t.display_name));
   if (t.display_name !== t.id) top.append(el("span", { class: "muted" }, t.id));
   card.append(top, el("div", { class: "title" }, t.description), el("div", { class: "muted" }, `${t.pipeline} › ${t.step}${loopText(t)}`));
   card.append(...statusPills(t));
@@ -1098,6 +1187,7 @@ const EVENT_LABELS = {
   config_asked: "Asked for a config value", migrated: "Migrated", approval_requested: "Approval requested",
   exclusive_wait: "Waiting for a shared resource", exclusive_start: "Started with a shared resource",
   exclusive_released: "Released a shared resource", exclusive_forced: "Shared resource released by force",
+  terminal_attached: "Opened the live terminal",
 };
 const EVENT_TONES = {
   step_done: "ok", task_finished: "ok", approved: "ok", task_unblocked: "ok", task_resumed: "ok",
@@ -1107,21 +1197,89 @@ const EVENT_TONES = {
 };
 const EXTRA_MAX = 300;
 function detailHashId() { return location.hash.startsWith(DETAIL_HASH) ? decodeURIComponent(location.hash.slice(DETAIL_HASH.length)) : null; }
-function openDetail(id) {
-  if (state.detail && state.detail.id === id) return;
-  state.detail = { id, data: null, key: null };
-  history.replaceState(null, "", location.pathname + location.search + DETAIL_HASH + encodeURIComponent(id));
-  render();
-  loadDetail();
+function loadFlag(key, fallback) {
+  try { const v = localStorage.getItem(key); return v === null ? fallback : v === "1"; } catch (e) { return fallback; }
 }
-function closeDetail() {
-  if (!state.detail) return;
-  const id = state.detail.id;
-  state.detail = null;
-  history.replaceState(null, "", location.pathname + location.search);
+function saveFlag(key, on) { try { localStorage.setItem(key, on ? "1" : "0"); } catch (e) {} }
+function storedSelection() {
+  try { return state.ws ? localStorage.getItem(SELECTED_PREFIX + state.ws) : null; } catch (e) { return null; }
+}
+/** The top card of the leftmost visible column, else of any column. */
+function firstTask() {
+  const columns = allColumns();
+  for (const name of [...columns.filter((c) => !state.hidden.includes(c)), ...columns]) {
+    const task = state.tasks.find((x) => !state.removed.has(x.id) && columnOf(x) === name);
+    if (task) return task.id;
+  }
+  return null;
+}
+/** Keeps a selected task while the board has one: the address, then the one saved for this workspace, then the first task. Returns true when the selection changed. */
+function ensureSelection() {
+  const exists = (id) => !!id && state.tasks.some((x) => x.id === id);
+  if (state.detail && exists(state.detail.id)) return false;
+  const id = [detailHashId(), storedSelection(), firstTask()].find(exists) || null;
+  if ((state.detail && state.detail.id) === id) return false;
+  state.detail = id ? { id, data: null, key: null } : null;
+  if (id) loadDetail();
+  return true;
+}
+function selectTask(id) {
+  if (!state.detail || state.detail.id !== id) {
+    state.detail = { id, data: null, key: null };
+    try { localStorage.setItem(SELECTED_PREFIX + state.ws, id); } catch (e) {}
+    history.replaceState(null, "", location.pathname + location.search + DETAIL_HASH + encodeURIComponent(id));
+    loadDetail();
+  }
+  state.panel.details = state.term.open = true;
+  saveFlag(DETAILS_KEY, true);
+  saveFlag(TERM_KEY, true);
   render();
-  const name = document.querySelector(`.card[data-task="${CSS.escape(id)}"] .name-link`);
+  revealTaskColumn(id);
+}
+/** Opening the right columns narrows the board, which can push the selected task's column out of view; scroll the board just enough to show it again. */
+function revealTaskColumn(id) {
+  const board = byId("main").querySelector(".board");
+  const card = board && board.querySelector(`.card[data-task="${CSS.escape(id)}"]`);
+  if (!card) return;
+  const column = card.closest(".column") || card;
+  const view = board.getBoundingClientRect(), box = column.getBoundingClientRect();
+  let shift = 0;
+  if (box.left < view.left) shift = box.left - view.left - REVEAL_MARGIN;
+  else if (box.right > view.right) shift = Math.min(box.right - view.right + REVEAL_MARGIN, box.left - view.left - REVEAL_MARGIN);
+  if (shift) board.scrollLeft += shift;
+}
+function setPanelOpen(which, open) {
+  if (which === "details") { state.panel.details = open; saveFlag(DETAILS_KEY, open); }
+  else { state.term.open = open; saveFlag(TERM_KEY, open); }
+  render();
+}
+/** The workspace column sits on the left, so its tab is on its right edge and the arrows point the other way. */
+function renderWorkspacePanel() {
+  const open = state.panel.workspaces;
+  byId("sidebar").hidden = !open;
+  const tab = byId("ws-tab");
+  tab.setAttribute("aria-expanded", open ? "true" : "false");
+  tab.title = open ? "Hide the workspaces" : "Show the workspaces";
+  tab.querySelector(".chev").textContent = open ? "◂" : "▸";
+}
+function setWorkspacesOpen(open) {
+  state.panel.workspaces = open;
+  saveFlag("factory.workspaces", open);
+  renderWorkspacePanel();
+}
+function closeDetails() {
+  const id = state.detail && state.detail.id;
+  setPanelOpen("details", false);
+  const name = id && document.querySelector(`.card[data-task="${CSS.escape(id)}"] .name-link`);
   if (name) name.focus();
+}
+function updateRail() {
+  for (const [tabId, open, label] of [["details-tab", state.panel.details, "details"], ["term-tab", state.term.open, "terminal"]]) {
+    const tab = byId(tabId);
+    tab.setAttribute("aria-expanded", open ? "true" : "false");
+    tab.title = open ? `Hide the ${label}` : `Show the ${label}`;
+    tab.querySelector(".chev").textContent = open ? "▸" : "◂";
+  }
 }
 async function loadDetail() {
   const d = state.detail;
@@ -1208,21 +1366,27 @@ function infoSection(d) {
   return box;
 }
 function renderDetail() {
-  const aside = byId("detail");
   const d = state.detail;
-  aside.hidden = !d;
-  if (!d) { clear(aside); return; }
+  const showDetails = !!d && state.panel.details;
+  byId("detail").hidden = !d;
+  byId("detail-main").hidden = !showDetails;
+  byId("pcol-details").dataset.open = showDetails ? "1" : "";
+  byId("detail").dataset.open = showDetails || (!!d && state.term.open) ? "1" : "";
+  byId("detail").dataset.both = showDetails && !!d && state.term.open ? "1" : "";
+  updateRail();
+  renderTerminalShell();
+  const aside = byId("detail-main");
+  if (!showDetails) { clear(aside); return; }
   const scroll = aside.scrollTop;
   const openValues = new Set([...aside.querySelectorAll(".facts details[open] summary")].map((n) => n.textContent));
   const row = (d.data && d.data.row) || state.tasks.find((x) => x.id === d.id);
-  const close = el("button", { type: "button", class: "close", "aria-label": "Close details", title: "Close (Esc)", onclick: closeDetail }, "✕");
   const names = el("div", { class: "names" });
   if (row) {
     const ticket = ticketNode(row);
     if (ticket) names.append(el("span", { class: "ticket" }, ticket));
     names.append(el("h2", {}, row.display_name), row.display_name !== row.id ? el("span", { class: "muted" }, row.id) : "");
   } else names.append(el("h2", {}, d.id));
-  clear(aside).append(el("div", { class: "dhead" }, names, close));
+  clear(aside).append(el("div", { class: "dhead" }, names));
   if (!row) return;
   aside.append(el("p", { class: "desc" }, row.description), el("div", { class: "pills" }, ...statusPills(row)));
   if (row.attention && row.attention.message) aside.append(el("pre", { class: "attention-message" }, row.attention.message));
@@ -1238,15 +1402,228 @@ function renderDetail() {
   aside.scrollTop = scroll;
 }
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape" || e.defaultPrevented || modalOpen() || menuOpen() || !state.detail) return;
-  closeDetail();
+  if (e.key !== "Escape" || e.defaultPrevented || modalOpen() || menuOpen() || !state.detail || !state.panel.details) return;
+  if (e.target.closest && e.target.closest("#detail-term")) return;
+  closeDetails();
 });
-window.addEventListener("hashchange", () => { const id = detailHashId(); if (id) openDetail(id); else closeDetail(); });
-setInterval(() => { if (state.detail && !document.hidden) loadDetail(); }, DETAIL_REFRESH_MS);
+window.addEventListener("hashchange", () => { const id = detailHashId(); if (id && state.tasks.some((x) => x.id === id)) selectTask(id); });
+setInterval(() => { if (state.detail && state.panel.details && !document.hidden) loadDetail(); }, DETAIL_REFRESH_MS);
+
+const TERM_KEY = "factory.terminal";
+const LIVE_KEYS = { esc: "\x1b", tab: "\t", up: "\x1b[A", down: "\x1b[B", right: "\x1b[C", left: "\x1b[D", backspace: "\x7f", space: " ", enter: "\r", "ctrl+c": "\x03" };
+const LIVE_INPUT_MAX = 8000;
+const LIVE_FIT_DELAY_MS = 150;
+const LIVE_THEME = {
+  background: "#0E0908", foreground: "#E6DFDC", cursor: "#FF5AA5", cursorAccent: "#0E0908", selectionBackground: "#67388899",
+  black: "#2E2322", red: "#FF6B6B", green: "#7CC63A", yellow: "#FECD40", blue: "#6CA8FF", magenta: "#D58BFF", cyan: "#4FD1C5", white: "#E6DFDC",
+  brightBlack: "#7A6E6A", brightRed: "#FF8A8A", brightGreen: "#A8E07F", brightYellow: "#FFE07A", brightBlue: "#9CC4FF", brightMagenta: "#E5B3FF", brightCyan: "#81E6D9", brightWhite: "#FFFFFF",
+};
+state.term = { open: loadFlag(TERM_KEY, false) };
+function renderTerminalShell() {
+  const aside = byId("detail");
+  const show = !!state.detail && state.term.open;
+  if (show && state.live.id !== state.detail.id) startLive();
+  if (!show && state.live.id) stopLive();
+  byId("detail-term").hidden = !show;
+  byId("pcol-term").dataset.open = show ? "1" : "";
+  aside.dataset.term = show ? "1" : "";
+  const row = state.detail && state.tasks.find((x) => x.id === state.detail.id);
+  byId("term-task").textContent = row ? `· ${row.display_name}` : "";
+}
+function setTermStatus(live, text) {
+  const status = document.querySelector("#detail-term .tstatus");
+  status.classList.toggle("live", live);
+  status.querySelector(".tstatus-text").textContent = text;
+}
+function updateTypeControls() {
+  for (const b of document.querySelectorAll("#detail-term .keys button")) b.disabled = !state.live.connected;
+}
+
+state.live = { id: null, term: null, fit: null, abort: null, observer: null, queue: "", sending: false, connected: false, size: "", fitTimer: null };
+let xtermLoading = null;
+function loadXterm() {
+  if (window.Terminal && window.FitAddon) return Promise.resolve();
+  const load = (tag, attrs) => new Promise((ok, ko) => document.head.append(el(tag, { ...attrs, onload: ok, onerror: () => ko(new Error("Could not load the terminal component.")) })));
+  if (!xtermLoading) {
+    xtermLoading = Promise.all([load("link", { rel: "stylesheet", href: "/static/xterm.css" }), load("script", { src: "/static/xterm.js" })])
+      .then(() => load("script", { src: "/static/addon-fit.js" }))
+      .catch((e) => { xtermLoading = null; throw e; });
+  }
+  return xtermLoading;
+}
+function liveEnded(reason) {
+  const L = state.live;
+  L.connected = false;
+  setTermStatus(false, reason);
+  byId("term-reconnect").hidden = false;
+  updateTypeControls();
+}
+async function startLive() {
+  const d = state.detail, L = state.live;
+  stopLive();
+  L.id = d.id;
+  byId("term-reconnect").hidden = true;
+  setTermStatus(false, "Connecting…");
+  updateTypeControls();
+  try { await loadXterm(); } catch (e) { return liveEnded(e.message); }
+  if (state.live.id !== d.id || L.term) return;
+  const term = new window.Terminal({ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, cursorBlink: true, scrollback: 5000, theme: LIVE_THEME });
+  const fit = new window.FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(clear(byId("live-host")));
+  fit.fit();
+  Object.assign(L, { term, fit, size: `${term.cols}x${term.rows}` });
+  term.onData(queueLive);
+  L.observer = new ResizeObserver(scheduleFit);
+  L.observer.observe(byId("live-host"));
+  try {
+    await api(`/api/tasks/${d.id}/attach`, { cols: term.cols, rows: term.rows }, true);
+  } catch (e) {
+    term.write(`\r\n${e.message}\r\n`);
+    return liveEnded("Not live");
+  }
+  if (L.term === term) streamLive(d.id, term);
+}
+async function streamLive(id, term) {
+  const L = state.live, ctrl = new AbortController();
+  L.abort = ctrl;
+  let res;
+  try {
+    res = await fetch(apiUrl(`/api/tasks/${id}/attach/stream`), { headers: { "X-Factory-Token": TOKEN }, signal: ctrl.signal });
+  } catch (e) { if (!ctrl.signal.aborted) liveEnded("The connection failed."); return; }
+  if (!res.ok) {
+    let message = res.statusText;
+    try { message = (await res.json()).error || message; } catch (e) {}
+    term.write(`\r\n${message}\r\n`);
+    return liveEnded("Not live");
+  }
+  L.connected = true;
+  setTermStatus(true, "Live");
+  updateTypeControls();
+  term.focus();
+  const reader = res.body.getReader(), decoder = new TextDecoder();
+  let pending = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      pending += decoder.decode(value, { stream: true });
+      for (let nl = pending.indexOf("\n"); nl >= 0; nl = pending.indexOf("\n")) {
+        const msg = JSON.parse(pending.slice(0, nl));
+        pending = pending.slice(nl + 1);
+        if (msg.d) term.write(Uint8Array.from(atob(msg.d), (c) => c.charCodeAt(0)));
+        if (msg.closed) return liveEnded("The session terminal ended.");
+      }
+    }
+  } catch (e) { if (ctrl.signal.aborted) return; }
+  if (!ctrl.signal.aborted) liveEnded("The connection closed.");
+}
+function queueLive(data) {
+  const L = state.live;
+  if (!L.connected || !data) return;
+  L.queue += data;
+  if (!L.sending) flushLive();
+}
+/** Keys go out in order, one request at a time; keys typed meanwhile wait in the queue and leave together. */
+async function flushLive() {
+  const L = state.live, id = L.id;
+  L.sending = true;
+  while (L.queue && L.id === id) {
+    const data = L.queue.slice(0, LIVE_INPUT_MAX);
+    L.queue = L.queue.slice(data.length);
+    try { await api(`/api/tasks/${id}/attach/input`, { data }, true); } catch (e) { L.queue = ""; }
+  }
+  L.sending = false;
+}
+function scheduleFit() {
+  const L = state.live;
+  clearTimeout(L.fitTimer);
+  L.fitTimer = setTimeout(() => {
+    if (!L.term || byId("live-host").hidden) return;
+    L.fit.fit();
+    const size = `${L.term.cols}x${L.term.rows}`;
+    if (size === L.size || !L.connected) return;
+    L.size = size;
+    api(`/api/tasks/${L.id}/attach/resize`, { cols: L.term.cols, rows: L.term.rows }, true).catch(() => {});
+  }, LIVE_FIT_DELAY_MS);
+}
+function stopLive() {
+  const L = state.live;
+  if (L.abort) L.abort.abort();
+  if (L.observer) L.observer.disconnect();
+  if (L.term) L.term.dispose();
+  clearTimeout(L.fitTimer);
+  Object.assign(L, { id: null, term: null, fit: null, abort: null, observer: null, queue: "", connected: false, size: "" });
+}
+
+const WIDTH_STEP = 16;
+const PANES = {
+  "resize-detail": { key: "factory.detailWidth", prop: "--detail-w", host: () => byId("detail"), target: () => byId("detail-main"), side: "right", min: 260, max: () => Math.min(900, window.innerWidth * 0.6) },
+  "resize-term": { key: "factory.terminalWidth", prop: "--term-w", host: () => byId("detail"), target: () => byId("detail-term"), side: "right", min: 260, max: () => Math.min(1400, window.innerWidth * 0.7) },
+  "resize-ws": { key: "factory.workspacesWidth", prop: "--ws-w", host: () => byId("lcol-ws"), target: () => byId("sidebar"), side: "left", min: 160, max: () => Math.min(480, window.innerWidth * 0.35) },
+};
+/** A pane on the right grows when its handle moves left; the workspace pane on the left grows when it moves right. */
+function grownBy(pane, dx) { return pane.side === "right" ? -dx : dx; }
+function clampWidth(pane, w) { return Math.round(Math.max(pane.min, Math.min(pane.max(), w))); }
+function setPaneWidth(pane, w, save) {
+  const width = clampWidth(pane, w);
+  pane.host().style.setProperty(pane.prop, `${width}px`);
+  if (save) { try { localStorage.setItem(pane.key, String(width)); } catch (e) {} }
+  return width;
+}
+function restorePaneWidths() {
+  for (const pane of Object.values(PANES)) {
+    let saved = null;
+    try { saved = Number(localStorage.getItem(pane.key)); } catch (e) {}
+    if (saved) setPaneWidth(pane, saved, false);
+  }
+}
+for (const [id, pane] of Object.entries(PANES)) {
+  const handle = byId(id);
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX, startW = pane.target().getBoundingClientRect().width;
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("active");
+    document.body.classList.add("resizing");
+    const move = (ev) => setPaneWidth(pane, startW + grownBy(pane, ev.clientX - startX), false);
+    const up = (ev) => {
+      setPaneWidth(pane, startW + grownBy(pane, ev.clientX - startX), true);
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+      handle.classList.remove("active");
+      document.body.classList.remove("resizing");
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  });
+  handle.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const now = pane.target().getBoundingClientRect().width;
+    setPaneWidth(pane, now + grownBy(pane, e.key === "ArrowRight" ? WIDTH_STEP : -WIDTH_STEP), true);
+  });
+  handle.addEventListener("dblclick", () => {
+    pane.host().style.removeProperty(pane.prop);
+    try { localStorage.removeItem(pane.key); } catch (e) {}
+  });
+}
+byId("details-tab").addEventListener("click", () => setPanelOpen("details", !state.panel.details));
+byId("term-tab").addEventListener("click", () => setPanelOpen("terminal", !state.term.open));
+restorePaneWidths();
+byId("ws-tab").addEventListener("click", () => setWorkspacesOpen(!state.panel.workspaces));
+renderWorkspacePanel();
+for (const b of document.querySelectorAll("#detail-term .keys button")) b.addEventListener("click", () => {
+  queueLive(LIVE_KEYS[b.dataset.key]);
+  if (state.live.term) state.live.term.focus();
+});
+byId("term-reconnect").addEventListener("click", () => { stopLive(); renderTerminalShell(); });
 function setView(view) { state.view = view; render(); }
 byId("tab-tasks").addEventListener("click", () => setView("tasks"));
 byId("tab-backlog").addEventListener("click", () => setView("backlog"));
-{ const id = detailHashId(); if (id) state.detail = { id, data: null, key: null }; }
 refresh(true);
 setInterval(refresh, REFRESH_MS);
 setInterval(() => { for (const n of document.querySelectorAll("[data-next-check]")) n.textContent = countdownText(n.dataset.nextCheck); }, 1000);
