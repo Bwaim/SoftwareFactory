@@ -124,3 +124,9 @@ def test_screen_and_type_routes(served):
 def test_dashboard_page_has_the_terminal_view():
     for text in ('id="detail-term"', "/screen`", "/type`", 'data-key="ctrl+c"', "ansiNodes", "SCREEN_REFRESH_MS", "factory.terminal", "Typed in the terminal"):
         assert text in PAGE
+
+
+def test_dashboard_page_has_the_terminal_tab_and_resize_handles():
+    for text in ('id="term-tab"', 'aria-controls="detail-term"', 'id="resize-detail"', 'id="resize-term"', 'role="separator"', "factory.detailWidth", "factory.terminalWidth", "--detail-w", "--term-w"):
+        assert text in PAGE
+    assert "term-toggle" not in PAGE

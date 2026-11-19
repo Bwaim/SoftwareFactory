@@ -169,10 +169,21 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .card .name-link:hover { background: none; text-decoration: underline; }
 .card.task { cursor: pointer; }
 #detail { flex: 0 0 auto; display: flex; box-sizing: border-box; position: sticky; top: 0; height: 100vh; background: var(--column); border-left: 1px solid var(--panel-line); }
-#detail-main { width: 480px; box-sizing: border-box; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+#detail-main { width: var(--detail-w, 480px); box-sizing: border-box; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
 #detail-tabs { display: none; }
-#detail .term-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
-#detail-term { width: clamp(420px, 42vw, 760px); box-sizing: border-box; display: flex; flex-direction: column; border-left: 1px solid var(--panel-line); background: var(--column); min-height: 0; }
+#term-tab { flex: none; width: 30px; min-height: 0; padding: 12px 0; border: 0; border-left: 1px solid var(--panel-line); border-radius: 0; background: var(--column); color: var(--muted-strong); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+#term-tab:hover { background: var(--raised); color: var(--fg); }
+#term-tab .label { writing-mode: vertical-rl; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+#term-tab .chev { font-size: 14px; line-height: 1; }
+#term-tab[aria-expanded="true"] { box-shadow: inset 3px 0 0 var(--accent); color: var(--fg); }
+#term-close { display: none; }
+.resizer { position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; cursor: col-resize; z-index: 3; touch-action: none; }
+.resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background .15s; }
+.resizer:hover::after, .resizer:focus-visible::after, body.resizing .resizer.active::after { background: var(--brand-pink); }
+.resizer:focus-visible { outline: none; }
+body.resizing { cursor: col-resize; user-select: none; }
+body.resizing iframe, body.resizing .xterm { pointer-events: none; }
+#detail-term { position: relative; width: var(--term-w, clamp(420px, 42vw, 760px)); box-sizing: border-box; display: flex; flex-direction: column; border-left: 1px solid var(--panel-line); background: var(--column); min-height: 0; }
 #detail-term .thead { display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px; }
 #detail-term .thead h3 { margin: 0; flex: 1; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-strong); }
 #detail-term .tstatus { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
@@ -232,7 +243,9 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .facts details summary { cursor: pointer; color: var(--link); font-weight: 600; }
 .facts details pre { margin: 6px 0 0; font-size: 12px; }
 @media (max-width: 1400px) {
-  #detail[data-term="1"] { flex-direction: column; width: 560px; }
+  #detail[data-term="1"] { flex-direction: column; width: var(--detail-w, 560px); }
+  #detail[data-term="1"] #term-tab, #detail[data-term="1"] #resize-term { display: none; }
+  #detail[data-term="1"] #term-close { display: inline-flex; }
   #detail[data-term="1"] #detail-tabs { display: flex; gap: 6px; padding: 12px 20px 0; }
   #detail[data-term="1"] #detail-main, #detail[data-term="1"] #detail-term { width: auto; flex: 1; min-height: 0; border-left: 0; }
   #detail[data-term="1"][data-tab="terminal"] #detail-main, #detail[data-term="1"][data-tab="details"] #detail-term { display: none; }
@@ -240,6 +253,7 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 }
 @media (max-width: 900px) {
   #detail, #detail[data-term="1"] { position: fixed; inset: 0; z-index: 15; width: auto; height: auto; border-left: 0; }
+  .resizer { display: none; }
   #detail-main { width: auto; flex: 1; }
 }
 @media (max-width: 600px) {
@@ -292,12 +306,15 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
   <div class="workspace">
     <main id="main"></main>
     <aside id="detail" hidden aria-label="Task details">
+      <div class="resizer" id="resize-detail" role="separator" aria-orientation="vertical" aria-label="Resize the task details" tabindex="0"></div>
       <div id="detail-tabs" role="tablist" aria-label="Panel view">
         <button type="button" role="tab" id="tab-details" aria-selected="true">Details</button>
         <button type="button" role="tab" id="tab-terminal" aria-selected="false">Terminal</button>
       </div>
       <div id="detail-main"></div>
+      <button type="button" id="term-tab" aria-controls="detail-term" aria-expanded="false" title="Show the terminal"><span class="label">Terminal</span><span class="chev" aria-hidden="true">▸</span></button>
       <div id="detail-term" hidden aria-label="Task terminal">
+        <div class="resizer" id="resize-term" role="separator" aria-orientation="vertical" aria-label="Resize the terminal" tabindex="0"></div>
         <div class="thead">
           <h3>Terminal</h3>
           <div class="tmode" role="group" aria-label="Terminal mode">
@@ -1299,14 +1316,13 @@ function renderDetail() {
   const openValues = new Set([...aside.querySelectorAll(".facts details[open] summary")].map((n) => n.textContent));
   const row = (d.data && d.data.row) || state.tasks.find((x) => x.id === d.id);
   const close = el("button", { type: "button", class: "close", "aria-label": "Close details", title: "Close (Esc)", onclick: closeDetail }, "✕");
-  const termToggle = el("button", { type: "button", class: "term-toggle", "aria-pressed": state.term.open ? "true" : "false", onclick: () => setTerminalOpen(!state.term.open) }, "Terminal");
   const names = el("div", { class: "names" });
   if (row) {
     const ticket = ticketNode(row);
     if (ticket) names.append(el("span", { class: "ticket" }, ticket));
     names.append(el("h2", {}, row.display_name), row.display_name !== row.id ? el("span", { class: "muted" }, row.id) : "");
   } else names.append(el("h2", {}, d.id));
-  clear(aside).append(el("div", { class: "dhead" }, names, termToggle, close));
+  clear(aside).append(el("div", { class: "dhead" }, names, close));
   if (!row) return;
   aside.append(el("p", { class: "desc" }, row.description), el("div", { class: "pills" }, ...statusPills(row)));
   if (row.attention && row.attention.message) aside.append(el("pre", { class: "attention-message" }, row.attention.message));
@@ -1384,6 +1400,10 @@ function renderTerminalShell() {
   if (live && state.live.id !== state.detail.id) startLive();
   if (!live && state.live.id) stopLive();
   byId("detail-term").hidden = !show;
+  const tab = byId("term-tab");
+  tab.setAttribute("aria-expanded", show ? "true" : "false");
+  tab.title = show ? "Hide the terminal" : "Show the terminal";
+  tab.querySelector(".chev").textContent = show ? "◂" : "▸";
   aside.dataset.term = show ? "1" : "";
   aside.dataset.tab = state.term.tab;
   byId("tab-details").setAttribute("aria-selected", state.term.tab === "details" ? "true" : "false");
@@ -1633,6 +1653,62 @@ function stopLive() {
   clearTimeout(L.fitTimer);
   Object.assign(L, { id: null, term: null, fit: null, abort: null, observer: null, queue: "", connected: false, size: "" });
 }
+
+const WIDTH_STEP = 16;
+const PANES = {
+  "resize-detail": { key: "factory.detailWidth", prop: "--detail-w", target: () => byId("detail-main"), min: 360, max: () => Math.min(900, window.innerWidth * 0.6) },
+  "resize-term": { key: "factory.terminalWidth", prop: "--term-w", target: () => byId("detail-term"), min: 360, max: () => Math.min(1400, window.innerWidth * 0.7) },
+};
+function clampWidth(pane, w) { return Math.round(Math.max(pane.min, Math.min(pane.max(), w))); }
+function setPaneWidth(pane, w, save) {
+  const width = clampWidth(pane, w);
+  byId("detail").style.setProperty(pane.prop, `${width}px`);
+  if (save) { try { localStorage.setItem(pane.key, String(width)); } catch (e) {} }
+  return width;
+}
+function restorePaneWidths() {
+  for (const pane of Object.values(PANES)) {
+    let saved = null;
+    try { saved = Number(localStorage.getItem(pane.key)); } catch (e) {}
+    if (saved) setPaneWidth(pane, saved, false);
+  }
+}
+/** The panel is anchored on the right, so dragging a handle to the left makes its pane wider. */
+for (const [id, pane] of Object.entries(PANES)) {
+  const handle = byId(id);
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX, startW = pane.target().getBoundingClientRect().width;
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("active");
+    document.body.classList.add("resizing");
+    const move = (ev) => setPaneWidth(pane, startW + (startX - ev.clientX), false);
+    const up = (ev) => {
+      setPaneWidth(pane, startW + (startX - ev.clientX), true);
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+      handle.classList.remove("active");
+      document.body.classList.remove("resizing");
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  });
+  handle.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const now = pane.target().getBoundingClientRect().width;
+    setPaneWidth(pane, now + (e.key === "ArrowLeft" ? WIDTH_STEP : -WIDTH_STEP), true);
+  });
+  handle.addEventListener("dblclick", () => {
+    byId("detail").style.removeProperty(pane.prop);
+    try { localStorage.removeItem(pane.key); } catch (e) {}
+  });
+}
+byId("term-tab").addEventListener("click", () => setTerminalOpen(!state.term.open));
+restorePaneWidths();
 byId("term-close").addEventListener("click", () => setTerminalOpen(false));
 byId("tab-details").addEventListener("click", () => { state.term.tab = "details"; renderTerminalShell(); });
 byId("tab-terminal").addEventListener("click", () => { state.term.tab = "terminal"; renderTerminalShell(); loadScreen(); });

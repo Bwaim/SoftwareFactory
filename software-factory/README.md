@@ -399,8 +399,9 @@ The panel refreshes every 3 seconds. It shows:
 
 #### Task terminal
 
-The "Terminal" button in the task details opens the session terminal on the right of the details. Its ✕ button closes it. The browser remembers if it is open.
-When the window is too narrow for both, "Details" and "Terminal" tabs switch between them.
+The vertical "Terminal" tab on the right edge of the task details opens the session terminal on the right of the details. The same tab, then on the left edge of the terminal, closes it. The browser remembers if it is open.
+Drag the left edge of the details or of the terminal to change its width. The arrow keys move a focused edge too, and a double click resets it. The browser remembers the widths.
+When the window is too narrow for both, "Details" and "Terminal" tabs switch between them, and the terminal has a ✕ button to close it.
 The terminal has two modes. The browser remembers the last one.
 
 **Live** (default, when the terminal adapter has `attach`): a real terminal, attached to the session.
