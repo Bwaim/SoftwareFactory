@@ -396,7 +396,8 @@ The Dock app "CAPTN Dashboard" shows the dashboard in its own window.
 - When the app is installed, `factory dashboard` and the menu action "Open dashboard" show the dashboard in the app, not in a browser tab. The command still prints the URL.
 - `factory pipeline edit` and `factory step edit` still open the browser.
 - `factory dashboard` builds the app again when the factory changes. A failed build does not fail the command.
-- The app needs the factory to be installed with `install.sh`, because it runs `factory` through `uv`.
+- `factory app install` builds the app. On macOS, `install.sh` runs it for you. The app runs `factory` through `uv`.
+- The app runs `factory` with the environment of your login shell, so tasks find `tmux`, `herdr` and `claude`.
 
 When the server stops, the window shows "Server stopped" and a **Start** button. Click **Start** to start a new server. The app never starts a server by itself after the launch.
 
@@ -406,6 +407,7 @@ When you quit the app, it stops the server. The app warns you first.
 - If tasks wait on a done check, the warning lists them. Quitting stops their done checks. The buttons are **Stop**, **Keep server running** and **Cancel**. This warning always shows.
 - If the app cannot list the waiting tasks, the warning says so and has the same three buttons.
 - **Keep server running** quits the app and leaves the server up.
+- If you quit while the window shows "Starting the factory…", the app does not stop the server that this start launches. That server stops by itself after 30 idle minutes.
 
 "Create a pipeline" opens the editor as a tab of the app window. If the server stops, the editor tab shows "Server stopped. Reload the editor after Start. Unsaved changes are lost." Click **Start**, then reload the editor tab with Cmd+R.
 

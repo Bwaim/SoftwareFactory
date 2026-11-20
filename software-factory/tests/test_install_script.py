@@ -3,6 +3,7 @@ import http.server
 import os
 import shutil
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -124,8 +125,9 @@ def test_fresh_install(release, env, work):
     assert f"Installed factory 0.2.0 in {target}." in r.stdout
     v = subprocess.run([str(home / ".local/bin/factory"), "--version"], capture_output=True, text=True, env=env)
     assert "factory 0.2.0" in v.stdout
-    assert f"Dashboard app: {work / 'CAPTN Dashboard.app'}" in r.stdout
-    assert (work / "CAPTN Dashboard.app").is_dir()
+    if sys.platform == "darwin":
+        assert f"Dashboard app: {work / 'CAPTN Dashboard.app'}" in r.stdout
+        assert (work / "CAPTN Dashboard.app").is_dir()
 
 
 def test_dashboard_app_build_failure_warns(release, env, work):
