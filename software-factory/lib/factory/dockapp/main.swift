@@ -72,21 +72,21 @@ enum Command {
 }
 
 enum LoginEnvironment {
-    static let values: [String: String] = withUTF8(load())
+    static let values: [String: String] = withUTF8(withTools(load()))
     static let dropped: Set<String> = ["_", "SHLVL", "PWD", "OLDPWD"]
 
     static func load() -> [String: String] {
         let current = ProcessInfo.processInfo.environment
         let shell = current["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
-        let result = Command.run(shell, ["-l", "-c", "env"], environment: current, timeout: loginShellSeconds)
-        guard let output = result?.output else { return fallback(current) }
+        let result = Command.run(shell, ["-l", "-c", "env -0"], environment: current, timeout: loginShellSeconds)
+        guard let output = result?.output else { return current }
         let parsed = parse(output)
-        return parsed["PATH"] == nil ? fallback(current) : parsed
+        return parsed["PATH"] == nil ? current : parsed
     }
 
     static func parse(_ text: String) -> [String: String] {
         var values: [String: String] = [:]
-        for line in text.split(whereSeparator: \.isNewline) {
+        for line in text.split(separator: "\0") {
             guard let equals = line.firstIndex(of: "=") else { continue }
             let key = String(line[..<equals])
             guard isName(key), !dropped.contains(key) else { continue }
@@ -100,10 +100,13 @@ enum LoginEnvironment {
         return key.unicodeScalars.allSatisfy { $0 == "_" || ($0.isASCII && CharacterSet.alphanumerics.contains($0)) }
     }
 
-    static func fallback(_ current: [String: String]) -> [String: String] {
-        var values = current
-        let extra = ["/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.local/bin"]
-        values["PATH"] = (extra + [current["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"]).joined(separator: ":")
+    static func withTools(_ environment: [String: String]) -> [String: String] {
+        var path = (environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin").split(separator: ":").map(String.init)
+        for dir in ["/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.local/bin"] where !path.contains(dir) {
+            path.append(dir)
+        }
+        var values = environment
+        values["PATH"] = path.joined(separator: ":")
         return values
     }
 
