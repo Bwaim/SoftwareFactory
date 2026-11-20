@@ -577,7 +577,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let page = makePage(configuration: configuration)
         opener.window.addTabbedWindow(page.window, ordered: .above)
         page.window.makeKeyAndOrderFront(nil)
-        NSLog("CAPTN: tab opened, pages %d", pages.count)
         return page
     }
 
@@ -639,18 +638,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         checkingServer = false
         guard !up, checked == base, !starting else { return }
         serverStopped = true
-        NSLog("CAPTN: server down, pages %d, editors %d", pages.count, pages.filter { $0 !== dashboard }.count)
         showServerStopped()
         showBannerInEditors()
     }
 
     func showBannerInEditors() {
         for page in pages where page !== dashboard {
-            let url = page.webView.url?.absoluteString ?? "nil"
-            NSLog("CAPTN: banner push to %@", url)
-            page.webView.evaluateJavaScript("showServerStopped()") { result, error in
-                NSLog("CAPTN: banner push to %@ result %@ error %@", url, String(describing: result), String(describing: error))
-            }
+            page.webView.evaluateJavaScript("showServerStopped()") { _, _ in }
         }
     }
 

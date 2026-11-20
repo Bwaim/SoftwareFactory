@@ -541,8 +541,12 @@ async function loadBoard() {
   const [info, tasks, backlog] = await Promise.all([api("/api/info", undefined, true), api("/api/tasks", undefined, true), api("/api/backlog", undefined, true)]);
   return { info, tasks, backlog };
 }
+function serverUnreachable() { state.pollFailed = true; byId("offline").hidden = false; tellApp("unreachable"); }
+async function pingServer() {
+  try { await api("/api/ping", undefined, true, true); tellApp("reachable"); } catch (e) { serverUnreachable(); }
+}
 async function refresh(force) {
-  if (!force && (state.dragging || modalOpen())) return;
+  if (!force && (state.dragging || modalOpen())) return pingServer();
   const started = state.generation;
   try {
     const list = await api("/api/workspaces", undefined, true);
@@ -564,7 +568,7 @@ async function refresh(force) {
     const reselected = ensureSelection();
     if (!reselected && state.detail && force) loadDetail();
     if ((!changed && !reselected) || modalOpen() || state.dragging || (!force && menuOpen())) return;
-  } catch (e) { if (!e.stale) { state.pollFailed = true; byId("offline").hidden = false; tellApp("unreachable"); } return; }
+  } catch (e) { if (!e.stale) serverUnreachable(); return; }
   render();
 }
 function needsYou(t) { return t.attention || t.status === "blocked" || t.status === "awaiting_approval"; }

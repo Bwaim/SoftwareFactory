@@ -156,3 +156,9 @@ def test_editor_banner_can_be_shown_by_the_app():
     editor = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
     assert "function showServerStopped() { showError(SERVER_STOPPED); }" in editor
     assert "if (window.webkit?.messageHandlers?.captn) showServerStopped();" in editor
+
+
+def test_dashboard_pings_while_a_popup_is_open():
+    assert "if (!force && (state.dragging || modalOpen())) return pingServer();" in PAGE
+    assert 'try { await api("/api/ping", undefined, true, true); tellApp("reachable"); } catch (e) { serverUnreachable(); }' in PAGE
+    assert 'function serverUnreachable() { state.pollFailed = true; byId("offline").hidden = false; tellApp("unreachable"); }' in PAGE
