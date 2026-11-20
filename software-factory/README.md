@@ -30,7 +30,7 @@ You start and manage tasks from one orchestrator session in the main repository.
 You need:
 
 - `uv`. Install it with `brew install uv`.
-- Herdr: https://herdr.dev
+- A terminal: Herdr (https://herdr.dev, the default) or Warp (https://www.warp.dev) with tmux (`brew install tmux`). See [Terminal: Herdr or Warp](#terminal-herdr-or-warp).
 - git, only for pipelines with `worktree: true`. Each repository can have an `origin` remote, but it is optional.
 - Claude Code.
 - Optional: `gh` or `glab`, for the forge steps of the catalog.
@@ -96,6 +96,27 @@ Herdr adapter:
 - `herdr workspace rename`, `herdr tab rename`, `herdr agent rename`
 - `open -a <terminal app>`
 - `herdr notification show`
+
+Warp adapter:
+
+- `tmux -L captn new-session`, `has-session`, `kill-session`, `rename-session`
+- `tmux -L captn capture-pane`, `send-keys`, `load-buffer`, `paste-buffer`, `list-clients`, `display-message`, `attach-session`
+- `open warp://tab_config/<name>`, `open -a Warp`, `open -Ra Warp`
+- `osascript` (`display notification`)
+
+## Terminal: Herdr or Warp
+
+The factory runs each Claude session through a terminal adapter. Choose it with `terminal:` in `.factory/factory.yaml` (`herdr` or `warp`). The `FACTORY_TERMINAL` environment variable is used when the file has no value. Run `factory terminal check` after a change.
+
+With **Warp** (macOS only):
+
+- Warp cannot be driven from outside: its control tool (`warpctrl`) is off in the Stable release and cannot send input or read a pane. So Claude runs in a tmux session that the factory owns, and Warp only shows it.
+- tmux keeps a terminal session running in the background. The factory uses its own tmux server (`tmux -L captn`), so your own tmux sessions are not touched.
+- At launch the factory starts `claude` in a detached tmux session named after the task, in the task worktree. Then it writes a Warp tab config `~/.warp/tab_configs/captn-<name>.toml` and opens it: a new Warp tab attaches to the session.
+- Closing the Warp tab does not stop Claude. **Focus a task** opens a new tab when none is attached, or brings Warp to the front. It cannot pick the tab inside Warp.
+- Working or idle comes from the factory's Claude hooks (`Stop` and `UserPromptSubmit`), saved in `.factory/session-activity/`.
+- Close, pause and delete stop Claude and end the tmux session. The Warp tab then closes, and the tab config file is removed.
+- To look at a session by hand: `tmux -L captn ls`, then `tmux -L captn attach -t <name>`.
 
 ## Tutorial
 
@@ -457,7 +478,7 @@ Drag the left edge of the details or of the terminal to change its width. The ar
 
 The terminal is a real terminal, attached to the session:
 
-- The server runs `herdr agent attach <agent>` in a pseudo-terminal and streams it to the page. The page shows it with xterm.js, served by the local server from `lib/factory/web/vendor/xterm` (no CDN).
+- The server runs the adapter's attach command (`herdr agent attach <agent>`, or `tmux -L captn attach-session -t <name>` with Warp) in a pseudo-terminal and streams it to the page. The page shows it with xterm.js, served by the local server from `lib/factory/web/vendor/xterm` (no CDN).
 - Click in the terminal and type: every key goes to the session as you press it. The key buttons (Esc, Tab, the arrows, Backspace, Space, Enter, Ctrl+C) send the same keys.
 - The terminal follows the size of its column.
 - One terminal per task is shared by every open page. A new page gets the last 256 KB of output first.
