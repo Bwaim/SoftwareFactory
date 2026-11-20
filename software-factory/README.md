@@ -43,6 +43,12 @@ curl -fsSL https://raw.githubusercontent.com/Bwaim/SoftwareFactory/main/install.
 
 The script downloads the latest release into `~/.local/share/software-factory` and makes sure that its SHA-256 matches the release. It creates the link `~/.local/bin/factory`. If `~/.local/bin` is not in your `PATH`, add it. `factory init` does not create the link. If the link is missing, run `factory link`.
 
+Then the script asks which multi-terminal tool you already have: Herdr, Warp (macOS, with tmux), or none.
+
+- With none, it asks which one to install. It can run the install for you, after you say yes: Herdr's own install script, or `brew install --cask warp` and `brew install tmux`.
+- It saves the choice in `~/.config/software-factory/terminal`. `factory init` writes it into each new repository's `.factory/factory.yaml` (`terminal:`). A repository already set up keeps its own choice.
+- The questions read the terminal, so they work with `curl ... | sh`. Without a terminal (CI), nothing is asked. Set `FACTORY_INSTALL_TERMINAL=herdr` or `warp` to choose without a question.
+
 To update the factory, run the same command again.
 
 If you used the plugin before, uninstall it in Claude Code:

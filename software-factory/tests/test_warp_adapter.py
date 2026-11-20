@@ -206,3 +206,15 @@ def test_check_needs_tmux(warp_env, monkeypatch):
 def test_focus_does_not_ask_for_the_terminal_app(warp_env):
     assert WarpAdapter.front_app == "Warp" and "focused" not in WarpAdapter(None).capabilities()
 
+
+def test_install_choice_is_the_default_terminal(origin_repo, monkeypatch, tmp_path):
+    from factory import adapters
+    monkeypatch.delenv("FACTORY_TERMINAL", raising=False)
+    monkeypatch.setenv("FACTORY_HOME", str(tmp_path / "home"))
+    ctx = repo.load_ctx(cwd=origin_repo)
+    assert adapters.terminal_name(ctx) == "herdr"
+    (tmp_path / "home").mkdir()
+    (tmp_path / "home" / "terminal").write_text("warp\n")
+    assert adapters.terminal_name(ctx) == "warp"
+    monkeypatch.setenv("FACTORY_TERMINAL", "fake")
+    assert adapters.terminal_name(ctx) == "fake"
