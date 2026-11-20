@@ -30,7 +30,7 @@ You start and manage tasks from one orchestrator session in the main repository.
 You need:
 
 - `uv`. Install it with `brew install uv`.
-- Herdr: https://herdr.dev
+- A terminal: Herdr (https://herdr.dev, the default) or Warp (https://www.warp.dev) with tmux (`brew install tmux`). See [Terminal: Herdr or Warp](#terminal-herdr-or-warp).
 - git, only for pipelines with `worktree: true`. Each repository can have an `origin` remote, but it is optional.
 - Claude Code.
 - Optional: `gh` or `glab`, for the forge steps of the catalog.
@@ -42,6 +42,12 @@ curl -fsSL https://raw.githubusercontent.com/Bwaim/SoftwareFactory/main/install.
 ```
 
 The script downloads the latest release into `~/.local/share/software-factory` and makes sure that its SHA-256 matches the release. It creates the link `~/.local/bin/factory`. If `~/.local/bin` is not in your `PATH`, add it. `factory init` does not create the link. If the link is missing, run `factory link`.
+
+Then the script asks which multi-terminal tool you already have: Herdr, Warp (macOS, with tmux), or none.
+
+- With none, it asks which one to install. It can run the install for you, after you say yes: Herdr's own install script, or `brew install --cask warp` and `brew install tmux`.
+- It saves the choice in `~/.config/software-factory/terminal`. `factory init` writes it into each new repository's `.factory/factory.yaml` (`terminal:`). A repository already set up keeps its own choice.
+- The questions read the terminal, so they work with `curl ... | sh`. Without a terminal (CI), nothing is asked. Set `FACTORY_INSTALL_TERMINAL=herdr` or `warp` to choose without a question.
 
 To update the factory, run the same command again.
 
@@ -96,6 +102,31 @@ Herdr adapter:
 - `herdr workspace rename`, `herdr tab rename`, `herdr agent rename`
 - `open -a <terminal app>`
 - `herdr notification show`
+
+Warp adapter:
+
+- `tmux -L captn new-session`, `has-session`, `kill-session`, `rename-session`
+- `tmux -L captn capture-pane`, `send-keys`, `load-buffer`, `paste-buffer`, `list-clients`, `display-message`, `attach-session`
+- `open warp://tab_config/<name>`, `open -a Warp`, `open -Ra Warp`
+- `~/Applications/CAPTN Factory.app/Contents/MacOS/captn-notify <title> <body> <sound>`, and to build that app: `swiftc`, `codesign --sign -`, `lsregister -f`
+- `osascript` (`display notification`), when the CAPTN Factory app cannot be used
+
+## Terminal: Herdr or Warp
+
+The factory runs each Claude session through a terminal adapter. Choose it with `terminal:` in `.factory/factory.yaml` (`herdr` or `warp`). The `FACTORY_TERMINAL` environment variable is used when the file has no value. Run `factory terminal check` after a change.
+
+With **Warp** (macOS only):
+
+- Warp cannot be driven from outside: its control tool (`warpctrl`) is off in the Stable release and cannot send input or read a pane. So Claude runs in a tmux session that the factory owns, and Warp only shows it.
+- tmux keeps a terminal session running in the background. The factory uses its own tmux server (`tmux -L captn`), so your own tmux sessions are not touched.
+- At launch the factory starts `claude` in a detached tmux session named after the task, in the task worktree. Then it writes a Warp tab config `~/.warp/tab_configs/captn-<name>.toml` and opens it: a new Warp tab attaches to the session.
+- Closing the Warp tab does not stop Claude. **Focus a task** opens a new tab when none is attached, or brings Warp to the front. It cannot pick the tab inside Warp.
+- Working or idle comes from the factory's Claude hooks (`Stop` and `UserPromptSubmit`), saved in `.factory/session-activity/`.
+- Close, pause and delete stop Claude and end the tmux session. The Warp tab then closes, and the tab config file is removed.
+- To look at a session by hand: `tmux -L captn ls`, then `tmux -L captn attach -t <name>`.
+- Notifications show the CAPTN icon. macOS shows the icon of the app that sends a notification, so the factory sends through its own small app, `~/Applications/CAPTN Factory.app`. The first notification builds it with `swiftc` (from the Xcode command line tools) and signs it for this Mac only. It is built again when its sources change.
+- The first time, macOS asks whether CAPTN Factory may show notifications. Click **Allow**. If you closed the question or clicked **Don't Allow**, turn it on in **System Settings → Notifications → CAPTN Factory**: macOS does not ask again.
+- Until the app is allowed, or without `swiftc`, notifications still come, through `osascript`, with the Script Editor icon.
 
 ## Tutorial
 
@@ -439,7 +470,7 @@ Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
 #### Task details
 
 Two columns sit on the right of the board: **Details**, then **Terminal**. Each column has a vertical tab on its left edge. A tab opens or closes only its own column; a closed column shows only its tab. The browser remembers which columns are open.
-The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns. When the narrower board would hide the card's column, the board scrolls sideways just enough to show it.
+The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns. Click the selected card again to close them; a third click opens them again. When the narrower board would hide the card's column, the board scrolls sideways just enough to show it.
 By default, the two open columns together cover about a third of the page; one open column alone also covers about a third. A width you drag stays.
 Click a column's tab, or press Escape outside the terminal for the details, to close it; the task stays selected.
 Below 900 px, an open column fills the page.
@@ -447,8 +478,8 @@ The details refresh every 3 seconds while their column is open. They show:
 
 - The name, the ticket, the description, the status and the same buttons as the card.
 - **Pipeline**: every step of the pipeline. Done steps have a check, the current step says "now" and the loop count.
-- **Timeline**: the events of the task, newest first, from `events.jsonl`. It shows the last 200 events.
 - **Details**: pipeline, ticket, MR, branch, base, worktree, created and updated times, the values of the task state and the artifacts.
+- **Timeline**: the events of the task, newest first, from `events.jsonl`. It shows the last 200 events. "Step done" shows how long the step took. A step that starts and ends in the same second shows only its "Step done" line. A finished step ends a block: the factory logs "Unblocked" before it.
 
 #### Task terminal
 
@@ -457,8 +488,8 @@ Drag the left edge of the details or of the terminal to change its width. The ar
 
 The terminal is a real terminal, attached to the session:
 
-- The server runs `herdr agent attach <agent>` in a pseudo-terminal and streams it to the page. The page shows it with xterm.js, served by the local server from `lib/factory/web/vendor/xterm` (no CDN).
-- Click in the terminal and type: every key goes to the session as you press it. The key buttons (Esc, Tab, the arrows, Backspace, Space, Enter, Ctrl+C) send the same keys.
+- The server runs the adapter's attach command (`herdr agent attach <agent>`, or `tmux -L captn attach-session -t <name>` with Warp) in a pseudo-terminal and streams it to the page. The page shows it with xterm.js, served by the local server from `lib/factory/web/vendor/xterm` (no CDN).
+- Click in the terminal and type: every key goes to the session as you press it.
 - The terminal follows the size of its column.
 - One terminal per task is shared by every open page. A new page gets the last 256 KB of output first.
 - A terminal nobody watches closes after 30 seconds. At most 8 are open at once.

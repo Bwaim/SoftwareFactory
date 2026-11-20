@@ -3,6 +3,7 @@ import http.server
 import os
 import shutil
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -78,9 +79,24 @@ def env(work, release):
 
 
 def run_install(env):
+    # A new session has no controlling terminal, so the script cannot read /dev/tty and asks nothing.
     return subprocess.run(
-        ["/bin/sh", str(INSTALL)], env=env, capture_output=True, text=True, stdin=subprocess.DEVNULL,
+        ["/bin/sh", str(INSTALL)], env=env, capture_output=True, text=True, stdin=subprocess.DEVNULL, start_new_session=True,
     )
+
+
+def run_with_answers(env, work, *answers):
+    path = work / "answers"
+    path.write_text("".join(a + "\n" for a in answers))
+    return run_install({**env, "FACTORY_INSTALL_TTY": str(path)})
+
+
+def saved_terminal(env):
+    path = Path(env["HOME"]) / ".config/software-factory/terminal"
+    return path.read_text().strip() if path.exists() else None
+
+
+macos_only = pytest.mark.skipif(sys.platform != "darwin", reason="Warp is offered on macOS only")
 
 
 def test_fresh_install(release, env):
@@ -97,7 +113,7 @@ def test_fresh_install(release, env):
 
 def test_install_through_pipe(release, env):
     script = INSTALL.read_text()
-    r = subprocess.run(["/bin/sh"], input=script, env=env, capture_output=True, text=True)
+    r = subprocess.run(["/bin/sh"], input=script, env=env, capture_output=True, text=True, start_new_session=True)
     assert r.returncode == 0, r.stderr
     assert (Path(env["HOME"]) / ".local/share/software-factory/.installed-by-script").exists()
     assert "Installed factory 0.1.0" in r.stdout
@@ -111,9 +127,22 @@ def test_missing_claude_stops(release, env, work):
     assert not (Path(env["HOME"]) / ".local/share/software-factory").exists()
 
 
-def test_missing_herdr_warns(release, env):
-    r = run_install(env)
+def test_no_terminal_tool_warns_without_a_terminal_to_ask(release, env):
+    r = run_install({**env, "FACTORY_INSTALL_WARP_APP": "/nonexistent/Warp.app"})
     assert r.returncode == 0
+    assert "factory install: No terminal tool found. Tasks need Herdr (https://herdr.dev)" in r.stderr
+    assert saved_terminal(env) is None
+
+
+def test_herdr_found_without_a_terminal_saves_nothing(release, env, work):
+    write_stub(work / "fake bin/herdr", "exit 0")
+    r = run_install(env)
+    assert r.returncode == 0 and "terminal tool" not in r.stderr and saved_terminal(env) is None
+
+
+def test_terminal_from_the_environment(release, env):
+    r = run_install({**env, "FACTORY_INSTALL_TERMINAL": "herdr"})
+    assert saved_terminal(env) == "herdr"
     assert "factory install: herdr is not on PATH. Tasks need it to start. Install it from https://herdr.dev" in r.stderr
 
 
@@ -127,6 +156,57 @@ def test_missing_git_warns(release, env, work):
     r = run_install({**env, "PATH": env["PATH"].replace("/usr/bin", str(usr))})
     assert r.returncode == 0, r.stderr
     assert "factory install: git is not installed. Only pipelines with `worktree: false` can run." in r.stderr
+
+
+def test_bad_terminal_from_the_environment_stops(release, env):
+    r = run_install({**env, "FACTORY_INSTALL_TERMINAL": "kitty"})
+    assert r.returncode == 1 and "factory install: FACTORY_INSTALL_TERMINAL must be herdr or warp." in r.stderr
+
+
+@macos_only
+def test_asks_and_keeps_the_herdr_already_installed(release, env, work):
+    write_stub(work / "fake bin/herdr", "exit 0")
+    r = run_with_answers({**env, "FACTORY_INSTALL_WARP_APP": "/nonexistent/Warp.app"}, work, "")
+    assert r.returncode == 0, r.stderr
+    assert "1) Herdr (found)" in r.stdout and "Choice [1]: " in r.stdout
+    assert saved_terminal(env) == "herdr" and "Install Herdr" not in r.stdout
+
+
+@macos_only
+def test_asks_and_keeps_the_warp_already_installed(release, env, work):
+    (work / "Warp.app").mkdir()
+    write_stub(work / "fake bin/tmux", "exit 0")
+    r = run_with_answers({**env, "FACTORY_INSTALL_WARP_APP": str(work / "Warp.app")}, work, "2")
+    assert r.returncode == 0, r.stderr
+    assert "2) Warp (found), with tmux" in r.stdout and "Choice [2]: " in r.stdout
+    assert saved_terminal(env) == "warp" and "needed for tasks" not in r.stderr
+
+
+@macos_only
+def test_none_installed_asks_which_to_install(release, env, work):
+    r = run_with_answers({**env, "FACTORY_INSTALL_WARP_APP": "/nonexistent/Warp.app"}, work, "3", "2")
+    assert r.returncode == 0, r.stderr
+    assert "Which one would you like to install to use with CAPTN?" in r.stdout
+    assert "Install Warp later: https://www.warp.dev" in r.stdout and "Install tmux later: brew install tmux" in r.stdout
+    assert saved_terminal(env) == "warp"
+    assert "factory install: Warp and tmux are needed for tasks." in r.stderr
+
+
+@macos_only
+def test_declined_herdr_install_is_not_run(release, env, work):
+    r = run_with_answers({**env, "FACTORY_INSTALL_WARP_APP": "/nonexistent/Warp.app"}, work, "3", "1", "n")
+    assert r.returncode == 0, r.stderr
+    assert "Install Herdr now with its install script" in r.stdout and "Install Herdr later from https://herdr.dev" in r.stdout
+    assert saved_terminal(env) == "herdr"
+
+
+@macos_only
+def test_accepted_brew_installs_run_brew(release, env, work):
+    log = work / "brew.log"
+    write_stub(work / "fake bin/brew", f'echo "$@" >> "{log}"')
+    r = run_with_answers({**env, "FACTORY_INSTALL_WARP_APP": "/nonexistent/Warp.app"}, work, "3", "2", "y", "")
+    assert r.returncode == 0, r.stderr
+    assert log.read_text().splitlines() == ["install --cask warp", "install tmux"]
 
 
 def test_path_warning(release, env):

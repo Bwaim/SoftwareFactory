@@ -275,5 +275,8 @@ def front_text(result):
 
 def focus(ctx, tid):
     _, handle = live_handle(ctx, tid)
-    adapter_of(ctx).focus(handle)
+    adapter = adapter_of(ctx)
+    adapter.focus(handle)
+    if adapter.front_app:
+        return {"front": "ok", "app": adapter.front_app}
     return bring_to_front(ctx)

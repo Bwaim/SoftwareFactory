@@ -28,6 +28,8 @@ class AdapterError(FactoryError):
 
 class Adapter:
     name = ""
+    # The app the adapter's own focus brings to the front; None means ask the user which app shows the terminal.
+    front_app = None
 
     def __init__(self, ctx):
         self.ctx = ctx

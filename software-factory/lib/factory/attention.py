@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import adapters, events, fsio, repo, state, version
+from . import adapters, events, fsio, repo, session_activity, state, version
 
 def read_delay():
     try:
@@ -193,6 +193,7 @@ def run_hook(kind, stdin_text, cwd):
         return
     tid = None
     try:
+        session_activity.record(ctx, data.get("session_id"), kind)
         task = find_task(ctx, data.get("session_id"))
         tid = task and task["id"]
         HOOKS[kind](ctx, data)
