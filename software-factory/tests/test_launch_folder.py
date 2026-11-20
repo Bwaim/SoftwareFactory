@@ -15,7 +15,7 @@ def folder_pipeline(fdir, pid="folder"):
 def test_folder_launch_in_git_workspace(inited):
     folder_pipeline(inited.fdir)
     out = inited.factory.json("launch", "folder", "--description", "Do it")
-    tid = out["task_id"]
+    tid = out["id"]
     task = task_json(inited.fdir, tid)
     assert task["worktree"] is None and task["position"] == 0
     assert git("worktree", "list", cwd=inited.repo).count("\n") == 0
