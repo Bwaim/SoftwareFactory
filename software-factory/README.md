@@ -360,7 +360,7 @@ Then review the pipeline in the browser with `factory pipeline edit <id>`.
 
 Open it with the menu action "Open dashboard" or with `factory dashboard`. `factory dashboard` works from any folder.
 The page refreshes every 5 seconds.
-The header has three views: **Tasks**, **Backlog** and **Settings**. Each view fills the whole page: Backlog and Settings hide the Workspaces, Details and Terminal columns. Backlog names its workspace at the top.
+The header has three views: **Tasks**, **Backlog** and **Settings**. The button at the top right shows the dashboard in full screen; click it again, or press Escape, to leave. Each view fills the whole page: Backlog and Settings hide the Workspaces, Details and Terminal columns. Backlog names its workspace at the top.
 
 #### Workspaces
 

@@ -66,6 +66,15 @@ def test_selected_card_stands_out():
     assert "0 0 0 2px var(--brand-pink)" in rule and "color-mix(in srgb, var(--brand-pink) 10%, var(--panel))" in rule
 
 
+def test_fullscreen_toggle_in_header():
+    header = PAGE[PAGE.index("<header>"):PAGE.index("</header>")]
+    assert 'id="fullscreen-toggle" aria-pressed="false" aria-label="Enter full screen"' in header
+    assert '#fullscreen-toggle[aria-pressed="true"] { color: var(--brand-pink); }' in PAGE
+    for text in ["document.documentElement.requestFullscreen()", "document.exitFullscreen()",
+                 'addEventListener("fullscreenchange", updateFullscreenButton)', "fullscreenButton.hidden = !document.fullscreenEnabled;"]:
+        assert text in PAGE
+
+
 def test_focus_asks_terminal_app():
     assert "terminal_app" in PAGE and "Which terminal app shows Herdr?" in PAGE
 
