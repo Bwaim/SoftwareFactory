@@ -423,6 +423,7 @@ A finished task is always in `Done`.
 Any other task is in the column of its current step.
 If the column is unknown, the task goes in the first column.
 The "Columns" buttons hide or show a column. The browser remembers your choice.
+A column with no task is only as wide as its name, so the columns with tasks get the room.
 
 Each card shows:
 
@@ -511,7 +512,7 @@ Any change in the form turns the check off. Check again before you launch.
 
 #### Clean dialog
 
-The "Clean" button of the `Done` column lists the finished tasks that can be deleted.
+The "Clean" button of the `Done` column lists the finished tasks that can be deleted. It is hidden while `Done` is empty.
 
 1. Tick the tasks. Click "Check selected".
 2. For each task, the dialog shows uncommitted changes, unpushed commits and failed checks.

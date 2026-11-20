@@ -21,6 +21,14 @@ def test_card_has_countdown_and_check_now():
     assert "/check`" in PAGE
 
 
+def test_empty_columns_shrink_and_hide_clean():
+    assert ".column.no-tasks { flex: 0 0 auto;" in PAGE
+    assert '"column" + (empty ? " no-tasks" : "")' in PAGE
+    assert 'name === "Done" && !empty' in PAGE
+    # `.empty` is the empty board, with a 60vh minimum height.
+    assert ".column.empty" not in PAGE and '" empty"' not in PAGE
+
+
 def test_focus_asks_terminal_app():
     assert "terminal_app" in PAGE and "Which terminal app shows Herdr?" in PAGE
 
