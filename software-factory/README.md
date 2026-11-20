@@ -360,7 +360,7 @@ Then review the pipeline in the browser with `factory pipeline edit <id>`.
 
 Open it with the menu action "Open dashboard" or with `factory dashboard`. `factory dashboard` works from any folder.
 The page refreshes every 5 seconds.
-The header has two views: **Tasks** and **Backlog**.
+The header has three views: **Tasks**, **Backlog** and **Settings**. Each view fills the whole page: Backlog and Settings hide the Workspaces, Details and Terminal columns. Backlog names its workspace at the top.
 
 #### Workspaces
 
@@ -449,7 +449,10 @@ Status pill colors:
 | `paused` | grey |
 | `finished` | grey, green dot |
 
-The header has a light and dark mode button. The browser remembers your choice, for the dashboard and the pipeline editor.
+The **Settings** view holds the choices this browser remembers, for every workspace:
+
+- **Dark mode**: on by default. The pipeline editor follows this choice; it keeps its own light and dark mode button.
+- **Open the terminal with the details**: on by default. When it is off, selecting a task opens only its details.
 The browser tab title shows how many tasks need you, for example "(2) CAPTN Factory". An "Offline" tag shows when the page cannot reach the server.
 
 Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
@@ -470,8 +473,8 @@ Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
 
 #### Task details
 
-Two columns sit on the right of the board: **Details**, then **Terminal**. Each column has a vertical tab on its left edge. A tab opens or closes only its own column; a closed column shows only its tab. The browser remembers which columns are open.
-The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns. Click the selected card again to close them; a third click opens them again. When the narrower board would hide the card's column, the board scrolls sideways just enough to show it.
+Two columns sit on the right of the board: **Details**, then **Terminal**. They show on the Tasks view only. Each column has a vertical tab on its left edge. A tab opens or closes only its own column; a closed column shows only its tab. The browser remembers which columns are open.
+The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns, or only the details when **Open the terminal with the details** is off in Settings. Click the selected card again to close them; a third click opens them again. When the narrower board would hide the card's column, the board scrolls sideways just enough to show it.
 By default, the two open columns together cover about a third of the page; one open column alone also covers about a third. A width you drag stays.
 Click a column's tab, or press Escape outside the terminal for the details, to close it; the task stays selected.
 Below 900 px, an open column fills the page.

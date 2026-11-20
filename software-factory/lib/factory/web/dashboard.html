@@ -38,7 +38,9 @@ body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 header { background: var(--top); border-bottom: 1px solid var(--panel-line); padding: 12px 24px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
 header .grow { flex: 1; }
-header nav { display: flex; gap: 6px; }
+/* The view tabs sit on the header's bottom edge: 13px = its bottom padding and border, so the current tab covers the border and opens into the page
+   like a folder. Each view fills the whole page under the header: Backlog hides the Workspaces, Details and Terminal columns. */
+header nav { display: flex; gap: 4px; align-self: stretch; align-items: flex-end; margin-bottom: -13px; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand svg { width: 48px; height: 48px; flex: none; }
 .brand .names { display: flex; flex-direction: column; }
@@ -81,8 +83,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 button.primary { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
 button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 button.danger { color: var(--err); border-color: var(--err-line); }
-button.tab { font-size: 14px; padding: 0 16px; background: transparent; }
-button.tab.on, button.tab.on:hover { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
+button.tab { font-size: 15px; min-height: 44px; padding: 0 18px; background: transparent; color: var(--muted); border-color: transparent; border-bottom: 0; border-radius: 12px 12px 0 0; }
+button.tab:hover:not(:disabled) { background: transparent; color: var(--fg); }
+button.tab.on, button.tab.on:hover { background: var(--bg); color: var(--brand-pink); border-color: var(--panel-line); font-weight: 700; }
 button.toggle { font-weight: 500; min-height: 32px; padding: 0 12px; border-radius: 16px; }
 button.toggle.off { color: var(--muted); text-decoration: line-through; background: transparent; }
 a, .link { color: var(--link); cursor: pointer; font-weight: 600; }
@@ -114,6 +117,17 @@ button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-h
 .card .row { font-size: 13px; align-items: baseline; margin: 0; gap: 8px; }
 .card .row a { text-decoration: none; font-weight: 700; }
 .card .title { font-weight: 600; font-size: 14px; line-height: 1.35; }
+.page-title { margin: 0 0 12px; font-size: 20px; font-weight: 800; }
+.settings { max-width: 640px; }
+.settings > .muted { margin: 0 0 8px; }
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--panel-line); }
+.switch-row label { font-weight: 700; font-size: 15px; cursor: pointer; }
+.switch-row p { margin: 2px 0 0; font-size: 13px; }
+input[role="switch"] { appearance: none; flex: none; width: 44px; height: 26px; padding: 0; border: 0; border-radius: 13px; background: var(--line); position: relative; cursor: pointer; transition: background 0.15s; }
+input[role="switch"]::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; transition: transform 0.15s; }
+input[role="switch"]:checked { background: var(--accent); }
+input[role="switch"]:checked::after { transform: translateX(18px); }
+@media (prefers-reduced-motion: reduce) { input[role="switch"], input[role="switch"]::after { transition: none; } }
 .card.backlog { cursor: grab; max-width: 720px; margin: 0 0 10px; }
 .card.backlog .title { font-size: 15px; }
 .card.dragging { opacity: 0.4; }
@@ -151,9 +165,6 @@ button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-h
 .more .menu button { justify-content: flex-start; border-color: transparent; background: transparent; border-radius: 8px; }
 .more .menu button:hover:not(:disabled) { background: var(--raised); }
 .more .menu .muted { padding: 4px 12px; }
-.theme-toggle { width: 36px; padding: 0; border-radius: 50%; background: transparent; }
-.theme-toggle svg { width: 18px; height: 18px; }
-:root:not([data-theme="light"]) .theme-toggle .moon, :root[data-theme="light"] .theme-toggle .sun { display: none; }
 #offline { font-size: 12px; font-weight: 700; color: var(--attn-fg); background: var(--attn-bg); border-radius: 12px; padding: 3px 10px; }
 .check.approval .link { margin-left: 4px; }
 .empty { min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 48px 0; }
@@ -185,7 +196,7 @@ pre { white-space: pre-wrap; border: 1px solid var(--panel-line); border-radius:
 .report .bad { color: var(--err); }
 .report .good { color: var(--ok); font-weight: 600; }
 .footer { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 16px; flex-wrap: wrap; }
-.card.selected { border-color: var(--brand-pink); box-shadow: 0 0 0 1px var(--brand-pink); }
+.card.selected { border-color: var(--brand-pink); background: color-mix(in srgb, var(--brand-pink) 10%, var(--panel)); box-shadow: 0 0 0 2px var(--brand-pink), 0 8px 24px color-mix(in srgb, var(--brand-pink) 30%, transparent); }
 .card .name-link { font: inherit; font-weight: 700; color: var(--fg); background: none; border: 0; padding: 0; min-height: 0; border-radius: 4px; text-align: left; }
 .card .name-link:hover { background: none; text-decoration: underline; }
 .card.task { cursor: pointer; }
@@ -306,14 +317,11 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
   <nav aria-label="Views">
     <button class="tab" id="tab-tasks">Tasks</button>
     <button class="tab" id="tab-backlog">Backlog</button>
+    <button class="tab" id="tab-settings">Settings</button>
   </nav>
   <span class="grow"></span>
   <span id="offline" hidden title="The dashboard cannot reach the factory server. The board may be out of date.">Offline</span>
   <span id="updated" class="muted"></span>
-  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode" title="Switch to light mode">
-    <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-    <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-  </button>
 </header>
 <div class="layout">
   <div id="lcol-ws">
@@ -570,10 +578,14 @@ function render() {
   banner.hidden = !adapterDown();
   banner.textContent = adapterDown() ? state.info.adapter.message : "";
   renderMigration();
-  byId("tab-tasks").classList.toggle("on", state.view === "tasks");
-  byId("tab-backlog").classList.toggle("on", state.view === "backlog");
+  for (const view of ["tasks", "backlog", "settings"]) {
+    const tab = byId("tab-" + view);
+    tab.classList.toggle("on", state.view === view);
+    if (state.view === view) tab.setAttribute("aria-current", "page"); else tab.removeAttribute("aria-current");
+  }
   byId("updated").textContent = "Updated " + new Date().toLocaleTimeString();
   renderSidebar();
+  byId("lcol-ws").hidden = state.view !== "tasks";
   const main = byId("main");
   const oldBoard = main.querySelector(".board");
   const left = oldBoard ? oldBoard.scrollLeft : 0;
@@ -589,6 +601,7 @@ function mainView() {
   const ws = currentWorkspace();
   if (!ws) return el("div", {}, el("p", { class: "muted" }, "No workspace. Click + to add a factory."));
   if (ws.error) return el("div", {}, el("p", { class: "ws-error" }, ws.error));
+  if (state.view === "settings") return settingsView();
   return state.view === "tasks" ? tasksView() : backlogView();
 }
 function closeOnClick(menu) {
@@ -1245,6 +1258,8 @@ async function openClean() {
 
 function backlogView() {
   const root = el("div");
+  const ws = currentWorkspace();
+  if (ws) root.append(el("h2", { class: "page-title" }, `Backlog of ${ws.name}`));
   root.append(el("div", { class: "toolbar" }, button("Add", openAdd, { cls: "primary" }), el("span", { class: "muted" }, "Drag a card to change its priority.")));
   const list = el("div");
   state.backlog.forEach((e, i) => list.append(backlogCard(e, i)));
@@ -1311,19 +1326,25 @@ byId("main").addEventListener("wheel", (e) => {
   board.scrollLeft += dx;
 }, { passive: false });
 const THEME_KEY = "factory.theme";
-function themeLabel() {
-  const label = document.documentElement.dataset.theme === "light" ? "Switch to dark mode" : "Switch to light mode";
-  const b = byId("theme-toggle");
-  b.setAttribute("aria-label", label);
-  b.title = label;
-}
-byId("theme-toggle").addEventListener("click", () => {
-  const light = document.documentElement.dataset.theme !== "light";
+/** On by default: selecting a task opens its terminal next to its details, as before this setting existed. */
+const TERM_ON_SELECT_KEY = "factory.terminalOnSelect";
+function isLight() { return document.documentElement.dataset.theme === "light"; }
+function setTheme(light) {
   if (light) document.documentElement.dataset.theme = "light"; else delete document.documentElement.dataset.theme;
   try { localStorage.setItem(THEME_KEY, light ? "light" : "dark"); } catch (e) {}
-  themeLabel();
-});
-themeLabel();
+}
+function switchRow(id, label, hint, checked, onChange) {
+  const input = el("input", { type: "checkbox", role: "switch", id, checked, onchange: (e) => onChange(e.target.checked) });
+  return el("div", { class: "switch-row" }, el("div", {}, el("label", { for: id }, label), el("p", { class: "muted" }, hint)), input);
+}
+function settingsView() {
+  return el("div", { class: "settings" },
+    el("h2", { class: "page-title" }, "Settings"),
+    el("p", { class: "muted" }, "Saved in this browser, for every workspace."),
+    switchRow("set-dark", "Dark mode", "Use the dark theme. The pipeline editor follows this choice.", !isLight(), (on) => setTheme(!on)),
+    switchRow("set-term", "Open the terminal with the details", "When you select a task, open its live terminal next to its details.",
+      loadFlag(TERM_ON_SELECT_KEY, true), (on) => saveFlag(TERM_ON_SELECT_KEY, on)));
+}
 
 const EVENT_LABELS = {
   task_created: "Task created", step_started: "Step started", step_done: "Step done", step_goto: "Went to step",
@@ -1379,9 +1400,12 @@ function selectTask(id) {
     history.replaceState(null, "", location.pathname + location.search + DETAIL_HASH + encodeURIComponent(id));
     loadDetail();
   }
-  state.panel.details = state.term.open = true;
+  state.panel.details = true;
   saveFlag(DETAILS_KEY, true);
-  saveFlag(TERM_KEY, true);
+  if (loadFlag(TERM_ON_SELECT_KEY, true)) {
+    state.term.open = true;
+    saveFlag(TERM_KEY, true);
+  }
   render();
   revealTaskColumn(id);
 }
@@ -1561,7 +1585,7 @@ function infoSection(d) {
 function renderDetail() {
   const d = state.detail;
   const showDetails = !!d && state.panel.details;
-  byId("detail").hidden = !d;
+  byId("detail").hidden = !d || state.view !== "tasks";
   byId("detail-main").hidden = !showDetails;
   byId("pcol-details").dataset.open = showDetails ? "1" : "";
   byId("detail").dataset.open = showDetails || (!!d && state.term.open) ? "1" : "";
@@ -1806,6 +1830,7 @@ byId("term-reconnect").addEventListener("click", () => { stopLive(); renderTermi
 function setView(view) { state.view = view; render(); }
 byId("tab-tasks").addEventListener("click", () => setView("tasks"));
 byId("tab-backlog").addEventListener("click", () => setView("backlog"));
+byId("tab-settings").addEventListener("click", () => setView("settings"));
 refresh(true);
 setInterval(refresh, REFRESH_MS);
 setInterval(() => { for (const n of document.querySelectorAll("[data-next-check]")) n.textContent = countdownText(n.dataset.nextCheck); }, 1000);
