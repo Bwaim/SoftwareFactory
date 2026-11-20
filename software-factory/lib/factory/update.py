@@ -1,13 +1,17 @@
 import json
 import os
 import re
+import secrets
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.request
 from pathlib import Path
 
 from . import cli, fsio, repo, workspaces
+from .errors import FactoryError
 
 API_URL = "https://api.github.com/repos/Bwaim/SoftwareFactory/releases/latest"
 RELEASES = "https://github.com/Bwaim/SoftwareFactory/releases/download"
@@ -85,3 +89,121 @@ class Checker:
         if os.environ.get("FACTORY_NO_UPDATE_CHECK") or not script_install():
             return
         threading.Thread(target=self.run, daemon=True).start()
+
+
+def install_url(version):
+    return os.environ.get("FACTORY_UPDATE_INSTALL_URL") or f"{RELEASES}/v{version}/install.sh"
+
+
+def install_env(version):
+    env = dict(os.environ)
+    env["FACTORY_INSTALL_TTY"] = str(Path(tempfile.mkdtemp()) / "tty")
+    env["FACTORY_INSTALL_DOWNLOAD_BASE"] = f"{RELEASES}/v{version}"
+    env["FACTORY_INSTALL_DIR"] = str(root())
+    terminal = workspaces.home() / "terminal"
+    if terminal.exists():
+        env["FACTORY_INSTALL_TERMINAL"] = terminal.read_text().strip()
+    return env
+
+
+def run_install(version):
+    with tempfile.TemporaryDirectory() as tmp:
+        script = Path(tmp) / "install.sh"
+        try:
+            with urllib.request.urlopen(install_url(version), timeout=60) as response:
+                script.write_bytes(response.read())
+        except Exception as e:
+            return 1, f"Download of install.sh failed: {e}"
+        done = subprocess.run(
+            ["sh", str(script)], cwd=tmp, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, env=install_env(version),
+        )
+        return done.returncode, done.stdout
+
+
+def installed_version():
+    return fsio.read_text(root() / "VERSION").strip() or None
+
+
+def spawn_new():
+    from . import server as server_mod
+    return server_mod.spawn_server([str(root() / "bin" / "factory"), "serve"])
+
+
+class Updater:
+    def __init__(self, server, checker, start=spawn_new):
+        self.server = server
+        self.checker = checker
+        self.start = start
+        self.lock = threading.Lock()
+        self.job_id = None
+        self.state = None
+
+    def run(self, ws):
+        with self.lock:
+            if self.state is not None:
+                return self.job_id
+            latest = self.checker.latest
+            if latest is None:
+                raise FactoryError("No update is available.")
+            self.job_id = secrets.token_hex(6)
+            self.state = "running"
+            self.server.jobs[self.job_id] = {"status": "running"}
+        threading.Thread(target=self.work, args=(self.job_id, latest, ws), daemon=True).start()
+        return self.job_id
+
+    def holds(self):
+        return self.state in ("running", "done", "failed")
+
+    def job_read(self, job_id):
+        self.end_hold(job_id, ("done",))
+
+    def close(self):
+        self.end_hold(self.job_id, ("done", "failed"))
+
+    def end_hold(self, job_id, states):
+        with self.lock:
+            if job_id == self.job_id and self.state in states:
+                self.state = "ended"
+
+    def work(self, job_id, latest, ws):
+        try:
+            self.server.pause_for_update()
+            status, output = run_install(latest)
+            if status != 0 and installed_version() != latest:
+                self.fail(job_id, output)
+                return
+            self.finish(job_id, *self.start_new(latest, ws, status, output))
+        except Exception as e:
+            self.fail(job_id, str(e))
+
+    def start_new(self, latest, ws, status, output):
+        from . import server as server_mod
+        warn = status != 0
+        if warn:
+            fsio.atomic_write_text(workspaces.home() / "update.log", output)
+        try:
+            info = self.start()
+        except Exception:
+            error = f"The update is installed, but the new server did not start. See {server_mod.log_path()}."
+            return "failed", {"status": "error", "error": error, "output": output}
+        params = {"ws": ws} if ws else {}
+        params["updated"] = latest
+        if warn:
+            params["warn"] = "1"
+        url = server_mod.page_url(info, "dashboard", **params)
+        return "done", {"status": "done", "result": {"url": url, "version": latest, "output": output}}
+
+    def finish(self, job_id, state, job):
+        with self.lock:
+            self.state = state
+            timer = threading.Timer(HOLD_SECONDS, self.end_hold, args=(job_id, (state,)))
+            timer.daemon = True
+            timer.start()
+            self.server.jobs[job_id] = job
+
+    def fail(self, job_id, output):
+        self.server.resume_after_update()
+        with self.lock:
+            self.state = None
+            self.server.jobs[job_id] = {"status": "error", "error": "The update failed.", "output": output}
