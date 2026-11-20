@@ -33,6 +33,39 @@ def test_empty_columns_shrink_and_hide_clean():
     assert ".column.empty" not in PAGE and '" empty"' not in PAGE
 
 
+def test_view_tabs_are_folder_tabs_not_pills():
+    assert "header nav { display: flex; gap: 4px; align-self: stretch; align-items: flex-end; margin-bottom: -13px; }" in PAGE
+    header = PAGE[PAGE.index("<header>"):PAGE.index("</header>")]
+    assert 'id="tab-tasks"' in header and 'id="tab-backlog"' in header
+    # A tab switches the whole page under the header: Backlog hides every side column and names its workspace instead.
+    assert 'byId("lcol-ws").hidden = state.view !== "tasks";' in PAGE
+    assert 'byId("detail").hidden = !d || state.view !== "tasks";' in PAGE
+    assert "`Backlog of ${ws.name}`" in PAGE
+    assert "border-bottom: 0; border-radius: 12px 12px 0 0;" in PAGE
+    assert "button.tab.on, button.tab.on:hover { background: var(--bg); color: var(--brand-pink);" in PAGE
+    assert 'tab.setAttribute("aria-current", "page")' in PAGE
+    # The filled pink pill is for Launch only.
+    assert "button.tab.on, button.tab.on:hover { background: var(--accent)" not in PAGE
+
+
+def test_settings_tab_holds_theme_and_terminal_switches():
+    header = PAGE[PAGE.index("<header>"):PAGE.index("</header>")]
+    assert 'id="tab-settings">Settings</button>' in header
+    # The theme moved from a header button to a switch in Settings.
+    assert "theme-toggle" not in PAGE and 'switchRow("set-dark", "Dark mode"' in PAGE
+    assert 'switchRow("set-term", "Open the terminal with the details"' in PAGE
+    assert 'role: "switch"' in PAGE
+    # Selecting a task opens the terminal only when the setting is on, which is the default.
+    select = PAGE[PAGE.index("function selectTask("):PAGE.index("function toggleTask(")]
+    assert "if (loadFlag(TERM_ON_SELECT_KEY, true)) {" in select
+    assert "state.term.open = true;" in select and "state.panel.details = state.term.open = true;" not in select
+
+
+def test_selected_card_stands_out():
+    rule = PAGE[PAGE.index(".card.selected {"):PAGE.index("\n", PAGE.index(".card.selected {"))]
+    assert "0 0 0 2px var(--brand-pink)" in rule and "color-mix(in srgb, var(--brand-pink) 10%, var(--panel))" in rule
+
+
 def test_focus_asks_terminal_app():
     assert "terminal_app" in PAGE and "Which terminal app shows Herdr?" in PAGE
 
