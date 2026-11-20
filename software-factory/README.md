@@ -423,7 +423,7 @@ A finished task is always in `Done`.
 Any other task is in the column of its current step.
 If the column is unknown, the task goes in the first column.
 The "Columns" buttons hide or show a column. The browser remembers your choice.
-A column with no task is only as wide as its name, so the columns with tasks get the room.
+A column with no task shows only its header, as wide as its name, so the columns with tasks get the room.
 
 Each card shows:
 

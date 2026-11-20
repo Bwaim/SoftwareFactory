@@ -22,8 +22,12 @@ def test_card_has_countdown_and_check_now():
 
 
 def test_empty_columns_shrink_and_hide_clean():
-    assert ".column.no-tasks { flex: 0 0 auto;" in PAGE
+    assert ".column.no-tasks { flex: 0 0 auto; min-width: 104px; min-height: 0; padding: 0; background: none; }" in PAGE
     assert '"column" + (empty ? " no-tasks" : "")' in PAGE
+    # Only the header shows; screen readers still hear that the column is empty.
+    assert 'el("p", { class: "visually-hidden" }, "No tasks here")' in PAGE
+    rules = [line for line in PAGE.splitlines() if line.startswith(".column.no-tasks")]
+    assert len(rules) == 3 and not any("dashed" in line for line in rules)
     assert 'name === "Done" && !empty' in PAGE
     # `.empty` is the empty board, with a 60vh minimum height.
     assert ".column.empty" not in PAGE and '" empty"' not in PAGE
