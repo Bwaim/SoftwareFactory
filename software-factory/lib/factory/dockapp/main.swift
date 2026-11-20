@@ -609,6 +609,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func pageSaid(_ message: String) {
         if message == "unreachable" {
             serverMayBeDown()
+        } else if message.hasPrefix("navigate:") {
+            guard let url = URL(string: String(message.dropFirst("navigate:".count))),
+                  ServerAddress.isFactoryPage(url) else { return }
+            loadDashboard(url)
+            for page in pages where page !== dashboard {
+                page.reload(base: url)
+            }
         }
     }
 
