@@ -8,6 +8,8 @@ import pytest
 from factory import dockapp
 from factory.errors import FactoryError
 
+real_refresh = dockapp.refresh
+
 
 @pytest.fixture
 def mac(monkeypatch):
@@ -138,9 +140,6 @@ def test_app_install_command_prints_path(factory, tools):
     assert "Drag it to the Dock to keep it there." in r.stdout
 
 
-real_refresh = dockapp.refresh
-
-
 @pytest.fixture
 def dash(monkeypatch):
     from factory import commands, server
@@ -191,10 +190,14 @@ def test_dashboard_opens_app_when_rebuild_fails(dash, monkeypatch):
     monkeypatch.setattr(dockapp, "refresh", real_refresh)
 
     def fail():
+        calls.append(("install",))
         raise FactoryError("no")
 
+    monkeypatch.setattr(dockapp, "uv_path", lambda: "/opt/uv/bin/uv")
+    monkeypatch.setattr(dockapp, "current", lambda uv: False)
     monkeypatch.setattr(dockapp, "install", fail)
 
     run(None)
 
-    assert calls == [("app", "http://127.0.0.1:1/dashboard")]
+    assert calls.count(("install",)) == 1
+    assert calls == [("install",), ("app", "http://127.0.0.1:1/dashboard")]
