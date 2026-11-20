@@ -1,52 +1,8 @@
-import json
 import plistlib
-import stat
-import sys
 
 import pytest
 
 from factory import appbuild, notifier
-
-FAKE_SWIFTC = """#!/bin/sh
-echo "swiftc $*" >> "$FAKE_TOOLS_LOG"
-[ "${FAKE_SWIFTC_EXIT:-0}" = 0 ] || exit "$FAKE_SWIFTC_EXIT"
-while [ "$1" != "-o" ]; do shift; done
-cat > "$2" <<'APP'
-#!/bin/sh
-"$FAKE_PYTHON" -c 'import json,sys,os; open(os.environ["FAKE_APP_LOG"],"a").write(json.dumps(sys.argv[1:])+"\\n")' "$@"
-exit "${FAKE_NOTIFY_EXIT:-0}"
-APP
-chmod +x "$2"
-"""
-
-FAKE_CODESIGN = """#!/bin/sh
-echo "codesign $*" >> "$FAKE_TOOLS_LOG"
-"""
-
-
-@pytest.fixture
-def tools(tmp_path, monkeypatch):
-    bindir = tmp_path / "bin"
-    bindir.mkdir()
-    for name, text in (("swiftc", FAKE_SWIFTC), ("codesign", FAKE_CODESIGN)):
-        exe = bindir / name
-        exe.write_text(text)
-        exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
-    tools_log, app_log = tmp_path / "tools.log", tmp_path / "app.log"
-    # /usr/bin holds the real swiftc and codesign, so PATH leaves it out.
-    monkeypatch.setenv("PATH", f"{bindir}:/bin")
-    monkeypatch.setenv("FAKE_PYTHON", sys.executable)
-    monkeypatch.setenv("FAKE_TOOLS_LOG", str(tools_log))
-    monkeypatch.setenv("FAKE_APP_LOG", str(app_log))
-
-    def compiles():
-        return sum(line.startswith("swiftc ") for line in tools_log.read_text().splitlines()) if tools_log.exists() else 0
-
-    def sent():
-        return [json.loads(line) for line in app_log.read_text().splitlines()] if app_log.exists() else []
-
-    return compiles, sent
-
 
 def info(app):
     with open(app / "Contents" / "Info.plist", "rb") as f:

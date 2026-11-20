@@ -106,6 +106,9 @@ def register(sub, common):
     svs = p.add_subparsers(dest="action", required=True)
     st = svs.add_parser("stop", parents=[common]); st.add_argument("--unless-waiting", action="store_true")
     svs.add_parser("waiting", parents=[common])
+    p = sub.add_parser("app")
+    aps = p.add_subparsers(dest="action", required=True)
+    aps.add_parser("install", parents=[common])
     p = sub.add_parser("catalog")
     cts = p.add_subparsers(dest="action", required=True)
     cts.add_parser("list", parents=[common])
@@ -704,6 +707,13 @@ def dashboard_cmd(args):
     url = server.page_url(info, "dashboard", **ws)
     server.open_page(url)
     print(f"Dashboard: {url}")
+
+
+@cli.command("app install")
+def app_install_cmd(args):
+    from . import dockapp
+    print(f"Dashboard app: {dockapp.install()}")
+    print("Drag it to the Dock to keep it there.")
 
 
 @cli.command("server stop")
