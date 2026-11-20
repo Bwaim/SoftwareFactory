@@ -54,6 +54,19 @@ def test_task_settings_env(inited):
     assert data["env"] == {"FACTORY_TASK": task["id"]}
 
 
+@pytest.mark.parametrize("text, message", [
+    ("{not json", "is not valid JSON"),
+    ("[1, 2]", "must hold a JSON object"),
+    ('{"env": ["A"]}', "`env` must be a JSON object"),
+])
+def test_bad_shared_settings_raise_clear_error(inited, text, message):
+    shared = inited.fdir / "claude-settings.json"
+    shared.write_text(text)
+    with pytest.raises(FactoryError, match=message) as e:
+        session.write_task_settings(repo.load_ctx(cwd=inited.repo), {"id": "t1"})
+    assert str(shared) in str(e.value)
+
+
 def test_missing_worktree_folder(inited):
     ctx = repo.load_ctx(cwd=inited.repo)
     gone = inited.work / "gone"

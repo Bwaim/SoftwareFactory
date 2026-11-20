@@ -2,7 +2,7 @@ import subprocess
 import sys
 import uuid
 
-from . import adapters, config, events, exclusive, fsio, state
+from . import adapters, config, events, exclusive, fsio, init, state
 from .adapters.base import AdapterError
 from .errors import FactoryError
 
@@ -44,8 +44,16 @@ def task_settings_path(ctx, task):
     return state.task_dir(ctx, task["id"]) / "claude-settings.json"
 
 
+def shared_settings(ctx):
+    path = ctx.fdir / "claude-settings.json"
+    settings = init.read_settings(path) if path.exists() else {}
+    if not isinstance(settings.get("env", {}), dict):
+        raise FactoryError(f"{path}: `env` must be a JSON object. Fix or remove it, then run again.")
+    return settings
+
+
 def write_task_settings(ctx, task):
-    settings = fsio.read_json(ctx.fdir / "claude-settings.json", {})
+    settings = shared_settings(ctx)
     settings["env"] = {**settings.get("env", {}), "FACTORY_TASK": task["id"]}
     path = task_settings_path(ctx, task)
     fsio.write_json(path, settings)
