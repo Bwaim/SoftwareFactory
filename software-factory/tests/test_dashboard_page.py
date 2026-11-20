@@ -42,8 +42,11 @@ def test_workspace_sidebar_and_routes():
 
 
 def test_workspace_add_flow_texts():
-    for text in ["no_factory", "Set up and add", "Library folder", "Choose folder…", "/api/workspaces/pick-folder", "/api/host", "Rename", "two lines in .git/info/exclude", "Git does not track these files. Init keeps files that exist."]:
+    for text in ["no_factory", "Set up and add", "Library folder", "Choose folder…", "/api/workspaces/pick-folder", "/api/host", "Rename", "In a git repository, the factory adds two lines to .git/info/exclude, so git does not track these files.",
+                 "Init keeps files that exist.", "/path/to/folder"]:
         assert text in PAGE
+    for text in ["/path/to/repository", "Git does not track these files."]:
+        assert text not in PAGE
     assert "Remove ${ws.name} from the dashboard? The repository and its tasks stay on disk. Done checks of this workspace stop. The workspace comes back when a task in this repository waits for a done check, when you resume a task in it, or when you run \\`factory dashboard\\` in it." in PAGE
 
 

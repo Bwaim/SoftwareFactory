@@ -647,7 +647,7 @@ function folderRow(input, out, picker) {
 }
 async function openAddWorkspace() {
   const picker = await folderPicker();
-  const path = el("input", { type: "text", placeholder: "/path/to/repository" });
+  const path = el("input", { type: "text", placeholder: "/path/to/folder" });
   const out = el("div");
   const row = folderRow(path, out, picker);
   const add = button("Add", async () => {
@@ -669,8 +669,8 @@ function openSetup(path, main) {
   }, { cls: "primary" });
   showModal({ title: `Set up the factory in ${main}?`, content: [
     el("p", {}, "Init writes these files:"),
-    el("ul", { class: "ws-list" }, el("li", {}, `${main}/.factory/`), el("li", {}, "two lines in .git/info/exclude")),
-    el("p", { class: "muted" }, "Git does not track these files. Init keeps files that exist."),
+    el("ul", { class: "ws-list" }, el("li", {}, `${main}/.factory/`)),
+    el("p", { class: "muted" }, "In a git repository, the factory adds two lines to .git/info/exclude, so git does not track these files. Init keeps files that exist."),
     field("Library folder", library), out, el("div", { class: "footer" }, closeButton("Cancel"), go)] });
 }
 function textInput(value, attrs = {}) {
