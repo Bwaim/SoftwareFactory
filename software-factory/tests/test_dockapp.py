@@ -233,6 +233,32 @@ def test_dashboard_opens_app_when_rebuild_fails(dash, monkeypatch):
     assert calls == [("install",), ("app", "http://127.0.0.1:1/dashboard")]
 
 
+def test_server_does_not_inherit_the_dock_app_flag(factory_home, monkeypatch):
+    from factory import server
+    factory_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("FACTORY_DOCK_APP", "1")
+    envs = []
+
+    class Exited:
+        pid = -1
+
+        def poll(self):
+            return 1
+
+    def popen(argv, **kwargs):
+        envs.append(kwargs.get("env"))
+        return Exited()
+
+    monkeypatch.setattr(server.subprocess, "Popen", popen)
+
+    with pytest.raises(FactoryError, match="did not start"):
+        server.ensure_server()
+
+    assert envs and envs[0] is not None
+    assert "FACTORY_DOCK_APP" not in envs[0]
+    assert envs[0]["FACTORY_HOME"] == str(factory_home)
+
+
 def swiftc_found():
     try:
         return subprocess.run(["xcrun", "--find", "swiftc"], capture_output=True).returncode == 0
