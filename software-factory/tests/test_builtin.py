@@ -39,3 +39,11 @@ def test_edit_steps_run_in_the_orchestrator():
         _, body = parse_step_text((SF / "builtin" / "steps" / f"{sid}.md").read_text(), sid)
         assert "Run in the orchestrator session." in body and "factory block" not in body
         assert f"(`{sid}`): follow the built-in step `{sid}`." in skill
+
+
+def test_implement_text_has_no_worktree():
+    assert "worktree" not in (SF / "builtin" / "steps" / "implement.md").read_text()
+
+
+def test_user_validation_without_git():
+    assert "Without git" in (SF / "builtin" / "steps" / "user-validation.md").read_text()

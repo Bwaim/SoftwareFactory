@@ -84,3 +84,9 @@ def test_readme_describes_cancel():
     for needle in ("factory cancel <id> [--dry-run]", "**Cancel**", "Cancel task", "Keep task", "patch id", "git stash apply"):
         assert needle in text, needle
     assert "the task counts as not merged" not in text
+
+
+def test_readme_worktree_key():
+    text = (SF / "README.md").read_text()
+    assert "worktree: false" in text
+    assert "You are in charge of this." in text

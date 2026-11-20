@@ -246,6 +246,23 @@ Local server:
 - `factory server stop`: stop the local server.
 - `factory server stop --unless-waiting`: stop the local server only when no task waits on a done check.
 
+### Folder pipelines
+
+Each pipeline has a required key `worktree`. Its value is `true` or `false`.
+
+- `worktree: true`: each task gets its own git worktree and branch. The repository must be a git repository.
+- `worktree: false`: the task runs in the workspace folder. It has no worktree and no branch. The folder does not need git.
+
+A workspace can be a plain folder outside git. Add it in the dashboard like any repository. `factory init` works in it. Only pipelines with `worktree: false` run there. A pipeline with `worktree: true` is listed as unavailable.
+
+A machine without the `git` program runs only pipelines with `worktree: false`. The factory does not call git for these tasks.
+
+The data version is 3. Run `factory migrate` after an update. It adds `worktree: true` to each pipeline that has no `worktree` key.
+
+The built-in pipeline `quick-task` ships with `worktree: false`. The steps `implement` and `user-validation` work in both kinds of pipeline. `user-validation` shows `git status` with git. Without git, it lists the files that the task changed.
+
+Two tasks of folder pipelines in one workspace can change the same files. You are in charge of this.
+
 ### Pipeline editor
 
 `factory pipeline edit [<id>]` opens the editor in the browser.
