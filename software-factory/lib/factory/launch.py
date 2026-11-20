@@ -6,7 +6,7 @@ from pathlib import Path
 
 from . import adapters, config, events, keys, loops, pipeline_check, repo, session, state
 from .errors import FactoryError
-from .registry import CREATE_WORKTREE, Registry
+from .registry import CREATE_WORKTREE, NEEDS_GIT, Registry
 
 TASK_ID_RE = state.TASK_ID_RE
 ID_BASE_MAX = 29
@@ -176,7 +176,10 @@ def plan_launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlo
     else:
         base = ticket_key(str(inputs.get("ticket", ""))) or slugify(report["description"] or "task")
         report["task_id"] = unique_id(ctx, base)
-    plan_worktree(ctx, reg, pipeline, report, inputs)
+    if pipeline.worktree is True and not ctx.git:
+        report["errors"].append(NEEDS_GIT.format(id=pipeline.id))
+    elif pipeline.worktree is True:
+        plan_worktree(ctx, reg, pipeline, report, inputs)
     report["ok"] = not report["errors"] and not report["missing_inputs"] and not report["missing_config"]
     return report
 
@@ -258,6 +261,12 @@ def rollback(undo):
             print(f"Rollback step failed: {e}", file=sys.stderr)
 
 
+def add_worktree(ctx, report, undo):
+    if create_worktree(ctx, report):
+        undo.append(lambda: repo.git(["branch", "-D", report["branch"]], ctx.main))
+    undo.append(lambda: repo.git(["worktree", "remove", "--force", report["worktree"]], ctx.main))
+
+
 def launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlog=None):
     report = plan_launch(ctx, pipeline_id, description, inputs, task_id, from_backlog)
     if not report["ok"]:
@@ -265,10 +274,8 @@ def launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlog=Non
     reg = Registry.load(ctx)
     undo = []
     try:
-        created_branch = create_worktree(ctx, report)
-        if created_branch:
-            undo.append(lambda: repo.git(["branch", "-D", report["branch"]], ctx.main))
-        undo.append(lambda: repo.git(["worktree", "remove", "--force", report["worktree"]], ctx.main))
+        if report["worktree"] is not None:
+            add_worktree(ctx, report, undo)
         task = new_task(ctx, reg, report, inputs)
         state.create(ctx, task)
         undo.append(lambda: shutil.rmtree(state.task_dir(ctx, task["id"]), ignore_errors=True))

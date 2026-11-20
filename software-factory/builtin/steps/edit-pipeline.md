@@ -13,4 +13,5 @@ Run in the orchestrator session.
 2. Collect what the pipeline needs. Ask the user for each item that is missing:
    - the input parameters: the keys the launch asks for,
    - the steps to use, in order. Run `factory step list --all --json` to show them.
+   - whether the pipeline runs in a worktree. Set `worktree: true` or `worktree: false` in every pipeline you write.
 3. Write the pipeline with the skill `/software-factory:factory-authoring`. Give it the answers of the user.

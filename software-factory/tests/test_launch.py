@@ -1,7 +1,7 @@
 import pytest
 
 from conftest import commit_all, events, fake_calls, fake_config, git, task_json, write_pipeline, write_step
-from factory import launch, repo
+from factory import launch, repo, session
 from factory.errors import FactoryError
 
 
@@ -56,7 +56,7 @@ def test_launch_detached(lp):
     assert "in_worktree" not in call and call["cwd"] == str(wt)
     assert args[args.index("--name") + 1] == task["id"]
     assert args[args.index("--session-id") + 1] == task["session_id"]
-    assert args[args.index("--settings") + 1] == str(lp.fdir / "claude-settings.json")
+    assert args[args.index("--settings") + 1] == str(session.task_settings_path(ctx(lp), task))
     assert args[args.index("--model") + 1] == "sonnet" and args[args.index("--effort") + 1] == "medium"
     assert str(lp.fdir / "tasks" / task["id"] / "artifacts") in args
     assert "Run `factory next`" in call["prompt"]

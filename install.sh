@@ -27,11 +27,13 @@ main() {
   link_dir=${FACTORY_LINK_DIR:-$HOME/.local/bin}
   link="$link_dir/factory"
 
-  for tool in curl tar uv git claude; do
+  for tool in curl tar uv claude; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required."
   done
   command -v herdr >/dev/null 2>&1 \
     || printf 'factory install: herdr is not on PATH. Tasks need it to start. Install it from https://herdr.dev\n' >&2
+  command -v git >/dev/null 2>&1 \
+    || printf 'factory install: git is not installed. Only pipelines with `worktree: false` can run.\n' >&2
 
   if [ ! -e "$dir" ]; then
     for b in "$dir".backup.*; do

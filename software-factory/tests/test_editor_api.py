@@ -56,7 +56,7 @@ def test_cli_lists(ed):
 
 def test_save_drops_empty_nested_fields(ed):
     inited, i = ed
-    data = {"id": "tidy", "description": "", "claude": {"model": "", "effort": ""},
+    data = {"id": "tidy", "description": "", "worktree": True, "claude": {"model": "", "effort": ""},
             "inputs": {"a": {"description": ""}}, "steps": [{"id": "gen", "with": {}, "model": "", "column": ""}]}
     status, saved = request(i, "POST", "/api/pipelines/save", {"data": data, "level": "local"})
     assert status == 200
@@ -79,7 +79,7 @@ def test_new_pipeline_over_existing_file_refused_then_replaced(ed):
     inited, i = ed
     path = inited.fdir / "pipelines" / "base.yaml"
     before = path.read_text()
-    data = {"id": "base", "description": "other", "steps": ["gen"]}
+    data = {"id": "base", "description": "other", "worktree": True, "steps": ["gen"]}
     status, body = request(i, "POST", "/api/pipelines/save", save_body(data))
     assert status == 409 and "already exists" in body["error"]
     assert path.read_text() == before
@@ -90,7 +90,7 @@ def test_new_pipeline_over_existing_file_refused_then_replaced(ed):
 
 def test_editing_the_same_pipeline_at_the_same_level_is_allowed(ed):
     inited, i = ed
-    data = {"id": "base", "description": "edited", "steps": ["gen", "loc"]}
+    data = {"id": "base", "description": "edited", "worktree": True, "steps": ["gen", "loc"]}
     status, _ = request(i, "POST", "/api/pipelines/save", save_body(data, original_id="base", original_level="local"))
     assert status == 200
     assert yaml.safe_load((inited.fdir / "pipelines" / "base.yaml").read_text())["description"] == "edited"
@@ -98,6 +98,6 @@ def test_editing_the_same_pipeline_at_the_same_level_is_allowed(ed):
 
 def test_editing_another_pipeline_or_level_over_existing_refused(ed):
     inited, i = ed
-    data = {"id": "base", "steps": ["gen"]}
+    data = {"id": "base", "worktree": True, "steps": ["gen"]}
     assert request(i, "POST", "/api/pipelines/save", save_body(data, original_id="other", original_level="local"))[0] == 409
     assert request(i, "POST", "/api/pipelines/save", save_body(data, original_id="base", original_level="generic"))[0] == 409

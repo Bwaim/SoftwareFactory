@@ -27,13 +27,13 @@ def test_init_without_origin_warns(factory, origin_repo, library_path):
     assert "Warning: This repository has no `origin` remote. Tasks start from the local `main` branch. Push and pull request steps fail." in r.stdout
 
 
-def test_init_outside_git_still_fails(factory, tmp_path, library_path):
+def test_init_outside_git_is_plain(factory, tmp_path, library_path):
     plain = tmp_path / "plain"
     plain.mkdir()
     env = {"GIT_CEILING_DIRECTORIES": str(tmp_path)}
-    r = factory("init", "--library", library_path, "--create-library", cwd=plain, env=env, check=False)
-    assert r.returncode == 1 and "not in a git repository" in (r.stdout + r.stderr)
-    assert not (plain / ".factory").exists()
+    r = factory("init", "--library", library_path, "--create-library", cwd=plain, env=env)
+    assert "not in a git repository" in r.stdout
+    assert (plain / ".factory" / "factory.yaml").exists()
 
 
 def test_launch_without_origin_new_branch(local):

@@ -43,13 +43,12 @@ def test_worktree_path_resolves_to_main(origin_repo, work):
         workspaces.add(workspaces.resolve_main(str(wt)))
 
 
-def test_resolve_main_refuses_missing_and_non_git(tmp_path):
+def test_resolve_main_refuses_missing_and_accepts_plain_folder(tmp_path):
     with pytest.raises(FactoryError):
         workspaces.resolve_main(str(tmp_path / "missing"))
     plain = tmp_path / "plain"
     plain.mkdir()
-    with pytest.raises(FactoryError):
-        workspaces.resolve_main(str(plain))
+    assert workspaces.resolve_main(str(plain)) == plain.resolve()
 
 
 def test_rename_rules(origin_repo):

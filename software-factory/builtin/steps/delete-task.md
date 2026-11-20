@@ -1,6 +1,6 @@
 ---
 id: delete-task
-description: Delete a task, its session, terminal, worktree and local branch
+description: Delete a task, its session, terminal, worktree (if any) and local branch
 category: factory
 type: ai
 done_when: The task folder is in the archive.

@@ -292,3 +292,51 @@ def test_herdr_attach_refused_when_agent_in_other_tab(herdr_env, monkeypatch):
     monkeypatch.setenv("FAKE_HERDR_AGENT_TAB", "w3:t4")
     with pytest.raises(AdapterError, match="does not belong"):
         adapter.attach_command({"agent": "t1", "tab": "w9:t1"})
+
+
+def test_folder_task_tab_in_main_workspace(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_EXISTING_WS", "1")
+    handle = adapter.start_session("t1", origin_repo, "p", [])
+    assert handle == {"agent": "t1", "tab": "w5:t2"}
+    assert not [c for c in calls() if c[:2] == ["worktree", "open"]]
+    tab_create = next(c for c in calls() if c[:2] == ["tab", "create"])
+    assert tab_create[tab_create.index("--workspace") + 1] == "w5"
+    assert tab_create[tab_create.index("--cwd") + 1] == str(origin_repo)
+
+
+def test_folder_task_closes_only_tab(herdr_env, origin_repo, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.setenv("FAKE_HERDR_EXISTING_WS", "1")
+    handle = adapter.start_session("t1", origin_repo, "p", [])
+    adapter.close(handle)
+    assert calls()[-1] == ["tab", "close", "w5:t2"]
+    assert closed(calls()) == []
+
+
+def test_folder_task_plain_creates_workspace(herdr_env, plain):
+    _, calls = herdr_env
+    adapter = HerdrAdapter(repo.load_ctx(cwd=plain))
+    handle = adapter.start_session("t1", plain, "p", [])
+    assert handle == {"agent": "t1", "workspace": "w7", "tab": "w7:t1"}
+    create = next(c for c in calls() if c[:2] == ["workspace", "create"])
+    assert create[create.index("--cwd") + 1] == str(plain)
+    assert "--no-focus" in create
+    assert not [c for c in calls() if c[:2] in (["worktree", "open"], ["tab", "create"])]
+
+
+def test_folder_task_git_without_main_workspace_shares_new_workspace(herdr_env, origin_repo):
+    adapter, calls = herdr_env
+    handle = adapter.start_session("t1", origin_repo, "p", [])
+    assert handle == {"agent": "t1", "tab": "w7:t1", "extra_workspaces": ["w7"]}
+    assert json.loads(adapter.shared_record().read_text()) == ["w7"]
+    adapter.close(handle)
+    assert ["tab", "close", "w7:t1"] in calls()
+    assert closed(calls()) == []
+
+
+def test_folder_task_plain_closes_its_workspace(herdr_env, plain):
+    _, calls = herdr_env
+    adapter = HerdrAdapter(repo.load_ctx(cwd=plain))
+    adapter.close(adapter.start_session("t1", plain, "p", []))
+    assert closed(calls()) == ["w7"]

@@ -2,14 +2,15 @@
 
 ## What it does
 
-The Software Factory starts each task in its own git worktree, its own Herdr tab and its own named Claude session.
+The Software Factory starts each task in its own Herdr tab and its own named Claude session.
+A task gets its own git worktree when its pipeline has `worktree: true`.
 Each type of task is a pipeline. A pipeline is an ordered list of reusable steps.
 One task is one run of a pipeline.
 You start and manage tasks from one orchestrator session in the main repository.
 
 ## Concepts
 
-- **Task**: one run of a pipeline. It has a worktree, a Herdr tab and a Claude session.
+- **Task**: one run of a pipeline. It has a Herdr tab and a Claude session. It has a git worktree when its pipeline has `worktree: true`.
 - **Display name**: the ticket key of a task, when the ticket is known only after the launch. Without it, the display name is the id.
 - **Pipeline**: a YAML file with an ordered list of steps.
 - **Step**: a markdown file. The frontmatter is the manifest. The body holds the instructions.
@@ -30,7 +31,7 @@ You need:
 
 - `uv`. Install it with `brew install uv`.
 - Herdr: https://herdr.dev
-- git. Each repository can have an `origin` remote, but it is optional.
+- git, only for pipelines with `worktree: true`. Each repository can have an `origin` remote, but it is optional.
 - Claude Code.
 - Optional: `gh` or `glab`, for the forge steps of the catalog.
 
@@ -245,6 +246,23 @@ Local server:
 - `factory dashboard`: start the local server if needed, add this repository to the dashboard list and print the dashboard URL. It works from any folder.
 - `factory server stop`: stop the local server.
 - `factory server stop --unless-waiting`: stop the local server only when no task waits on a done check.
+
+### Folder pipelines
+
+Each pipeline has a required key `worktree`. Its value is `true` or `false`.
+
+- `worktree: true`: each task gets its own git worktree and branch. The repository must be a git repository.
+- `worktree: false`: the task runs in the workspace folder. It has no worktree and no branch. The folder does not need git.
+
+A workspace can be a plain folder outside git. Add it in the dashboard like any repository. `factory init` works in it. Only pipelines with `worktree: false` run there. A pipeline with `worktree: true` is listed as unavailable.
+
+A machine without the `git` program runs only pipelines with `worktree: false`. The factory does not call git for these tasks.
+
+The data version is 3. Run `factory migrate` after an update. It adds `worktree: true` to each pipeline that has no `worktree` key.
+
+The built-in pipeline `quick-task` ships with `worktree: false`. The steps `implement` and `user-validation` work in both kinds of pipeline. `user-validation` shows `git status` with git. Without git, it lists the files that the task changed.
+
+Two tasks of folder pipelines in one workspace can change the same files. You are in charge of this.
 
 ### Pipeline editor
 

@@ -1,9 +1,10 @@
+import json
 import time
 
 import pytest
 
 from conftest import events, fake_calls, make_task, task_json, write_pipeline, write_step
-from factory import repo
+from factory import registry, repo
 from serverutil import info, request
 
 
@@ -140,3 +141,22 @@ def test_confirm_unpushed_must_be_true(dash):
     assert request(i, "POST", "/api/delete/dry-run", {"id": "dirty"})[1]["needs_confirm"] is True
     assert request(i, "POST", "/api/delete", {"id": "dirty", "confirm_unpushed": "false"})[0] == 400
     assert (inited.fdir / "tasks" / "dirty").exists()
+
+
+def test_pipelines_available_plain(plain, factory, work):
+    fdir = plain / ".factory"
+    write_step(fdir, "w", {"column": "Plan"})
+    write_pipeline(fdir, {"id": "wt", "steps": ["w"]})
+    write_pipeline(fdir, {"id": "fo", "steps": ["w"], "worktree": False})
+    factory("dashboard", cwd=plain, env={"GIT_CEILING_DIRECTORIES": str(work)})
+    try:
+        status, rows = request(info(fdir), "GET", "/api/pipelines")
+        by_id = {r["id"]: r for r in rows}
+        assert status == 200
+        assert by_id["wt"]["available"] is False
+        assert by_id["wt"]["reason"] == registry.NEEDS_GIT.format(id="wt")
+        assert by_id["fo"]["available"] is True and by_id["fo"]["reason"] is None
+        cli = json.loads(factory("pipeline", "list", "--json", cwd=plain, env={"GIT_CEILING_DIRECTORIES": str(work)}).stdout)
+        assert {r["id"]: r["available"] for r in cli}["wt"] is False
+    finally:
+        factory("server", "stop", cwd=plain, check=False)

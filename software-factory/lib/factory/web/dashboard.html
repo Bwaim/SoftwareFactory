@@ -647,7 +647,7 @@ function folderRow(input, out, picker) {
 }
 async function openAddWorkspace() {
   const picker = await folderPicker();
-  const path = el("input", { type: "text", placeholder: "/path/to/repository" });
+  const path = el("input", { type: "text", placeholder: "/path/to/folder" });
   const out = el("div");
   const row = folderRow(path, out, picker);
   const add = button("Add", async () => {
@@ -669,8 +669,8 @@ function openSetup(path, main) {
   }, { cls: "primary" });
   showModal({ title: `Set up the factory in ${main}?`, content: [
     el("p", {}, "Init writes these files:"),
-    el("ul", { class: "ws-list" }, el("li", {}, `${main}/.factory/`), el("li", {}, "two lines in .git/info/exclude")),
-    el("p", { class: "muted" }, "Git does not track these files. Init keeps files that exist."),
+    el("ul", { class: "ws-list" }, el("li", {}, `${main}/.factory/`)),
+    el("p", { class: "muted" }, "In a git repository, the factory adds two lines to .git/info/exclude, so git does not track these files. Init keeps files that exist."),
     field("Library folder", library), out, el("div", { class: "footer" }, closeButton("Cancel"), go)] });
 }
 function textInput(value, attrs = {}) {
@@ -726,9 +726,11 @@ function settingsForm(data, server, picker) {
     field("Columns", columns.node),
     field("Ticket URL", ticket),
     field("Hidden steps", hiddenSteps),
-    el("h4", {}, "Built-in step settings"),
-    field("Worktree folder", hinted(root, stepHint)),
-    field("Base branch", hinted(base, stepHint)),
+    ...(data.git ? [
+      el("h4", {}, "Built-in step settings"),
+      field("Worktree folder", hinted(root, stepHint)),
+      field("Base branch", hinted(base, stepHint)),
+    ] : []),
     el("h4", {}, "Server"),
     field("Poll interval in seconds", hinted(poll, env !== null ? `Set by FACTORY_POLL_SECONDS (${env} seconds).` : "Applies to all workspaces.")),
     movesBox,
@@ -1077,8 +1079,10 @@ async function openLaunch(prefill) {
   if (!pipelines.length) { showError("No pipeline found."); return; }
   const form = { inputs: {}, checked: null, ticket: 0 };
   const select = el("select");
-  for (const p of pipelines) select.append(el("option", { value: p.id }, p.id));
-  if (prefill.pipeline && pipelines.some((p) => p.id === prefill.pipeline)) select.value = prefill.pipeline;
+  for (const p of pipelines) select.append(el("option", { value: p.id, disabled: !p.available, title: p.available ? null : p.reason }, p.id));
+  const usable = pipelines.filter((p) => p.available);
+  if (usable.length) select.value = prefill.pipeline && usable.some((p) => p.id === prefill.pipeline) ? prefill.pipeline : usable[0].id;
+  const reasonBox = el("div", { class: "muted" }, ...pipelines.filter((p) => !p.available).map((p) => el("p", {}, `${p.id}: ${p.reason}`)));
   const description = el("textarea", { placeholder: "What should the task do?" });
   description.value = prefill.description || "";
   const inputsBox = el("div");
@@ -1089,7 +1093,7 @@ async function openLaunch(prefill) {
     await refresh(true);
     return res;
   }, { cls: "primary", disabled: true });
-  const checkButton = button("Check", check, { disabled: adapterDown(), hint: ADAPTER_BUTTONS });
+  const checkButton = button("Check", check, { disabled: adapterDown() || !usable.length, hint: adapterDown() ? ADAPTER_BUTTONS : null });
   const createPipelineButton = button("Create a pipeline", () => {
     window.open(`/editor?${new URLSearchParams({ token: TOKEN, ws: state.ws, new_pipeline: "1" })}`, "_blank", "noopener");
   });
@@ -1114,8 +1118,10 @@ async function openLaunch(prefill) {
     const box = el("div", { class: "report" });
     const line = (label, value) => value ? box.append(el("div", {}, `${label}: ${value}`)) : null;
     line("Task id", report.task_id);
-    line("Worktree", report.worktree);
-    line("Branch", report.branch ? `${report.branch} (${report.branch_case})` : report.branch_case);
+    if (report.worktree) {
+      line("Worktree", report.worktree);
+      line("Branch", report.branch ? `${report.branch} (${report.branch_case})` : report.branch_case);
+    }
     line("Base", report.base_ref);
     for (const k of report.missing_inputs) box.append(el("div", { class: "bad" }, `Missing input: ${k}`));
     for (const m of report.missing_config) box.append(configRow(m));
@@ -1149,8 +1155,8 @@ async function openLaunch(prefill) {
   }
   select.addEventListener("change", async () => { invalidate(); clear(reportBox); await loadInputs().catch(() => {}); });
   description.addEventListener("input", invalidate);
-  await loadInputs();
-  openModal(prefill.from_backlog ? "Start from backlog" : "Launch a task", field("Pipeline", select), field("Description", description), inputsBox, reportBox,
+  if (usable.length) await loadInputs();
+  openModal(prefill.from_backlog ? "Start from backlog" : "Launch a task", field("Pipeline", el("div", {}, select, reasonBox)), field("Description", description), inputsBox, reportBox,
     el("div", { class: "footer" }, createPipelineButton, closeButton("Cancel"), checkButton, launchButton));
 }
 

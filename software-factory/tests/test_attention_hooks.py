@@ -122,7 +122,7 @@ def test_hook_in_repo_without_factory_is_silent(factory, origin_repo):
 
 
 def test_hook_other_data_version_is_silent(att):
-    for v in ("1", "3"):
+    for v in ("1", "2"):
         r = att.factory("hook", "stop", input=json.dumps({"session_id": "sid-1", "last_assistant_message": "Q?"}), check=False, env={"FACTORY_DATA_VERSION": v})
         silent(r)
     assert "attention" not in task_json(att.fdir, "t1")

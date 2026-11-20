@@ -59,3 +59,17 @@ def test_expand_adds_create_worktree_and_overrides(inited):
     snap = reg.expand(reg.pipeline("p1"))
     assert [e["id"] for e in snap] == ["create-worktree", "s1"]
     assert snap[1] == {"id": "s1", "path": ["s1"], "with": {"k": 1}, "column": "Plan", "model": "opus", "effort": None}
+
+
+def test_expand_folder_pipeline(inited):
+    write_step(inited.fdir, "only", {})
+    write_pipeline(inited.fdir, {"id": "solo", "worktree": False, "steps": ["only"]})
+    reg = Registry.load(ctx_of(inited))
+    assert [e["id"] for e in reg.expand(reg.pipeline("solo"))] == ["only"]
+
+
+def test_expand_worktree_pipeline(inited):
+    write_step(inited.fdir, "only", {})
+    write_pipeline(inited.fdir, {"id": "solo", "worktree": True, "steps": ["only"]})
+    reg = Registry.load(ctx_of(inited))
+    assert [e["id"] for e in reg.expand(reg.pipeline("solo"))] == ["create-worktree", "only"]

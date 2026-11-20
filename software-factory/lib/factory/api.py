@@ -107,6 +107,7 @@ def workspace_row(server, entry):
     ws = server.fresh(entry["id"])
     row = {**entry, "needs_you": 0, "open_tasks": 0, "error": ws.error if ws else "Unknown workspace."}
     if ws and not ws.error:
+        row["git"] = ws.ctx.git
         tasks = state.list_tasks(ws.ctx)
         row.update(needs_you=board.needs_you(tasks), open_tasks=board.open_tasks(tasks))
     return row
@@ -248,7 +249,7 @@ def step_delete_run(server, sid, query, body):
 @route("GET", "/api/pipelines")
 def pipelines(server, query, body):
     from . import pipeline_store
-    return pipeline_store.list_pipelines(registry(server))
+    return pipeline_store.list_pipelines(registry(server), git=server.ctx.git)
 
 
 @route("GET", "/api/pipelines/([a-z][a-z0-9_-]*)")

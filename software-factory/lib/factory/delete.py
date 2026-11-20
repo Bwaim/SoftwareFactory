@@ -135,8 +135,19 @@ def lost_commits(ctx, worktree, branch, base_name, errors):
     return []
 
 
+def folder_plan(task):
+    return {
+        "task_id": task["id"], "session_id": task.get("session_id"), "terminal_handle": task.get("terminal_handle"),
+        "worktree": None, "branch": None, "base_ref": task.get("base_ref") or "main", "merged_into": None,
+        "has_origin": False, "uncommitted": [], "unpushed": [], "squash_merged": False, "delete_branch": False,
+        "needs_confirm": False, "check_errors": [], "reason": None, "by_content": False,
+    }
+
+
 def plan_delete(ctx, tid):
     task = state.load(ctx, tid)
+    if task.get("worktree") is None:
+        return folder_plan(task)
     worktree = task.get("worktree")
     base_name = task.get("base_ref") or "main"
     fetch_origin(ctx)
@@ -248,11 +259,13 @@ def plan_cancel(ctx, tid):
     keys = ("task_id", "session_id", "terminal_handle", "worktree", "branch", "base_ref", "uncommitted",
             "unpushed", "check_errors", "by_content", "reason")
     plan = {k: base[k] for k in keys}
+    plan["mr_url"] = task["state"].get("mr_url")
+    if plan["worktree"] is None:
+        return {**plan, "branch_commit": None, "detached_commit": None, "remote_branch": False}
     branch = plan["branch"]
     plan["branch_commit"] = branch_head(ctx, branch)
     plan["detached_commit"] = detached_head(plan["worktree"])
     plan["remote_branch"] = bool(branch) and ref_exists(ctx.main, f"refs/remotes/origin/{branch}")
-    plan["mr_url"] = task["state"].get("mr_url")
     return plan
 
 
@@ -333,7 +346,8 @@ def remove_delete(ctx, tid, confirm_unpushed):
     if plan["needs_confirm"] and not confirm_unpushed:
         raise FactoryError(render_plan(plan) + "\nRun again with --confirm-unpushed after the user approves.")
     left = close_terminal(ctx, plan["terminal_handle"])
-    remove_worktree(ctx, plan, left)
+    if plan["worktree"] is not None:
+        remove_worktree(ctx, plan, left)
     if plan["branch"] and plan["delete_branch"]:
         delete_branch(ctx, plan["branch"], left)
     events.log(ctx, tid, "task_deleted", None)
@@ -346,7 +360,8 @@ def remove_cancel(ctx, tid):
     left = close_terminal(ctx, plan["terminal_handle"])
     detached_commit = detached_head(plan["worktree"])
     saved = save_changes(tid, plan["worktree"]) if worktree_exists(plan) else None
-    remove_worktree(ctx, plan, left)
+    if plan["worktree"] is not None:
+        remove_worktree(ctx, plan, left)
     branch_commit = branch_head(ctx, plan["branch"])
     if plan["branch"]:
         delete_branch(ctx, plan["branch"], left)

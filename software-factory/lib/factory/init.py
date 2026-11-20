@@ -17,6 +17,7 @@ HOOK_EVENTS = {"Stop": "hook stop", "UserPromptSubmit": "hook prompt"}
 EXCLUDES = [".factory/", ".factory.backup-*/"]
 BACKLOG_HEADER = "# Backlog\n"
 TICKET_DEFAULT = "https://nextory.atlassian.net/browse/{key}"
+PLAIN_MESSAGE = "This folder is not in a git repository. Only pipelines with `worktree: false` can run."
 LIBRARY_MISSING = "The library folder does not exist. Create it, or leave the field blank."
 
 
@@ -139,11 +140,15 @@ def terminal_check(ctx):
 
 
 def git_check(ctx):
+    if not ctx.git:
+        return {"name": "git", "ok": True, "message": PLAIN_MESSAGE}
     message = "Git repository with an origin remote." if repo.has_origin(ctx.main) else "Git repository without a remote."
     return {"name": "git", "ok": True, "message": message}
 
 
 def origin_warning(ctx):
+    if not ctx.git:
+        return None
     if repo.has_origin(ctx.main):
         return None
     base = config.get_value(ctx, CREATE_WORKTREE, "base_ref") or "main"
@@ -161,10 +166,7 @@ def uv_check():
 
 
 def prerequisites(cwd):
-    try:
-        ctx = repo.load_ctx(cwd)
-    except FactoryError as e:
-        return [{"name": "git", "ok": False, "message": f"{e} Run the factory in a git repository."}, uv_check()]
+    ctx = repo.load_ctx(cwd)
     return [terminal_check(ctx), git_check(ctx), uv_check()]
 
 
@@ -184,6 +186,8 @@ def create_library_folder(lib):
 
 
 def add_excludes(ctx):
+    if not ctx.git:
+        return
     rel = repo.git(["rev-parse", "--git-path", "info/exclude"], ctx.main).stdout.strip()
     path = (ctx.main / rel).resolve()
     lines = path.read_text().splitlines() if path.exists() else []

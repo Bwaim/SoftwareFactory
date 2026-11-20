@@ -44,7 +44,7 @@ def snapshot(*roots):
 def test_converts_every_type(inited):
     make_v1(inited)
     out = inited.factory.json("migrate")
-    assert out["errors"] == [] and out["library_commit"]["message"] == "Factory library: migrate to version 2"
+    assert out["errors"] == [] and out["library_commit"]["message"] == "Factory library: migrate to version 3"
     ask = (inited.fdir / "steps" / "ask.md").read_text()
     head = yaml.safe_load(ask.split("---\n")[1])
     assert head["type"] == "ai" and "reads" not in head and "writes" not in head
@@ -141,7 +141,7 @@ def test_bad_state_key_is_a_warning(inited):
     make_task(repo.load_ctx(cwd=inited.repo), tid="odd", state={"Bad Key": "v"})
     out = inited.factory.json("migrate")
     assert any("`Bad Key`" in w for w in out["warnings"])
-    assert yaml.safe_load((inited.fdir / "factory.yaml").read_text())["version"] == 2
+    assert yaml.safe_load((inited.fdir / "factory.yaml").read_text())["version"] == 3
 
 
 def test_dry_run_lists_errors_without_change(inited):

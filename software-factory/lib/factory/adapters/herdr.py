@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import subprocess
+from pathlib import Path
 
 from .. import fsio
 from .base import OPTIONAL, Adapter, AdapterError, herdr_name
@@ -85,6 +86,20 @@ class HerdrAdapter(Adapter):
         handle["tab"] = pane["tab_id"]
         return pane["pane_id"]
 
+    def open_folder(self, handle, cwd):
+        ids = self.main_repo_workspace_ids(self.workspaces()) if self.ctx.git else []
+        if ids:
+            return self.create_tab(handle, ids[0], cwd)
+        result = parse(run(["workspace", "create", "--cwd", str(cwd), "--label", handle["agent"], "--no-focus"]))["result"]
+        pane = result["root_pane"]
+        handle["tab"] = pane["tab_id"]
+        if self.ctx.git:
+            handle["extra_workspaces"] = [pane["workspace_id"]]
+            self.record_shared(handle["extra_workspaces"])
+        else:
+            handle["workspace"] = pane["workspace_id"]
+        return pane["pane_id"]
+
     def find_extra_workspaces(self, before, handle):
         after = self.main_repo_workspace_ids(self.workspaces(check=False))
         return [w for w in after if w not in before and w != handle.get("workspace")]
@@ -114,8 +129,9 @@ class HerdrAdapter(Adapter):
         handle = {"agent": name}
         agent_started = False
         try:
-            pane = self.open_worktree(handle, cwd)
-            if "workspace" in handle:
+            folder = Path(cwd).resolve() == Path(self.ctx.main).resolve()
+            pane = self.open_folder(handle, cwd) if folder else self.open_worktree(handle, cwd)
+            if "workspace" in handle and not folder:
                 extra = self.find_extra_workspaces(before, handle)
                 if extra:
                     handle["extra_workspaces"] = extra

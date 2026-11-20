@@ -23,3 +23,8 @@ def test_save_errors_are_400(dash):
     inited, i = dash
     status, body = request(i, "POST", "/api/settings/save", {"columns": []})
     assert status == 400 and body["error"] == "Settings not saved." and body["errors"] == ["Add at least one column."]
+
+
+def test_settings_git_flag(dash):
+    inited, i = dash
+    assert request(i, "GET", "/api/settings")[1]["git"] is True

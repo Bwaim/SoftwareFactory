@@ -27,6 +27,15 @@ def check(reg, data, columns, save_level=None, hidden=()):
     pid = data.get("id") or ""
     if not is_valid_id(pid):
         error(f"The pipeline id `{pid}` must be lowercase: letters, digits, `-` or `_`, starting with a letter.")
+    worktree = data.get("worktree")
+    if "worktree" not in data:
+        error("The pipeline has no `worktree` key. Set `worktree: true` or `worktree: false`.")
+    elif not isinstance(worktree, bool):
+        error("`worktree` must be `true` or `false`.")
+    folder = worktree is False
+    if folder and "branch" in (data.get("inputs") or {}):
+        error("A pipeline with `worktree: false` cannot have a `branch` input.")
+    warned_git = set()
     entries = [normalize_entry(e) for e in data.get("steps") or []]
     if not entries:
         error("The pipeline has no step.")
@@ -44,7 +53,9 @@ def check(reg, data, columns, save_level=None, hidden=()):
     loop_keys = loops.keys_in_ranges(reg, entries)
     for i, entry in enumerate(entries):
         sid = entry.get("id")
-        if sid == CREATE_WORKTREE and i != 0:
+        if sid == CREATE_WORKTREE and folder:
+            error("`create-worktree` cannot be in a pipeline with `worktree: false`.")
+        elif sid == CREATE_WORKTREE and i != 0:
             error("`create-worktree` is listed, but not as the first step.")
         if sid not in reg.steps:
             error(f"The step `{sid}` does not exist.")
@@ -67,6 +78,9 @@ def check(reg, data, columns, save_level=None, hidden=()):
             if leaf is None:
                 error(f"The step `{path[-1]}` does not exist.")
                 continue
+            if folder and leaf.category == "git" and leaf.id not in warned_git:
+                warned_git.add(leaf.id)
+                warning(f"The step `{leaf.id}` is a git step, and the pipeline has `worktree: false`.")
             if leaf.column and leaf.column not in columns:
                 error(f"Step `{leaf.id}` uses the column `{leaf.column}`, which is not in the board columns.")
             if (entry.get("model") or entry.get("effort")) and leaf.run_in == "session":

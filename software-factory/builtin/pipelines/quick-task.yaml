@@ -1,5 +1,6 @@
 id: quick-task
 description: Ask the user for a small change, implement it, and validate it
+worktree: false
 steps:
   - get-user-request
   - id: implement

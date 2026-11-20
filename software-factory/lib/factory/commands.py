@@ -297,6 +297,11 @@ def parse_inputs(items):
     return inputs
 
 
+def started_line(task):
+    line = f"Task {task['id']} started."
+    return f"{line} Worktree: {task['worktree']}" if task["worktree"] else line
+
+
 @cli.command("launch")
 def launch_cmd(args):
     from . import launch
@@ -307,7 +312,7 @@ def launch_cmd(args):
         cli.emit(report, True) if args.json else print(launch.render_report(report))
         return 0 if report["ok"] else 1
     task = launch.launch(ctx, args.pipeline, args.description, inputs, args.id, args.from_backlog)
-    cli.emit(task, True) if args.json else print(f"Task {task['id']} started. Worktree: {task['worktree']}")
+    cli.emit(task, True) if args.json else print(started_line(task))
 
 
 @cli.command("delete")
@@ -727,7 +732,8 @@ def pipeline_keys_cmd(args):
 def pipeline_list_cmd(args):
     from . import pipeline_store
     from .registry import Registry
-    rows = pipeline_store.list_pipelines(Registry.load(ctx_of(args)))
+    ctx = ctx_of(args)
+    rows = pipeline_store.list_pipelines(Registry.load(ctx), git=ctx.git)
     if args.json:
         cli.emit(rows, True)
         return

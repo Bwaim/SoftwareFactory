@@ -190,6 +190,10 @@ A step file is YAML frontmatter between two `---` lines, then the body.
 
 - `id`: the pipeline id. It is also the file name.
 - `description`: one line.
+- `worktree`: required. Set `true` or `false`.
+  - `true`: each task gets its own git worktree.
+  - `false`: the task runs in the workspace root. There is no worktree and no branch.
+  - A pipeline with `worktree: false` cannot list `create-worktree` and cannot have a `branch` input.
 - `inputs`: map of key name to `type` and `description`. The launch asks for each one. A relative `file` path is resolved from the main repository.
   - Every input is required at launch. A `file` input must point to a file that exists at launch.
   - An input named `branch` makes the launch create the worktree on that branch, new or existing. Use the name `branch` only for that.
@@ -324,6 +328,7 @@ steps:
 ```yaml
 id: crash-fix
 description: Fix a crash from its log, then ask the user to validate
+worktree: true
 inputs:
   crash_log:
     type: file
@@ -417,6 +422,7 @@ When you find no real problem, set `findings` to `none`.
 ```yaml
 id: spec-review
 description: Write a spec, review it, and fix it until the review is clean
+worktree: false
 steps:
   - write-spec
   - id: review-spec
@@ -516,6 +522,7 @@ steps:
 ```yaml
 id: ticket-loop
 description: Split the work into tickets and build them one by one
+worktree: true
 steps:
   - split-tickets
   - id: ticket-round

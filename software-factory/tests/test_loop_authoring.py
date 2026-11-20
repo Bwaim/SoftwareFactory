@@ -25,7 +25,7 @@ def ed(inited):
 
 def test_editor_api_saves_and_loads_loop_unchanged(ed):
     inited, i = ed
-    data = {"id": "rl", "description": "Review loop", "steps": ["write", {"id": "review", "loop": LOOP}, "after"]}
+    data = {"id": "rl", "description": "Review loop", "worktree": True, "steps": ["write", {"id": "review", "loop": LOOP}, "after"]}
     status, saved = request(i, "POST", "/api/pipelines/save", {"data": data, "level": "local"})
     assert status == 200, saved
     status, loaded = request(i, "GET", "/api/pipelines/rl")

@@ -31,7 +31,7 @@ def v2(inited, work):
     git("commit", "-m", "library", cwd=inited.library.parent)
     set_version(inited.fdir / "factory.yaml", 1)
     make_task(repo.load_ctx(cwd=inited.repo), tid="t1")
-    env = {"FACTORY_MIGRATIONS_DIR": str(mdir)}
+    env = {"FACTORY_MIGRATIONS_DIR": str(mdir), "FACTORY_DATA_VERSION": "2"}
     return inited, env
 
 

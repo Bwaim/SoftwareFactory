@@ -1,6 +1,6 @@
 from . import fsio, library, pipeline_check
 from .errors import ExistsError, FactoryError
-from .registry import Registry, is_valid_id, normalize_entry
+from .registry import NEEDS_GIT, Registry, is_valid_id, normalize_entry
 
 
 def step_summary(step, hidden_ids=()):
@@ -20,10 +20,15 @@ def input_rows(data):
             for name, spec in (data.get("inputs") or {}).items()}
 
 
-def list_pipelines(reg):
-    return [{"id": p.id, "description": p.data.get("description", ""), "level": p.level, "path": str(p.path),
-             "inputs": input_rows(p.data)}
-            for p in sorted(reg.pipelines.values(), key=lambda p: p.id)]
+def pipeline_row(p, git):
+    available = git or p.worktree is False
+    return {"id": p.id, "description": p.data.get("description", ""), "level": p.level, "path": str(p.path),
+            "inputs": input_rows(p.data), "worktree": p.worktree, "available": available,
+            "reason": None if available else NEEDS_GIT.format(id=p.id)}
+
+
+def list_pipelines(reg, git=True):
+    return [pipeline_row(p, git) for p in sorted(reg.pipelines.values(), key=lambda p: p.id)]
 
 
 def load(reg, pid):
