@@ -22,6 +22,12 @@ def test_folder_launch_in_git_workspace(inited):
     assert fake_calls(inited.fdir)[0]["cwd"] == str(inited.repo)
 
 
+def test_folder_launch_prints_no_worktree(inited):
+    folder_pipeline(inited.fdir)
+    out = inited.factory("launch", "folder", "--description", "Do it", "--id", "f1").stdout
+    assert out.strip().splitlines()[-1] == "Task f1 started."
+
+
 def test_folder_launch_plain(plain, no_git):
     folder_pipeline(plain / ".factory")
     ctx = repo.load_ctx(cwd=plain)
