@@ -5,7 +5,7 @@ from .errors import FactoryError
 
 
 def repo_root(lib):
-    if not lib or not Path(lib).exists():
+    if not lib or not Path(lib).exists() or not repo.in_git(lib):
         return None
     r = repo.git(["rev-parse", "--show-toplevel"], lib, check=False)
     return Path(r.stdout.strip()).resolve() if r.returncode == 0 else None

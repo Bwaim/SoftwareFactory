@@ -79,6 +79,29 @@ def library_path(work):
     return root / "factory-library"
 
 
+@pytest.fixture
+def no_git(monkeypatch, tmp_path):
+    bin_dir = tmp_path / "no-git-bin"
+    bin_dir.mkdir()
+    (bin_dir / "uv").symlink_to(shutil.which("uv"))
+    (bin_dir / "python3").symlink_to(sys.executable)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    return bin_dir
+
+
+@pytest.fixture
+def plain(work, factory_home, monkeypatch):
+    from factory import init
+
+    monkeypatch.setenv("FACTORY_TERMINAL", "fake")
+    monkeypatch.setenv("FACTORY_NO_OPEN", "1")
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(work))
+    path = work / "plain"
+    path.mkdir()
+    init.init(path)
+    return path
+
+
 class Factory:
     def __init__(self, cwd, env):
         self.cwd = cwd
