@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
-from . import api, fsio, repo, runtime, server_settings, workspaces
+from . import api, fsio, repo, runtime, server_settings, update, workspaces
 from .errors import ExistsError, FactoryError
 
 IDLE_SECONDS = int(os.environ.get("FACTORY_SERVER_IDLE_SECONDS", "1800"))
@@ -74,6 +74,8 @@ class Server:
         self.updating = False
         self.active = 0
         self.idle = threading.Condition()
+        self.checker = update.Checker()
+        self.updater = update.Updater(self, self.checker)
         try:
             self.reload()
         except Exception as e:
@@ -128,6 +130,7 @@ class Server:
     def run(self):
         fsio.write_json(info_path(), {"port": self.port, "token": self.token, "pid": os.getpid()})
         os.chmod(info_path(), SERVER_INFO_MODE)
+        self.checker.start()
         threading.Thread(target=self.watch_idle, daemon=True).start()
         threading.Thread(target=self.poll_loop, daemon=True).start()
         try:
@@ -150,11 +153,16 @@ class Server:
         self.reload_if_changed()
         return any(engine.waiting_checks(ws.ctx) for ws in self.snapshot() if not ws.error)
 
+    def should_stop(self):
+        if self.updater.ended() or (self.replaced() and not self.updater.holds()):
+            return True
+        return time.time() - self.last > IDLE_SECONDS and not self.waiting()
+
     def watch_idle(self):
         while True:
             time.sleep(min(30, IDLE_SECONDS))
             try:
-                done = self.replaced() or (time.time() - self.last > IDLE_SECONDS and not self.waiting())
+                done = self.should_stop()
             except Exception as e:
                 log(f"idle check failed: {e}")
                 continue

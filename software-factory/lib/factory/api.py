@@ -19,6 +19,8 @@ PICKER_SCRIPT = [
 
 ROUTES = {"global": [], "workspace": []}
 WORKSPACE_PATH = re.compile(r"^/api/w/([a-z0-9-]{1,40})(/.*)$")
+WORKSPACE_ID = re.compile(r"[a-z0-9-]{1,40}")
+BAD_WORKSPACE_ID = "The workspace id is not valid."
 
 
 class NotFound(Exception):
@@ -100,7 +102,52 @@ def shutdown(server, query, body):
 def job(server, job_id, query, body):
     if job_id not in server.jobs:
         raise NotFound(job_id)
-    return server.jobs[job_id]
+    job = server.jobs[job_id]
+    if job["status"] != "running":
+        server.updater.job_read(job_id)
+    return job
+
+
+def running_tasks(server):
+    from . import state, update
+    server.reload_if_changed()
+    tasks = [t for ws in server.snapshot() if not ws.error for t in state.list_tasks(ws.ctx)]
+    return sum(1 for t in tasks if t["status"] in update.RUNNING_STATUSES)
+
+
+@route("GET", "/api/update", scope="global")
+def update_info(server, query, body):
+    from . import cli, update
+    latest = server.checker.latest
+    return {
+        "installed": cli.VERSION,
+        "latest": latest,
+        "dismissed": latest is not None and update.dismissed() == latest,
+        "running_tasks": running_tasks(server),
+        "log": str(workspaces.home() / "update.log"),
+    }
+
+
+@route("POST", "/api/update/dismiss", scope="global")
+def update_dismiss(server, query, body):
+    from . import update
+    if server.checker.latest is not None:
+        update.dismiss(server.checker.latest)
+    return {"ok": True}
+
+
+@route("POST", "/api/update/run", scope="global")
+def update_run(server, query, body):
+    ws = body.get("ws")
+    if ws is not None and not (isinstance(ws, str) and WORKSPACE_ID.fullmatch(ws)):
+        raise FactoryError(BAD_WORKSPACE_ID)
+    return {"job": server.updater.run(ws)}
+
+
+@route("POST", "/api/update/close", scope="global")
+def update_close(server, query, body):
+    server.updater.close()
+    return {"ok": True}
 
 
 def workspace_row(server, entry):

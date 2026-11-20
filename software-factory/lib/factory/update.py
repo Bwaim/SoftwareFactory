@@ -17,6 +17,7 @@ API_URL = "https://api.github.com/repos/Bwaim/SoftwareFactory/releases/latest"
 RELEASES = "https://github.com/Bwaim/SoftwareFactory/releases/download"
 CHECK_SECONDS = 24 * 3600
 HOLD_SECONDS = 60
+RUNNING_STATUSES = ("active", "awaiting_approval", "waiting_external")
 VERSION_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 
