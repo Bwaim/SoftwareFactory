@@ -2,6 +2,7 @@ import json
 import os
 import re
 import secrets
+import signal
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,7 @@ API_URL = "https://api.github.com/repos/Bwaim/SoftwareFactory/releases/latest"
 RELEASES = "https://github.com/Bwaim/SoftwareFactory/releases/download"
 CHECK_SECONDS = 24 * 3600
 HOLD_SECONDS = 60
+INSTALL_TIMEOUT_SECONDS = 900
 RUNNING_STATUSES = ("active", "awaiting_approval", "waiting_external")
 VERSION_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
@@ -115,11 +117,21 @@ def run_install(version):
                 script.write_bytes(response.read())
         except Exception as e:
             return 1, f"Download of install.sh failed: {e}"
-        done = subprocess.run(
+        proc = subprocess.Popen(
             ["sh", str(script)], cwd=tmp, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, text=True, env=install_env(version),
+            stderr=subprocess.STDOUT, text=True, env=install_env(version), start_new_session=True,
         )
-        return done.returncode, done.stdout
+        try:
+            output, _ = proc.communicate(timeout=INSTALL_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except OSError:
+                pass
+            output, _ = proc.communicate()
+            note = f"The install timed out after {INSTALL_TIMEOUT_SECONDS:g} s."
+            return 1, f"{output or ''}\n{note}".strip()
+        return proc.returncode, output
 
 
 def installed_version():

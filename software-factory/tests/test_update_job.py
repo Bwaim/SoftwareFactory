@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -218,3 +219,23 @@ def test_not_ended_after_failure_before_swap(fakes):
     fakes.script = "echo boom\nexit 1\n"
     fakes.finish(fakes.updater.run(None))
     assert fakes.server.resumed and not fakes.updater.ended()
+
+
+def test_install_timeout_kills_the_script_and_resumes(fakes, monkeypatch, tmp_path):
+    monkeypatch.setattr(update, "INSTALL_TIMEOUT_SECONDS", 1)
+    pidfile = tmp_path / "child.pid"
+    fakes.script = f'echo started\nsleep 30 &\necho $! > "{pidfile}"\nwait\n'
+    job = fakes.finish(fakes.updater.run(None))
+    assert job["status"] == "error" and job["error"] == "The update failed."
+    assert "started" in job["output"] and "The install timed out after 1 s." in job["output"]
+    assert fakes.server.resumed and not fakes.updater.holds()
+    pid = int(pidfile.read_text())
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("the install script left a child process")

@@ -38,6 +38,14 @@ def test_update_routes_allowed_while_updating(live):
         assert request(live.info, "POST", path, {})[0] != 409
 
 
+def test_shutdown_allowed_while_updating(live):
+    live.server.updating = True
+    stops = []
+    live.server.stop = lambda: stops.append(True)
+    assert request(live.info, "POST", "/api/shutdown", {}) == (200, {"ok": True})
+    assert stops == [True]
+
+
 def test_pause_waits_for_running_activity(live):
     srv = live.server
     entered, release = threading.Event(), threading.Event()

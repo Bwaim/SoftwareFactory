@@ -27,7 +27,7 @@ STATIC = {
     "/static/xterm.css": ("vendor/xterm/xterm.css", "text/css; charset=utf-8"),
     "/static/addon-fit.js": ("vendor/xterm/addon-fit.js", "text/javascript; charset=utf-8"),
 }
-UPDATE_ALLOWED = ("/api/update/run", "/api/update/close")
+UPDATE_ALLOWED = ("/api/update/run", "/api/update/close", "/api/shutdown")
 UPDATE_RUNNING = "An update is running."
 
 
