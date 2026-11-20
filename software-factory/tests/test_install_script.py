@@ -117,6 +117,18 @@ def test_missing_herdr_warns(release, env):
     assert "factory install: herdr is not on PATH. Tasks need it to start. Install it from https://herdr.dev" in r.stderr
 
 
+def test_missing_git_warns(release, env, work):
+    usr = work / "usr bin"
+    usr.mkdir()
+    for tool in Path("/usr/bin").iterdir():
+        if tool.name != "git":
+            (usr / tool.name).symlink_to(tool)
+    (work / "tools/git").unlink()
+    r = run_install({**env, "PATH": env["PATH"].replace("/usr/bin", str(usr))})
+    assert r.returncode == 0, r.stderr
+    assert "factory install: git is not installed. Only pipelines with `worktree: false` can run." in r.stderr
+
+
 def test_path_warning(release, env):
     r = run_install(env)
     assert f"Add {Path(env['HOME']) / '.local/bin'} to your PATH." in r.stdout
