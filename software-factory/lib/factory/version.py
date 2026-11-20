@@ -3,7 +3,7 @@ import os
 from . import fsio
 from .errors import FactoryError
 
-DATA_VERSION = int(os.environ.get("FACTORY_DATA_VERSION", "2"))
+DATA_VERSION = int(os.environ.get("FACTORY_DATA_VERSION", "3"))
 
 
 def compare(v):

@@ -50,7 +50,7 @@ def test_version_mismatch_refused(origin_repo):
 def test_version_report_states(origin_repo):
     f = origin_repo / ".factory"
     f.mkdir()
-    (f / "factory.yaml").write_text(yaml.safe_dump({"version": 2}))
+    (f / "factory.yaml").write_text(yaml.safe_dump({"version": version.DATA_VERSION}))
     assert version.report(repo.load_ctx(cwd=origin_repo))["state"] == "same"
 
 
