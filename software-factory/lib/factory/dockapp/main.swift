@@ -12,6 +12,11 @@ let dashboardCommandSeconds = 300.0
 let loginShellSeconds = 10.0
 let brandPurple = NSColor(srgbRed: 0x67 / 255.0, green: 0x38 / 255.0, blue: 0x88 / 255.0, alpha: 1)
 
+func onMainRunLoop(_ block: @escaping () -> Void) {
+    RunLoop.main.perform(inModes: [.common, .modalPanel], block: block)
+    CFRunLoopWakeUp(CFRunLoopGetMain())
+}
+
 struct CommandResult {
     let status: Int32
     let output: String
@@ -136,7 +141,7 @@ enum Factory {
     static func runInBackground(_ arguments: [String], timeout: TimeInterval, then finish: @escaping (CommandResult?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             let result = run(arguments, timeout: timeout)
-            DispatchQueue.main.async { finish(result) }
+            onMainRunLoop { finish(result) }
         }
     }
 
@@ -191,7 +196,7 @@ enum ServerAddress {
         request.setValue(token(of: base), forHTTPHeaderField: "X-Factory-Token")
         URLSession.shared.dataTask(with: request) { _, response, _ in
             let up = (response as? HTTPURLResponse)?.statusCode == 200
-            DispatchQueue.main.async { finish(up) }
+            onMainRunLoop { finish(up) }
         }.resume()
     }
 }
@@ -654,7 +659,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard case .quit(let stopServer) = choice else { return }
         quitConfirmed = true
         stopServerOnQuit = stopServer
-        NSApp.terminate(nil)
+        onMainRunLoop { NSApp.terminate(nil) }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -694,7 +699,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func checkBeforeQuit(then decide: @escaping (QuitChoice) -> Void) {
         quitCheckRunning = true
         guard let base else {
-            DispatchQueue.main.async { [weak self] in
+            onMainRunLoop { [weak self] in
                 self?.quitCheckRunning = false
                 decide(.quit(stopServer: false))
             }

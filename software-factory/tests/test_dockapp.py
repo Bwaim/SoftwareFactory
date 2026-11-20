@@ -306,3 +306,10 @@ APP_TEXTS = [
 @pytest.mark.parametrize("text", APP_TEXTS)
 def test_swift_texts(text):
     assert text in dockapp.SOURCE.read_text()
+
+
+def test_swift_callbacks_avoid_the_main_dispatch_queue():
+    source = dockapp.SOURCE.read_text()
+
+    assert "DispatchQueue.main" not in source
+    assert "RunLoop.main.perform(inModes: [.common, .modalPanel]" in source
