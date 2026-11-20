@@ -1090,6 +1090,9 @@ async function openLaunch(prefill) {
     return res;
   }, { cls: "primary", disabled: true });
   const checkButton = button("Check", check, { disabled: adapterDown(), hint: ADAPTER_BUTTONS });
+  const createPipelineButton = button("Create a pipeline", () => {
+    window.open(`/editor?${new URLSearchParams({ token: TOKEN, ws: state.ws, new_pipeline: "1" })}`, "_blank", "noopener");
+  });
   const payload = () => {
     const inputs = {};
     for (const [k, node] of Object.entries(form.inputs)) inputs[k] = node.value;
@@ -1148,7 +1151,7 @@ async function openLaunch(prefill) {
   description.addEventListener("input", invalidate);
   await loadInputs();
   openModal(prefill.from_backlog ? "Start from backlog" : "Launch a task", field("Pipeline", select), field("Description", description), inputsBox, reportBox,
-    el("div", { class: "footer" }, closeButton("Cancel"), checkButton, launchButton));
+    el("div", { class: "footer" }, createPipelineButton, closeButton("Cancel"), checkButton, launchButton));
 }
 
 async function openClean() {

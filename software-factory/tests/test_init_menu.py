@@ -109,6 +109,7 @@ def test_menu_before_and_after_init(factory, origin_repo, library_path):
     factory("init", "--library", library_path, "--create-library")
     keys = [a["key"] for g in factory.json("menu")["groups"] for a in g["actions"]]
     assert "init" not in keys and keys[0] == "launch" and keys[-1] == "exit"
+    assert {"edit-pipeline", "edit-step"} <= set(keys)
     fake_config(origin_repo / ".factory", capabilities=["state"])
     keys = [a["key"] for g in factory.json("menu")["groups"] for a in g["actions"]]
     assert "focus" not in keys and "send-prompt" not in keys

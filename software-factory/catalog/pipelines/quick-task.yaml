@@ -1,6 +1,0 @@
-id: quick-task
-description: Do a small change, validate it, and commit it
-steps:
-  - implement
-  - user-validation
-  - commit

@@ -146,6 +146,8 @@ Herdr adapter:
 - **Release a shared resource**: free an exclusive resource that a stuck task holds. It shows the holder and the waiting tasks, and asks you to confirm.
 - **Create or edit a pipeline**: open the pipeline editor in the browser.
 - **Create a new step**: open the step form in the pipeline editor.
+- **Create or edit a pipeline in this session**: answer the questions of the orchestrator. It writes the pipeline file and checks it.
+- **Create or edit a step in this session**: answer the questions of the orchestrator. It writes the step file and checks it.
 - **Delete a step**: delete a local or generic step. It first shows what the delete does, then asks you to confirm.
 - **Browse the catalog**: list and install catalog pipelines and steps.
 - **Add a backlog entry**: add an entry to the backlog.
