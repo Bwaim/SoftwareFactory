@@ -139,3 +139,14 @@ def test_launch_popup_opens_editor_on_a_new_pipeline():
 def test_migration_commit_notice():
     for text in ['id="migration"', "library_commit", "The factory migrated the library. These files are not committed:", "Commit to library", "/api/library/commit"]:
         assert text in PAGE
+
+
+def test_dashboard_tells_the_app():
+    assert 'messageHandlers?.captn?.postMessage(msg)' in PAGE
+    assert 'tellApp("unreachable")' in PAGE and 'tellApp("reachable")' in PAGE
+
+
+def test_editor_tells_the_app():
+    editor = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
+    assert 'tellApp("unreachable")' in editor
+    assert "Server stopped. Reload the editor after Start. Unsaved changes are lost." in editor

@@ -390,6 +390,7 @@ const GLOBAL_API = /^\/api\/(ping|shutdown|jobs\/|workspaces|host|server-setting
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
 const state = { generation: 0, view: "tasks", ws: new URLSearchParams(location.search).get("ws"), workspaces: [], renaming: null, info: emptyInfo(), tasks: [], backlog: [], hidden: loadHidden(new URLSearchParams(location.search).get("ws")), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null, panel: { details: loadFlag(DETAILS_KEY, true), workspaces: loadFlag("factory.workspaces", true) } };
 const byId = (id) => document.getElementById(id);
+function tellApp(msg) { window.webkit?.messageHandlers?.captn?.postMessage(msg); }
 function emptyInfo() { return { columns: [], ticket_url: "", adapter: { ok: true, message: "" }, capabilities: [] }; }
 
 function apiUrl(path) { return GLOBAL_API.test(path) ? path : `/api/w/${encodeURIComponent(state.ws)}${path.slice(4)}`; }
@@ -553,6 +554,7 @@ async function refresh(force) {
     if (state.generation !== generation) return;
     if (state.pollFailed) { hideError(); state.pollFailed = false; }
     byId("offline").hidden = true;
+    tellApp("reachable");
     const key = JSON.stringify([state.workspaces, state.ws, board, Math.floor(Date.now() / 60000)]);
     const changed = key !== state.lastKey;
     const { info, tasks, backlog } = board || { info: emptyInfo(), tasks: [], backlog: [] };
@@ -562,7 +564,7 @@ async function refresh(force) {
     const reselected = ensureSelection();
     if (!reselected && state.detail && force) loadDetail();
     if ((!changed && !reselected) || modalOpen() || state.dragging || (!force && menuOpen())) return;
-  } catch (e) { if (!e.stale) { state.pollFailed = true; byId("offline").hidden = false; } return; }
+  } catch (e) { if (!e.stale) { state.pollFailed = true; byId("offline").hidden = false; tellApp("unreachable"); } return; }
   render();
 }
 function needsYou(t) { return t.attention || t.status === "blocked" || t.status === "awaiting_approval"; }
