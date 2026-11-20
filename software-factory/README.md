@@ -77,7 +77,7 @@ From the version that contains the dashboard update, the dashboard shows a banne
 
 If you use version 0.2.0 or older, run the install command one more time to get this feature. Your dashboard shows no banner until then.
 
-To turn the check off, set `FACTORY_NO_UPDATE_CHECK=1`.
+To turn the check off, add `export FACTORY_NO_UPDATE_CHECK=1` to your shell profile (for example `~/.zshrc`). The Dock app reads the environment of your login shell, so a variable that you set only in one terminal has no effect on it. Restart the server after the change.
 
 If you used the plugin before, uninstall it in Claude Code:
 
