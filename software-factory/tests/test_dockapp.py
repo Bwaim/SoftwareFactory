@@ -136,3 +136,65 @@ def test_app_install_command_prints_path(factory, tools):
 
     assert f"Dashboard app: {dockapp.app_path()}" in r.stdout
     assert "Drag it to the Dock to keep it there." in r.stdout
+
+
+real_refresh = dockapp.refresh
+
+
+@pytest.fixture
+def dash(monkeypatch):
+    from factory import commands, server
+    calls = []
+    monkeypatch.delenv("FACTORY_NO_OPEN", raising=False)
+    monkeypatch.delenv("FACTORY_DOCK_APP", raising=False)
+    monkeypatch.setattr(commands, "current_workspace", lambda: {})
+    monkeypatch.setattr(server, "ensure_server", lambda: {"port": 1})
+    monkeypatch.setattr(server, "page_url", lambda info, page, **ws: "http://127.0.0.1:1/dashboard")
+    monkeypatch.setattr(server, "open_page", lambda url: calls.append(("page", url)))
+    monkeypatch.setattr(dockapp, "refresh", lambda: calls.append(("refresh",)))
+    monkeypatch.setattr(dockapp, "installed", lambda: True)
+    monkeypatch.setattr(dockapp, "open_url", lambda url: calls.append(("app", url)))
+    return commands.dashboard_cmd, calls
+
+
+def test_dashboard_opens_the_app_when_installed(dash, capsys):
+    run, calls = dash
+
+    run(None)
+
+    assert calls == [("refresh",), ("app", "http://127.0.0.1:1/dashboard")]
+    assert "Dashboard: http://127.0.0.1:1/dashboard" in capsys.readouterr().out
+
+
+def test_dashboard_opens_the_browser_without_the_app(dash, monkeypatch):
+    run, calls = dash
+    monkeypatch.setattr(dockapp, "installed", lambda: False)
+
+    run(None)
+
+    assert calls == [("refresh",), ("page", "http://127.0.0.1:1/dashboard")]
+
+
+@pytest.mark.parametrize("name", ["FACTORY_NO_OPEN", "FACTORY_DOCK_APP"])
+def test_dashboard_quiet_skips_rebuild_and_open(dash, monkeypatch, capsys, name):
+    run, calls = dash
+    monkeypatch.setenv(name, "1")
+
+    run(None)
+
+    assert calls == []
+    assert "Dashboard: " in capsys.readouterr().out
+
+
+def test_dashboard_opens_app_when_rebuild_fails(dash, monkeypatch):
+    run, calls = dash
+    monkeypatch.setattr(dockapp, "refresh", real_refresh)
+
+    def fail():
+        raise FactoryError("no")
+
+    monkeypatch.setattr(dockapp, "install", fail)
+
+    run(None)
+
+    assert calls == [("app", "http://127.0.0.1:1/dashboard")]

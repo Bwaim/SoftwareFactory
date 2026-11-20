@@ -701,11 +701,16 @@ def current_workspace():
 
 @cli.command("dashboard")
 def dashboard_cmd(args):
-    from . import server
+    from . import dockapp, server
     ws = current_workspace()
     info = server.ensure_server()
     url = server.page_url(info, "dashboard", **ws)
-    server.open_page(url)
+    if not (os.environ.get("FACTORY_DOCK_APP") or os.environ.get("FACTORY_NO_OPEN")):
+        dockapp.refresh()
+        if dockapp.installed():
+            dockapp.open_url(url)
+        else:
+            server.open_page(url)
     print(f"Dashboard: {url}")
 
 
