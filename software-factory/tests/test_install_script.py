@@ -350,6 +350,27 @@ def test_brew_path_line_when_brew_is_not_on_path(release, env, work):
     assert f'Add this line to ~/.zprofile: eval "$({brew} shellenv)"' in r.stdout
 
 
+def test_second_run_finds_tools_off_the_user_path(release, env, work):
+    brew = brew_stub(work)
+    hide_command(work, "uv")
+    (brew.parent / "uv").symlink_to(shutil.which("uv"))
+    write_stub(brew.parent / "herdr", "exit 0")
+    hide_command(work, "claude")
+    local_bin = Path(env["HOME"]) / ".local/bin"
+    local_bin.mkdir(parents=True)
+    write_stub(local_bin / "claude", "exit 0")
+    r = run_with_answers({**env, "FACTORY_INSTALL_BREW_PATHS": str(brew)}, work, "", "")
+    assert r.returncode == 0, r.stderr
+    assert "1) Herdr (found)" in r.stdout
+    assert "  3) [ ] uv (found)" in r.stdout and "  4) [ ] Claude Code (found)" in r.stdout
+    assert brew_log(work) == []
+
+
+def test_installer_that_installs_nothing_is_reported(release, env, work):
+    r = run_with_answers({**env, "CURL_STUB_SCRIPT": ""}, work, "1", "")
+    assert "factory install: The Homebrew install failed." in r.stderr
+
+
 def test_path_warning(release, env):
     r = run_install(env)
     assert f"Add {Path(env['HOME']) / '.local/bin'} to your PATH." in r.stdout

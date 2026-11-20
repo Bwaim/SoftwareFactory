@@ -279,7 +279,7 @@ install_items() {
         fi
         ;;
     esac
-    if ! run_install "$key" "$command"; then
+    if ! run_install "$key" "$command" || { [ "$key" != clt ] && ! item_found "$key"; }; then
       printf 'factory install: The %s install failed. Install it later: %s\n' "$name" "$command" >&2
       continue
     fi
@@ -373,16 +373,16 @@ main() {
 
   user_path=$PATH
   platform_init
+  export PATH="$HOME/.local/bin:$PATH"
+  use_brew
   if open_answers; then interactive=1; else interactive=0; fi
   choose_terminal
   if [ "$interactive" = 1 ]; then
     build_list
     choose_items
-    use_brew
     install_items
+    use_brew
   fi
-  export PATH="$HOME/.local/bin:$PATH"
-  use_brew
 
   for tool in curl tar uv claude; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required."
