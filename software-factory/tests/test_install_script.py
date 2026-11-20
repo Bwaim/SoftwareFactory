@@ -3,6 +3,7 @@ import http.server
 import os
 import shutil
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -46,6 +47,11 @@ def release(work):
     server.server_close()
 
 
+FAKE_SWIFTC = '''while [ "$1" != "-o" ]; do shift; done
+printf '#!/bin/sh\\n' > "$2"
+chmod +x "$2"'''
+
+
 def write_stub(path, body):
     path.write_text("#!/bin/sh\n" + body + "\n")
     path.chmod(0o755)
@@ -66,6 +72,8 @@ def env(work, release):
     fake.mkdir()
     write_stub(fake / "claude", "exit 0")
     write_stub(fake / "xcode-select", "exit 0")
+    write_stub(fake / "swiftc", FAKE_SWIFTC)
+    write_stub(fake / "codesign", "exit 0")
     write_stub(fake / "curl", f'''url=""
 for a in "$@"; do case "$a" in http*) url=$a;; esac; done
 case "$url" in http://127.0.0.1*) exec "{tools}/curl" "$@";; esac
@@ -84,6 +92,8 @@ echo "${{CURL_STUB_SCRIPT:-echo installer}}"''')
         "FACTORY_INSTALL_ARM64": "1",
         "FACTORY_INSTALL_BREW_PATHS": "/nonexistent/brew",
         "FACTORY_INSTALL_WARP_APP": "/nonexistent/Warp.app",
+        "FACTORY_LSREGISTER": "",
+        "FACTORY_DASHBOARD_APP": str(work / "CAPTN Dashboard.app"),
     }
 
 
@@ -105,7 +115,7 @@ def saved_terminal(env):
     return path.read_text().strip() if path.exists() else None
 
 
-def test_fresh_install(release, env):
+def test_fresh_install(release, env, work):
     r = run_install(env)
     home = Path(env["HOME"])
     target = home / ".local/share/software-factory"
@@ -115,6 +125,23 @@ def test_fresh_install(release, env):
     assert f"Installed factory 0.2.0 in {target}." in r.stdout
     v = subprocess.run([str(home / ".local/bin/factory"), "--version"], capture_output=True, text=True, env=env)
     assert "factory 0.2.0" in v.stdout
+    if sys.platform == "darwin":
+        assert f"Dashboard app: {work / 'CAPTN Dashboard.app'}" in r.stdout
+        assert (work / "CAPTN Dashboard.app").is_dir()
+
+
+def test_dashboard_app_build_failure_warns(release, env, work):
+    write_stub(work / "fake bin/swiftc", "exit 1")
+    r = run_install(env)
+    assert r.returncode == 0, r.stderr
+    assert "factory install: The dashboard app did not build. Run factory app install to see why." in r.stderr
+    assert "Dashboard app: " not in r.stdout
+
+
+def test_linux_install_skips_dashboard_app(release, env):
+    r = run_install({**env, "FACTORY_INSTALL_OS": "Linux"})
+    assert r.returncode == 0, r.stderr
+    assert "Dashboard app:" not in r.stdout + r.stderr
 
 
 def test_install_through_pipe(release, env):

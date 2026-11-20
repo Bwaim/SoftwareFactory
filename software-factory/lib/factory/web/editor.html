@@ -177,11 +177,16 @@ function readShowHidden() { try { return localStorage.getItem(SHOW_HIDDEN_KEY) =
 function saveShowHidden(value) { try { localStorage.setItem(SHOW_HIDDEN_KEY, value ? "1" : "0"); } catch (e) {} }
 const state = { steps: [], columns: [], pipelines: [], loadedLevel: null, saveLevel: "local", model: null, checkTimer: null, checkCount: 0, hasError: true, commit: null, savedPath: null, original: null, confirmReplace: false, showHidden: readShowHidden() };
 const byId = (id) => document.getElementById(id);
+const SERVER_STOPPED = "Server stopped. Reload the editor after Start. Unsaved changes are lost.";
+function tellApp(msg) { window.webkit?.messageHandlers?.captn?.postMessage(msg); }
+function showServerStopped() { showError(SERVER_STOPPED); }
+function serverStopped() { tellApp("unreachable"); if (window.webkit?.messageHandlers?.captn) showServerStopped(); }
 
 async function api(path, body) {
   const opts = { headers: { "X-Factory-Token": TOKEN } };
   if (body !== undefined) { opts.method = "POST"; opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
-  const r = await fetch(apiPath(path), opts);
+  let r;
+  try { r = await fetch(apiPath(path), opts); } catch (e) { serverStopped(); throw e; }
   const data = await r.json();
   if (r.status === 409) { const conflict = new Error(data.error); conflict.conflict = true; throw conflict; }
   if (!r.ok) { showError(data.error || r.statusText); throw new Error(data.error || r.statusText); }

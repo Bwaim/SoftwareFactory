@@ -193,3 +193,15 @@ def test_editor_needs_a_listed_workspace(inited):
     assert r.returncode == 1
     assert "This repository is not in the dashboard. Run `factory dashboard` in it first." in r.stderr
     assert workspaces.list_all() == []
+
+
+def test_server_waiting_lists_waiting_tasks(inited):
+    waiting_task(inited, inited.repo, "t1")
+    try:
+        assert json.loads(inited.factory("server", "waiting", "--json").stdout) == ["t1"]
+    finally:
+        inited.factory("server", "stop")
+
+
+def test_server_waiting_empty_from_anywhere(factory, tmp_path):
+    assert json.loads(factory("server", "waiting", "--json", cwd=tmp_path).stdout) == []

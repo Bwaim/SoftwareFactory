@@ -361,6 +361,12 @@ finish_terminal() {
   fi
 }
 
+install_dashboard_app() {
+  on_macos || return 0
+  "$dir/bin/factory" app install \
+    || printf 'factory install: The dashboard app did not build. Run factory app install to see why.\n' >&2
+}
+
 main() {
   set -eu
   umask 022
@@ -457,6 +463,7 @@ main() {
   fi
 
   printf 'Installed factory %s in %s.\n' "$version" "$dir"
+  install_dashboard_app
   finish_terminal
   case ":$user_path:" in
     *":$link_dir:"*) ;;

@@ -130,8 +130,8 @@ Warp adapter:
 - `tmux -L captn new-session`, `has-session`, `kill-session`, `rename-session`
 - `tmux -L captn capture-pane`, `send-keys`, `load-buffer`, `paste-buffer`, `list-clients`, `display-message`, `attach-session`
 - `open warp://tab_config/<name>`, `open -a Warp`, `open -Ra Warp`
-- `~/Applications/CAPTN Factory.app/Contents/MacOS/captn-notify <title> <body> <sound>`, and to build that app: `swiftc`, `codesign --sign -`, `lsregister -f`
-- `osascript` (`display notification`), when the CAPTN Factory app cannot be used
+- `~/Applications/CAPTN Dashboard Notifier.app/Contents/MacOS/captn-notify <title> <body> <sound>`, and to build that app: `swiftc`, `codesign --sign -`, `lsregister -f`
+- `osascript` (`display notification`), when the CAPTN Dashboard Notifier app cannot be used
 
 ## Terminal: Herdr or Warp
 
@@ -146,8 +146,8 @@ With **Warp** (macOS only):
 - Working or idle comes from the factory's Claude hooks (`Stop` and `UserPromptSubmit`), saved in `.factory/session-activity/`.
 - Close, pause and delete stop Claude and end the tmux session. The Warp tab then closes, and the tab config file is removed.
 - To look at a session by hand: `tmux -L captn ls`, then `tmux -L captn attach -t <name>`.
-- Notifications show the CAPTN icon. macOS shows the icon of the app that sends a notification, so the factory sends through its own small app, `~/Applications/CAPTN Factory.app`. The first notification builds it with `swiftc` (from the Xcode command line tools) and signs it for this Mac only. It is built again when its sources change.
-- The first time, macOS asks whether CAPTN Factory may show notifications. Click **Allow**. If you closed the question or clicked **Don't Allow**, turn it on in **System Settings → Notifications → CAPTN Factory**: macOS does not ask again.
+- Notifications show the CAPTN icon. macOS shows the icon of the app that sends a notification, so the factory sends through its own small app, `~/Applications/CAPTN Dashboard Notifier.app`. The first notification builds it with `swiftc` (from the Xcode command line tools) and signs it for this Mac only. It is built again when its sources change.
+- The first time, macOS asks whether to allow notifications from CAPTN Dashboard Notifier. Click **Allow**. If you closed the question or clicked **Don't Allow**, turn it on in **System Settings → Notifications → CAPTN Dashboard Notifier**: macOS does not ask again. The new name replaces the old app `CAPTN Factory`. The first notification deletes the old app. macOS keeps your choice, because the app identifier does not change.
 - Until the app is allowed, or without `swiftc`, notifications still come, through `osascript`, with the Script Editor icon.
 
 ## Tutorial
@@ -299,6 +299,8 @@ Local server:
 - `factory dashboard`: start the local server if needed, add this repository to the dashboard list and print the dashboard URL. It works from any folder.
 - `factory server stop`: stop the local server.
 - `factory server stop --unless-waiting`: stop the local server only when no task waits on a done check.
+- `factory server waiting --json`: print the ids of the tasks that wait on a done check, as a JSON list.
+- `factory app install`: build the Dock app "CAPTN Dashboard" and print its path. macOS only.
 
 ### Folder pipelines
 
@@ -383,6 +385,33 @@ Then review the pipeline in the browser with `factory pipeline edit <id>`.
 Open it with the menu action "Open dashboard" or with `factory dashboard`. `factory dashboard` works from any folder.
 The page refreshes every 5 seconds.
 The header has three views: **Tasks**, **Backlog** and **Settings**. The button at the top right shows the dashboard in full screen; click it again, or press Escape, to leave. Each view fills the whole page: Backlog and Settings hide the Workspaces, Details and Terminal columns. Backlog names its workspace at the top.
+
+#### Dock app (macOS)
+
+The Dock app "CAPTN Dashboard" shows the dashboard in its own window.
+
+- On macOS, `install.sh` tries to build it. It prints a warning when it cannot. To build it by hand, run `factory app install`. It prints the path `~/Applications/CAPTN Dashboard.app`.
+- Drag the app to the Dock to keep it there.
+- A click on the Dock icon starts the server when needed and shows the dashboard. When the app already runs, the click brings its window to the front.
+- When the app is installed, `factory dashboard` and the menu action "Open dashboard" show the dashboard in the app, not in a browser tab. The command still prints the URL.
+- `factory pipeline edit` and `factory step edit` still open the browser.
+- `factory dashboard` builds the app again when the factory changes. A failed build does not fail the command.
+- `factory app install` builds the app. On macOS, `install.sh` runs it for you. The app runs `factory` through `uv`.
+- The app runs `factory` with the environment of your login shell, so tasks find `tmux`, `herdr` and `claude`.
+
+When the server stops, the window shows "Server stopped" and a **Start** button. Click **Start** to start a new server. The app never starts a server by itself after the launch.
+
+When you quit the app, it stops the server. The app warns you first.
+
+- If no task waits on a done check, the warning has the buttons **Quit** and **Cancel**. Select "Don't show again" to skip this warning in the future.
+- If tasks wait on a done check, the warning lists them. Quitting stops their done checks. The buttons are **Stop**, **Keep server running** and **Cancel**. This warning always shows.
+- If the app cannot list the waiting tasks, the warning says so and has the same three buttons.
+- **Keep server running** quits the app and leaves the server up.
+- If you quit while the window shows "Starting the factory…", the app does not stop the server that this start launches. That server stops by itself after 30 idle minutes.
+
+"Create a pipeline" opens the editor as a tab of the app window. If the server stops, the editor tab shows "Server stopped. Reload the editor after Start. Unsaved changes are lost." Click **Start**, then reload the editor tab with Cmd+R.
+
+Links to other sites open in your browser.
 
 #### Workspaces
 
@@ -681,7 +710,7 @@ When `factory.yaml` or `config.yaml` is not valid YAML, every command prints `Er
 
 ## Troubleshooting
 
-- **Terminal check failed.** Start Claude inside a Herdr pane. The pane sets `HERDR_ENV=1`. If `herdr` is missing, install it.
+- **Terminal check failed.** Herdr must be running. Open Herdr, then try again. A server started outside a Herdr pane, for example by the Dock app, works when Herdr runs. If `herdr` is missing, install it.
 - **Data version mismatch.**
   - Older data: start the orchestrator. It runs the migration.
   - Newer data: update the plugin.

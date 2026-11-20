@@ -332,11 +332,12 @@ def ensure_server():
         if info:
             return info
         old_pid = (read_info() or {}).get("pid")
+        env = {k: v for k, v in os.environ.items() if k != "FACTORY_DOCK_APP"}
         with open(log_path(), "a") as out:
             child = subprocess.Popen(
                 [sys.executable, str(repo.PLUGIN_ROOT / "bin" / "factory"), "serve"],
                 cwd=home, stdin=subprocess.DEVNULL, stdout=out, stderr=out,
-                start_new_session=True, close_fds=True,
+                start_new_session=True, close_fds=True, env=env,
             )
         deadline = time.time() + START_TIMEOUT
         while time.time() < deadline and child.poll() is None:

@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import uuid
@@ -34,7 +35,9 @@ def factory_home(tmp_path, monkeypatch):
     home = tmp_path / "factory-home"
     monkeypatch.setenv("FACTORY_HOME", str(home))
     # Never build or run the real notifier app in ~/Applications.
-    monkeypatch.setenv("FACTORY_NOTIFIER_APP", str(tmp_path / "Applications" / "CAPTN Factory.app"))
+    monkeypatch.setenv("FACTORY_NOTIFIER_APP", str(tmp_path / "Applications" / "CAPTN Dashboard Notifier.app"))
+    monkeypatch.setenv("FACTORY_DASHBOARD_APP", str(tmp_path / "Applications" / "CAPTN Dashboard.app"))
+    monkeypatch.setenv("FACTORY_LSREGISTER", "")
     return home
 
 
@@ -250,3 +253,44 @@ def hook(inited, kind, payload, delay="60", stdin=None, cwd=None):
 
 def silent(r):
     assert r.returncode == 0 and r.stdout == "" and r.stderr == ""
+
+
+FAKE_SWIFTC = """#!/bin/sh
+echo "swiftc $*" >> "$FAKE_TOOLS_LOG"
+[ -z "$FAKE_SWIFTC_STDERR" ] || echo "$FAKE_SWIFTC_STDERR" >&2
+[ "${FAKE_SWIFTC_EXIT:-0}" = 0 ] || exit "$FAKE_SWIFTC_EXIT"
+while [ "$1" != "-o" ]; do shift; done
+cat > "$2" <<'APP'
+#!/bin/sh
+"$FAKE_PYTHON" -c 'import json,sys,os; open(os.environ["FAKE_APP_LOG"],"a").write(json.dumps(sys.argv[1:])+"\\n")' "$@"
+exit "${FAKE_NOTIFY_EXIT:-0}"
+APP
+chmod +x "$2"
+"""
+
+FAKE_CODESIGN = """#!/bin/sh
+echo "codesign $*" >> "$FAKE_TOOLS_LOG"
+"""
+
+
+@pytest.fixture
+def tools(tmp_path, monkeypatch):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for name, text in (("swiftc", FAKE_SWIFTC), ("codesign", FAKE_CODESIGN)):
+        exe = bindir / name
+        exe.write_text(text)
+        exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    tools_log, app_log = tmp_path / "tools.log", tmp_path / "app.log"
+    monkeypatch.setenv("PATH", f"{bindir}:/bin")
+    monkeypatch.setenv("FAKE_PYTHON", sys.executable)
+    monkeypatch.setenv("FAKE_TOOLS_LOG", str(tools_log))
+    monkeypatch.setenv("FAKE_APP_LOG", str(app_log))
+
+    def compiles():
+        return sum(line.startswith("swiftc ") for line in tools_log.read_text().splitlines()) if tools_log.exists() else 0
+
+    def sent():
+        return [json.loads(line) for line in app_log.read_text().splitlines()] if app_log.exists() else []
+
+    return compiles, sent

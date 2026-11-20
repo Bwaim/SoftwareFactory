@@ -44,10 +44,16 @@ class HerdrAdapter(Adapter):
         return set(OPTIONAL)
 
     def check(self):
-        if os.environ.get("HERDR_ENV") != "1":
-            return False, "This session does not run inside Herdr (HERDR_ENV is not 1). Start Claude in a Herdr pane, then start the factory again."
         if not shutil.which("herdr"):
             return False, "The `herdr` command is not installed. Install Herdr from https://herdr.dev."
+        if os.environ.get("HERDR_ENV") == "1":
+            return True, "Herdr is available."
+        try:
+            reachable = run(["workspace", "list"], timeout=10, check=False).returncode == 0
+        except AdapterError:
+            reachable = False
+        if not reachable:
+            return False, "Herdr is not running. Open Herdr, then try again."
         return True, "Herdr is available."
 
     def workspaces(self, check=True):

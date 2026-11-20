@@ -139,3 +139,26 @@ def test_launch_popup_opens_editor_on_a_new_pipeline():
 def test_migration_commit_notice():
     for text in ['id="migration"', "library_commit", "The factory migrated the library. These files are not committed:", "Commit to library", "/api/library/commit"]:
         assert text in PAGE
+
+
+def test_dashboard_tells_the_app():
+    assert 'messageHandlers?.captn?.postMessage(msg)' in PAGE
+    assert 'tellApp("unreachable")' in PAGE and 'tellApp("reachable")' in PAGE
+
+
+def test_editor_tells_the_app():
+    editor = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
+    assert 'tellApp("unreachable")' in editor
+    assert "Server stopped. Reload the editor after Start. Unsaved changes are lost." in editor
+
+
+def test_editor_banner_can_be_shown_by_the_app():
+    editor = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
+    assert "function showServerStopped() { showError(SERVER_STOPPED); }" in editor
+    assert "if (window.webkit?.messageHandlers?.captn) showServerStopped();" in editor
+
+
+def test_dashboard_pings_while_a_popup_is_open():
+    assert "if (!force && (state.dragging || modalOpen())) return pingServer();" in PAGE
+    assert 'try { await api("/api/ping", undefined, true, true); tellApp("reachable"); } catch (e) { serverUnreachable(); }' in PAGE
+    assert 'function serverUnreachable() { state.pollFailed = true; byId("offline").hidden = false; tellApp("unreachable"); }' in PAGE
