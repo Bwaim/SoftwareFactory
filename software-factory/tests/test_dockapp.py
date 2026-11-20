@@ -34,6 +34,7 @@ def test_install_builds_the_app(tools, mac, monkeypatch):
     assert info(app)["CFBundleExecutable"] == "captn-dashboard"
     assert info(app)["CAPTNUv"] == "/opt/uv/bin/uv"
     assert info(app)["CAPTNFactory"] == str(dockapp.factory_path())
+    assert info(app)["NSHighResolutionCapable"] is True
     assert compiles() == 1
 
 
@@ -130,6 +131,34 @@ def test_refresh_rebuilds_a_stale_app(tools, mac, monkeypatch):
     assert compiles() == 2
 
 
+def test_refresh_rebuilds_a_stale_stamp(tools, mac, monkeypatch):
+    compiles, _ = tools
+    monkeypatch.setenv("UV", "/opt/uv/bin/uv")
+    app = dockapp.install()
+    plist = app / "Contents" / "Info.plist"
+    data = info(app)
+    data["CAPTNBuildStamp"] = "old"
+    with open(plist, "wb") as f:
+        plistlib.dump(data, f)
+
+    dockapp.refresh()
+
+    assert compiles() == 2
+    assert info(app)["CAPTNFactory"] == str(dockapp.factory_path())
+
+
+def test_refresh_leaves_an_app_of_another_factory(tools, mac, monkeypatch, tmp_path):
+    compiles, _ = tools
+    monkeypatch.setenv("UV", "/opt/uv/bin/uv")
+    app = dockapp.install()
+    monkeypatch.setattr(dockapp, "factory_path", lambda: tmp_path / "other" / "bin" / "factory")
+
+    dockapp.refresh()
+
+    assert compiles() == 1
+    assert info(app)["CAPTNFactory"] != str(tmp_path / "other" / "bin" / "factory")
+
+
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
 def test_app_install_command_prints_path(factory, tools):
     fake = {k: os.environ[k] for k in ("PATH", "FAKE_PYTHON", "FAKE_TOOLS_LOG", "FAKE_APP_LOG")}
@@ -195,6 +224,7 @@ def test_dashboard_opens_app_when_rebuild_fails(dash, monkeypatch):
 
     monkeypatch.setattr(dockapp, "uv_path", lambda: "/opt/uv/bin/uv")
     monkeypatch.setattr(dockapp, "current", lambda uv: False)
+    monkeypatch.setattr(dockapp, "ours", lambda: True)
     monkeypatch.setattr(dockapp, "install", fail)
 
     run(None)

@@ -49,6 +49,7 @@ def info_plist(uv):
         "CFBundleVersion": "1",
         "LSMinimumSystemVersion": "13.0",
         "NSPrincipalClass": "NSApplication",
+        "NSHighResolutionCapable": True,
         "CAPTNUv": uv,
         "CAPTNFactory": str(factory_path()),
         appbuild.STAMP_KEY: stamp(uv),
@@ -90,9 +91,13 @@ def install():
     return app
 
 
+def ours():
+    return (appbuild.read_info(app_path()) or {}).get("CAPTNFactory") == str(factory_path())
+
+
 def refresh():
     uv = uv_path()
-    if installed() and not (uv and current(uv)):
+    if installed() and ours() and not (uv and current(uv)):
         try:
             install()
         except FactoryError:
