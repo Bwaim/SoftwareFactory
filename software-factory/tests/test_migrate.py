@@ -83,3 +83,64 @@ def test_migrate_plan_without_library(factory, origin_repo):
     factory("init")
     p = migrate.plan(repo.load_ctx(origin_repo))
     assert p["library"]["migrate"] is False and p["library"]["path"] is None
+
+
+def test_dashboard_migrates_older_repo(v2, monkeypatch):
+    from factory import server, version
+    inited, env = v2
+    monkeypatch.setenv("FACTORY_MIGRATIONS_DIR", env["FACTORY_MIGRATIONS_DIR"])
+    monkeypatch.setattr(version, "DATA_VERSION", 2)
+    srv = server.Server()
+    try:
+        assert srv.runtime("repo").error is None
+        assert yaml.safe_load((inited.fdir / "factory.yaml").read_text())["version"] == 2
+        assert yaml.safe_load((inited.library / "factory.yaml").read_text())["version"] == 2
+        assert (inited.fdir / "migrated-repo.txt").exists()
+        assert list(inited.repo.glob(".factory.backup-*"))
+    finally:
+        srv.httpd.server_close()
+
+
+def test_dashboard_shows_failed_migration(v2, monkeypatch):
+    from factory import server, version
+    inited, env = v2
+    monkeypatch.setenv("FACTORY_MIGRATIONS_DIR", env["FACTORY_MIGRATIONS_DIR"])
+    monkeypatch.setattr(version, "DATA_VERSION", 2)
+    (inited.library / "steps" / "dirty.md").write_text("x")
+    srv = server.Server()
+    try:
+        assert "uncommitted" in srv.runtime("repo").error
+        assert yaml.safe_load((inited.fdir / "factory.yaml").read_text())["version"] == 1
+    finally:
+        srv.httpd.server_close()
+
+
+def test_dashboard_offers_library_commit(v2, monkeypatch):
+    from factory import api, server, version
+    inited, env = v2
+    monkeypatch.setenv("FACTORY_MIGRATIONS_DIR", env["FACTORY_MIGRATIONS_DIR"])
+    monkeypatch.setattr(version, "DATA_VERSION", 2)
+    srv = server.Server()
+    try:
+        ws = srv.runtime("repo")
+        offer = api.info(ws, {}, None)["library_commit"]
+        assert offer["message"] == "Factory library: migrate to version 2"
+        assert any(f.endswith("migrated-lib.txt") for f in offer["files"])
+        api.library_commit(ws, {}, {"message": offer["message"], "paths": offer["paths"]})
+        assert api.info(srv.fresh("repo"), {}, None)["library_commit"] is None
+    finally:
+        srv.httpd.server_close()
+
+
+def test_dashboard_drops_offer_after_cli_commit(v2, monkeypatch):
+    from factory import api, server, version
+    inited, env = v2
+    monkeypatch.setenv("FACTORY_MIGRATIONS_DIR", env["FACTORY_MIGRATIONS_DIR"])
+    monkeypatch.setattr(version, "DATA_VERSION", 2)
+    srv = server.Server()
+    try:
+        git("add", "-A", cwd=inited.library.parent)
+        git("commit", "-m", "migrate", cwd=inited.library.parent)
+        assert api.info(srv.runtime("repo"), {}, None)["library_commit"] is None
+    finally:
+        srv.httpd.server_close()

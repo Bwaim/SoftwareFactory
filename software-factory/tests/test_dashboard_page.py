@@ -92,3 +92,8 @@ def test_launch_popup_opens_editor_on_a_new_pipeline():
     assert 'new_pipeline: "1"' in PAGE and "createPipelineButton, closeButton(\"Cancel\")" in PAGE
     editor = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
     assert 'else if (params.get("new_pipeline")) openModel(emptyModel(), null);' in editor
+
+
+def test_migration_commit_notice():
+    for text in ['id="migration"', "library_commit", "The factory migrated the library. These files are not committed:", "Commit to library", "/api/library/commit"]:
+        assert text in PAGE

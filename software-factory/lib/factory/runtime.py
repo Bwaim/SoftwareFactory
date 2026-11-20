@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from . import adapters, repo, version
+from . import adapters, library, migrate, repo, version
 from .errors import FactoryError
 
 
@@ -21,12 +21,33 @@ def check_adapter(ctx):
     return {"ok": ok, "message": message}, capabilities
 
 
-def load(path):
+def open_ctx(path):
     if not Path(path).is_dir():
         raise FactoryError(f"The folder {path} does not exist.")
-    ctx = repo.load_ctx(cwd=path)
+    return repo.load_ctx(cwd=path)
+
+
+def load(path):
+    ctx = open_ctx(path)
     version.require_repo(ctx)
     return ctx
+
+
+def migrate_if_older(ctx):
+    if not ctx.initialized():
+        return None
+    p = migrate.plan(ctx)
+    if p["repo"]["migrate"] or p["library"]["migrate"]:
+        return migrate.migrate(ctx)
+    return None
+
+
+def library_changes(lib):
+    top = library.repo_root(lib)
+    if top is None:
+        return []
+    out = repo.git(["status", "--porcelain", "-uall", "--", str(lib)], top).stdout
+    return [line[3:] for line in out.splitlines() if line.strip()]
 
 
 class Workspace:
@@ -36,14 +57,32 @@ class Workspace:
         self.id = entry["id"]
         self.name = entry["name"]
         self.path = entry["path"]
-        self.yaml_mtime = factory_mtime(self.path)
         self.ctx, self.error = None, None
         self.adapter, self.capabilities = {"ok": False, "message": ""}, []
         try:
-            self.ctx = load(self.path)
+            ctx = open_ctx(self.path)
+            self.remember_commit(migrate_if_older(ctx))
+            version.require_repo(ctx)
+            self.ctx = ctx
             self.adapter, self.capabilities = check_adapter(self.ctx)
         except Exception as e:
             self.ctx, self.error = None, str(e)
+        self.yaml_mtime = factory_mtime(self.path)
+
+    def remember_commit(self, migrated):
+        if migrated and migrated["library_commit"]:
+            self.server.library_commits[self.id] = migrated["library_commit"]
+
+    @property
+    def library_commit(self):
+        offer = self.server.library_commits.get(self.id)
+        if not offer:
+            return None
+        files = library_changes(self.ctx.library())
+        if not files:
+            self.server.library_commits.pop(self.id, None)
+            return None
+        return {**offer, "files": files}
 
     @property
     def jobs(self):
