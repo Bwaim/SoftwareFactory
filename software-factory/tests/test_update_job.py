@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from factory import server as server_mod
 from factory import update
 from factory.errors import FactoryError
 
@@ -170,3 +171,50 @@ def test_new_server_failure_holds_until_close(fakes):
 def test_pause_runs_before_install(fakes):
     fakes.finish(fakes.updater.run(None))
     assert fakes.server.calls[:2] == ["pause", "install"]
+
+
+def test_close_does_nothing_on_success(fakes):
+    fakes.finish(fakes.updater.run(None))
+    fakes.updater.close()
+    assert fakes.updater.holds() and not fakes.updater.ended()
+
+
+def test_error_after_swap_keeps_paused_and_holds(fakes, monkeypatch):
+    def broken(*args, **kwargs):
+        raise RuntimeError("no url")
+    monkeypatch.setattr(server_mod, "page_url", broken)
+    job = fakes.finish(fakes.updater.run(None))
+    assert job["error"].startswith("The update is installed, but the new server did not start. See ")
+    assert "no url" in job["output"]
+    assert not fakes.server.resumed and fakes.updater.holds()
+    fakes.updater.close()
+    assert fakes.updater.ended()
+
+
+def test_ended_after_read_on_success(fakes):
+    fakes.finish(fakes.updater.run(None))
+    assert not fakes.updater.ended()
+    fakes.updater.job_read(fakes.job_id)
+    assert fakes.updater.ended()
+
+
+def test_ended_after_close_on_failure(fakes):
+    fakes.start_error = True
+    fakes.finish(fakes.updater.run(None))
+    assert not fakes.updater.ended()
+    fakes.updater.close()
+    assert fakes.updater.ended()
+
+
+def test_ended_after_hold_timer(fakes, monkeypatch):
+    monkeypatch.setattr(update, "HOLD_SECONDS", 0.2)
+    fakes.finish(fakes.updater.run(None))
+    assert not fakes.updater.ended()
+    time.sleep(0.5)
+    assert fakes.updater.ended()
+
+
+def test_not_ended_after_failure_before_swap(fakes):
+    fakes.script = "echo boom\nexit 1\n"
+    fakes.finish(fakes.updater.run(None))
+    assert fakes.server.resumed and not fakes.updater.ended()

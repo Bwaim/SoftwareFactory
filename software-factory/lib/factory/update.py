@@ -130,6 +130,12 @@ def spawn_new():
     return server_mod.spawn_server([str(root() / "bin" / "factory"), "serve"])
 
 
+def not_started(output):
+    from . import server as server_mod
+    error = f"The update is installed, but the new server did not start. See {server_mod.log_path()}."
+    return "failed", {"status": "error", "error": error, "output": output}
+
+
 class Updater:
     def __init__(self, server, checker, start=spawn_new):
         self.server = server
@@ -159,7 +165,10 @@ class Updater:
         self.end_hold(job_id, ("done",))
 
     def close(self):
-        self.end_hold(self.job_id, ("done", "failed"))
+        self.end_hold(self.job_id, ("failed",))
+
+    def ended(self):
+        return self.state == "ended"
 
     def end_hold(self, job_id, states):
         with self.lock:
@@ -167,6 +176,7 @@ class Updater:
                 self.state = "ended"
 
     def work(self, job_id, latest, ws):
+        output = ""
         try:
             self.server.pause_for_update()
             status, output = run_install(latest)
@@ -175,7 +185,11 @@ class Updater:
                 return
             self.finish(job_id, *self.start_new(latest, ws, status, output))
         except Exception as e:
-            self.fail(job_id, str(e))
+            output = f"{output}\n{e}".strip()
+            if installed_version() != latest:
+                self.fail(job_id, output)
+            else:
+                self.finish(job_id, *not_started(output))
 
     def start_new(self, latest, ws, status, output):
         from . import server as server_mod
@@ -185,8 +199,7 @@ class Updater:
         try:
             info = self.start()
         except Exception:
-            error = f"The update is installed, but the new server did not start. See {server_mod.log_path()}."
-            return "failed", {"status": "error", "error": error, "output": output}
+            return not_started(output)
         params = {"ws": ws} if ws else {}
         params["updated"] = latest
         if warn:
