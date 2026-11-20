@@ -260,6 +260,96 @@ def test_terminal_from_the_environment_still_shows_the_list(release, env, work):
     assert "Which one do you already have?" not in r.stdout and "  5) [x] Herdr" in r.stdout
 
 
+def brew_stub(work):
+    brew = work / "brew/bin/brew"
+    brew.parent.mkdir(parents=True)
+    write_stub(brew, f'''echo "$@" >> "{work}/brew.log"
+[ "$1" = shellenv ] && echo 'export PATH="{brew.parent}:$PATH"'
+exit 0''')
+    return brew
+
+
+def brew_log(work):
+    log = work / "brew.log"
+    return [line for line in log.read_text().splitlines() if line != "shellenv"] if log.exists() else []
+
+
+def hide_command(work, name):
+    for folder in ("fake bin", "tools"):
+        path = work / folder / name
+        if path.exists() or path.is_symlink():
+            path.unlink()
+
+
+def test_selected_brew_items_install_in_order(release, env, work):
+    brew = brew_stub(work)
+    r = run_with_answers({**env, "FACTORY_INSTALL_BREW_PATHS": str(brew)}, work, "2", "7", "")
+    assert r.returncode == 0, r.stderr
+    assert brew_log(work) == ["install --cask warp", "install tmux", "install gh"]
+
+
+def test_homebrew_install_runs_the_official_script(release, env, work):
+    run_with_answers(env, work, "1", "")
+    assert "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh" in (work / "curl.log").read_text()
+
+
+def test_brew_items_without_homebrew_print_install_later(release, env, work):
+    r = run_with_answers(env, work, "1", "2", "")
+    assert "Install Herdr later: brew install herdr" in r.stdout
+    assert saved_terminal(env) == "herdr"
+
+
+def test_failed_homebrew_install_continues(release, env, work):
+    r = run_with_answers({**env, "CURL_STUB_SCRIPT": "exit 1"}, work, "1", "")
+    assert r.returncode == 0, r.stderr
+    assert "factory install: The Homebrew install failed." in r.stderr
+    assert "Install Herdr later: brew install herdr" in r.stdout
+
+
+def test_intel_mac_uses_the_official_scripts(release, env, work):
+    for name in ("uv", "claude"):
+        hide_command(work, name)
+    run_with_answers({**env, "FACTORY_INSTALL_ARM64": "0"}, work, "1", "")
+    urls = (work / "curl.log").read_text()
+    assert "https://astral.sh/uv/install.sh" in urls
+    assert "https://claude.ai/install.sh" in urls and "https://herdr.dev/install.sh" in urls
+
+
+def test_uv_script_does_not_edit_shell_files(release, env, work):
+    hide_command(work, "uv")
+    write_stub(work / "fake bin/env", f'echo "$@" >> "{work}/env.log"')
+    run_with_answers({**env, "FACTORY_INSTALL_ARM64": "0"}, work, "1", "")
+    assert "UV_NO_MODIFY_PATH=1 sh" in (work / "env.log").read_text()
+
+
+def test_command_line_tools_install_waits_for_enter(release, env, work):
+    write_stub(work / "fake bin/xcode-select", f'[ "$1" = -p ] && exit 2; echo "$@" >> "{work}/xcode.log"')
+    r = run_with_answers(env, work, "1", "", "")
+    assert (work / "xcode.log").read_text().strip() == "--install"
+    assert "Finish the Command Line Tools install in its window, then press Enter. " in r.stdout
+
+
+def test_unselected_uv_stops_before_the_factory(release, env, work):
+    hide_command(work, "uv")
+    r = run_with_answers(env, work, "1", "3", "")
+    assert r.returncode == 1 and "factory install: uv is required." in r.stderr
+
+
+def test_everything_found_installs_nothing(release, env, work):
+    brew = brew_stub(work)
+    for name in ("herdr", "gh", "glab"):
+        write_stub(work / f"fake bin/{name}", "exit 0")
+    r = run_with_answers({**env, "FACTORY_INSTALL_BREW_PATHS": str(brew)}, work, "1", "")
+    assert ") [x]" not in r.stdout and brew_log(work) == []
+    assert not (work / "curl.log").exists()
+
+
+def test_brew_path_line_when_brew_is_not_on_path(release, env, work):
+    brew = brew_stub(work)
+    r = run_with_answers({**env, "FACTORY_INSTALL_BREW_PATHS": str(brew)}, work, "1", "")
+    assert f'Add this line to ~/.zprofile: eval "$({brew} shellenv)"' in r.stdout
+
+
 def test_path_warning(release, env):
     r = run_install(env)
     assert f"Add {Path(env['HOME']) / '.local/bin'} to your PATH." in r.stdout

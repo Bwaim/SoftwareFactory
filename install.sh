@@ -252,6 +252,56 @@ choose_items() {
   done
 }
 
+use_brew() {
+  brew_bin=$(brew_path)
+  [ -n "$brew_bin" ] || return 0
+  eval "$("$brew_bin" shellenv </dev/null)"
+}
+
+run_install() {
+  if [ "$1" = brew ]; then
+    sh -c "$2" <&3
+  else
+    sh -c "$2" </dev/null
+  fi
+}
+
+install_items() {
+  for key in $mandatory_items $optional_items; do
+    is_selected "$key" || continue
+    name=$(item_name "$key")
+    command=$(install_command "$key")
+    case "$command" in
+      "brew "*)
+        if ! command -v brew >/dev/null 2>&1; then
+          printf 'Install %s later: %s\n' "$name" "$command"
+          continue
+        fi
+        ;;
+    esac
+    if ! run_install "$key" "$command"; then
+      printf 'factory install: The %s install failed. Install it later: %s\n' "$name" "$command" >&2
+      continue
+    fi
+    case "$key" in
+      clt) ask "Finish the Command Line Tools install in its window, then press Enter. " "" ;;
+      brew) use_brew ;;
+    esac
+  done
+}
+
+brew_path_hint() {
+  brew_bin=$(brew_path)
+  [ -n "$brew_bin" ] || return 0
+  case ":$user_path:" in
+    *":$(dirname "$brew_bin"):"*) ;;
+    *)
+      if on_macos; then shell_file="~/.zprofile"; else shell_file="~/.bashrc"; fi
+      printf 'Add this line to %s: eval "$(%s shellenv)"\n' "$shell_file" "$brew_bin"
+      ;;
+  esac
+}
+
 ask_terminal() {
   if has_herdr; then default=1; elif has_warp; then default=2; else default=3; fi
   printf '\nCAPTN runs each task in a multi-terminal tool.\n'
@@ -321,13 +371,18 @@ main() {
   link_dir=${FACTORY_LINK_DIR:-$HOME/.local/bin}
   link="$link_dir/factory"
 
+  user_path=$PATH
   platform_init
   if open_answers; then interactive=1; else interactive=0; fi
   choose_terminal
   if [ "$interactive" = 1 ]; then
     build_list
     choose_items
+    use_brew
+    install_items
   fi
+  export PATH="$HOME/.local/bin:$PATH"
+  use_brew
 
   for tool in curl tar uv claude; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required."
@@ -403,10 +458,11 @@ main() {
 
   printf 'Installed factory %s in %s.\n' "$version" "$dir"
   finish_terminal
-  case ":$PATH:" in
+  case ":$user_path:" in
     *":$link_dir:"*) ;;
     *) printf 'Add %s to your PATH.\n' "$link_dir" ;;
   esac
+  brew_path_hint
 }
 
 main "$@"
