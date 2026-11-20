@@ -1079,12 +1079,10 @@ async function openLaunch(prefill) {
   if (!pipelines.length) { showError("No pipeline found."); return; }
   const form = { inputs: {}, checked: null, ticket: 0 };
   const select = el("select");
-  for (const p of pipelines) select.append(el("option", { value: p.id, disabled: !p.available }, p.id));
+  for (const p of pipelines) select.append(el("option", { value: p.id, disabled: !p.available, title: p.available ? null : p.reason }, p.id));
   const usable = pipelines.filter((p) => p.available);
   if (usable.length) select.value = prefill.pipeline && usable.some((p) => p.id === prefill.pipeline) ? prefill.pipeline : usable[0].id;
-  const reasonBox = el("p", { class: "muted" });
-  const showReason = () => { const p = pipelines.find((x) => x.id === select.value); reasonBox.textContent = p && !p.available ? p.reason : ""; };
-  showReason();
+  const reasonBox = el("div", { class: "muted" }, ...pipelines.filter((p) => !p.available).map((p) => el("p", {}, `${p.id}: ${p.reason}`)));
   const description = el("textarea", { placeholder: "What should the task do?" });
   description.value = prefill.description || "";
   const inputsBox = el("div");
@@ -1095,7 +1093,7 @@ async function openLaunch(prefill) {
     await refresh(true);
     return res;
   }, { cls: "primary", disabled: true });
-  const checkButton = button("Check", check, { disabled: adapterDown(), hint: ADAPTER_BUTTONS });
+  const checkButton = button("Check", check, { disabled: adapterDown() || !usable.length, hint: adapterDown() ? ADAPTER_BUTTONS : null });
   const createPipelineButton = button("Create a pipeline", () => {
     window.open(`/editor?${new URLSearchParams({ token: TOKEN, ws: state.ws, new_pipeline: "1" })}`, "_blank", "noopener");
   });
@@ -1155,9 +1153,9 @@ async function openLaunch(prefill) {
       inputsBox.append(field(name, el("div", {}, node, hint ? el("div", { class: "muted" }, hint) : "")));
     }
   }
-  select.addEventListener("change", async () => { showReason(); invalidate(); clear(reportBox); await loadInputs().catch(() => {}); });
+  select.addEventListener("change", async () => { invalidate(); clear(reportBox); await loadInputs().catch(() => {}); });
   description.addEventListener("input", invalidate);
-  await loadInputs();
+  if (usable.length) await loadInputs();
   openModal(prefill.from_backlog ? "Start from backlog" : "Launch a task", field("Pipeline", el("div", {}, select, reasonBox)), field("Description", description), inputsBox, reportBox,
     el("div", { class: "footer" }, createPipelineButton, closeButton("Cancel"), checkButton, launchButton));
 }

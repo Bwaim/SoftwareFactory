@@ -1,3 +1,4 @@
+import json
 import time
 
 import pytest
@@ -155,5 +156,7 @@ def test_pipelines_available_plain(plain, factory, work):
         assert by_id["wt"]["available"] is False
         assert by_id["wt"]["reason"] == registry.NEEDS_GIT.format(id="wt")
         assert by_id["fo"]["available"] is True and by_id["fo"]["reason"] is None
+        cli = json.loads(factory("pipeline", "list", "--json", cwd=plain, env={"GIT_CEILING_DIRECTORIES": str(work)}).stdout)
+        assert {r["id"]: r["available"] for r in cli}["wt"] is False
     finally:
         factory("server", "stop", cwd=plain, check=False)
