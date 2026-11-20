@@ -1,7 +1,3 @@
-// CAPTN Factory notifier: shows one macOS notification with the CAPTN icon, then exits.
-// Usage: captn-notify <title> <body> <sound>. An empty sound means silent.
-// factory/notifier.py builds it into "CAPTN Factory.app" and reads the exit codes below.
-// It must run from inside that bundle: macOS ties the permission and the icon to the bundle id.
 import AppKit
 import UserNotifications
 
