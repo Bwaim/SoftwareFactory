@@ -27,13 +27,28 @@ You start and manage tasks from one orchestrator session in the main repository.
 
 ## Install and prerequisites
 
-You need:
+The factory needs these tools. The install script lists them, and it can install them for you.
 
-- `uv`. Install it with `brew install uv`.
-- A terminal: Herdr (https://herdr.dev, the default) or Warp (https://www.warp.dev) with tmux (`brew install tmux`). See [Terminal: Herdr or Warp](#terminal-herdr-or-warp).
-- git, only for pipelines with `worktree: true`. Each repository can have an `origin` remote, but it is optional.
-- Claude Code.
-- Optional: `gh` or `glab`, for the forge steps of the catalog.
+Mandatory:
+
+- Xcode Command Line Tools (macOS): git, and swiftc for Warp notifications. Install them with `xcode-select --install`.
+- Homebrew: it installs the other tools. See https://brew.sh.
+- `uv`: it runs the factory (Python). Install it with `brew install uv`.
+- Claude Code: it runs each task. Install it with `brew install --cask claude-code`.
+- A terminal tool: Herdr (`brew install herdr`, the default), or Warp (`brew install --cask warp`) with tmux (`brew install tmux`). See [Terminal: Herdr or Warp](#terminal-herdr-or-warp).
+- git (Linux): only for pipelines with `worktree: true`. Install it with your package manager. Each repository can have an `origin` remote, but it is optional.
+
+Optional:
+
+- `gh` or `glab`, for the forge steps of the catalog. Install them with `brew install gh` or `brew install glab`.
+
+On an Intel Mac, Homebrew has no ready-built `uv`, `herdr`, `tmux`, `gh` and `glab`, and it builds them from source. So the script installs `uv`, Claude Code and Herdr with their official scripts:
+
+- `curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh`
+- `curl -fsSL https://claude.ai/install.sh | bash`
+- `curl -fsSL https://herdr.dev/install.sh | sh`
+
+With Herdr, Homebrew is then optional on an Intel Mac. On Linux, Claude Code also installs with its official script.
 
 Install the factory with this command:
 
@@ -41,13 +56,20 @@ Install the factory with this command:
 curl -fsSL https://raw.githubusercontent.com/Bwaim/SoftwareFactory/main/install.sh | sh
 ```
 
-The script downloads the latest release into `~/.local/share/software-factory` and makes sure that its SHA-256 matches the release. It creates the link `~/.local/bin/factory`. If `~/.local/bin` is not in your `PATH`, add it. `factory init` does not create the link. If the link is missing, run `factory link`.
+First, the script asks which multi-terminal tool you already have: Herdr, Warp (macOS, with tmux), or none. With none, it asks which one to use. On Linux, it uses Herdr.
 
-Then the script asks which multi-terminal tool you already have: Herdr, Warp (macOS, with tmux), or none.
+Then the script shows the list of tools, with the use of each one. `[x]` means that the script installs the tool. Missing mandatory tools are selected. A tool that is already installed shows `(found)`.
 
-- With none, it asks which one to install. It can run the install for you, after you say yes: Herdr's own install script, or `brew install --cask warp` and `brew install tmux`.
-- It saves the choice in `~/.config/software-factory/terminal`. `factory init` writes it into each new repository's `.factory/factory.yaml` (`terminal:`). A repository already set up keeps its own choice.
-- The questions read the terminal, so they work with `curl ... | sh`. Without a terminal (CI), nothing is asked. Set `FACTORY_INSTALL_TERMINAL=herdr` or `warp` to choose without a question.
+- Type one or more numbers, separated by spaces, to change the selection. Press Enter to install.
+- The script installs the selected tools in list order. The Homebrew install asks for your password. After `xcode-select --install`, finish the install in its window, then press Enter.
+- If Homebrew is not installed, the script does not install the Homebrew tools. It prints the command for each one.
+- If an install fails, the script prints a warning and continues.
+
+Then the script downloads the latest release into `~/.local/share/software-factory` and makes sure that its SHA-256 matches the release. It creates the link `~/.local/bin/factory`. If `uv` or `claude` is missing, it stops before this step. `factory init` does not create the link. If the link is missing, run `factory link`.
+
+- The script never edits your shell files. One exception: the Claude Code script runs `claude install`, which can add `~/.local/bin` to one. At the end, the script prints the lines to add for `~/.local/bin` and for Homebrew.
+- It saves the terminal choice in `~/.config/software-factory/terminal`. `factory init` writes it into each new repository's `.factory/factory.yaml` (`terminal:`). A repository already set up keeps its own choice.
+- The questions read the terminal, so they work with `curl ... | sh`. Without a terminal (CI), nothing is asked and nothing is installed. Set `FACTORY_INSTALL_TERMINAL=herdr` or `warp` to choose the terminal without a question. The list of tools still shows.
 
 To update the factory, run the same command again.
 
