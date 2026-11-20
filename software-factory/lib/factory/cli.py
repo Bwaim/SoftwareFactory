@@ -4,7 +4,7 @@ import sys
 
 from .errors import FactoryError
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 NO_VERSION_CHECK = {"init", "version", "migrate", "link", "terminal check", "menu", "hook", "serve", "dashboard", "server stop"}
 COMMANDS = {}
 
