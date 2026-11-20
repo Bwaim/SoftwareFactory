@@ -150,3 +150,9 @@ def test_editor_tells_the_app():
     editor = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
     assert 'tellApp("unreachable")' in editor
     assert "Server stopped. Reload the editor after Start. Unsaved changes are lost." in editor
+
+
+def test_editor_banner_can_be_shown_by_the_app():
+    editor = (SF / "lib" / "factory" / "web" / "editor.html").read_text()
+    assert "function showServerStopped() { showError(SERVER_STOPPED); }" in editor
+    assert "if (window.webkit?.messageHandlers?.captn) showServerStopped();" in editor

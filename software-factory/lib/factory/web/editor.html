@@ -179,7 +179,8 @@ const state = { steps: [], columns: [], pipelines: [], loadedLevel: null, saveLe
 const byId = (id) => document.getElementById(id);
 const SERVER_STOPPED = "Server stopped. Reload the editor after Start. Unsaved changes are lost.";
 function tellApp(msg) { window.webkit?.messageHandlers?.captn?.postMessage(msg); }
-function serverStopped() { tellApp("unreachable"); if (window.webkit?.messageHandlers?.captn) showError(SERVER_STOPPED); }
+function showServerStopped() { showError(SERVER_STOPPED); }
+function serverStopped() { tellApp("unreachable"); if (window.webkit?.messageHandlers?.captn) showServerStopped(); }
 
 async function api(path, body) {
   const opts = { headers: { "X-Factory-Token": TOKEN } };

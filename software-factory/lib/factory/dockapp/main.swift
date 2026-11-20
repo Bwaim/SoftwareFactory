@@ -639,6 +639,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !up, checked == base, !starting else { return }
         serverStopped = true
         showServerStopped()
+        showBannerInEditors()
+    }
+
+    func showBannerInEditors() {
+        for page in pages where page !== dashboard {
+            page.webView.evaluateJavaScript("showServerStopped()") { _, _ in }
+        }
     }
 
     func showServerStopped() {

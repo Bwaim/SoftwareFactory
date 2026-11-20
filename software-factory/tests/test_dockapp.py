@@ -300,6 +300,7 @@ APP_TEXTS = [
     '"/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.local/bin"',
     "var environment = LoginEnvironment.values",
     "isElementFullscreenEnabled = true",
+    'evaluateJavaScript("showServerStopped()")',
 ]
 
 
