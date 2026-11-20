@@ -153,3 +153,28 @@ def test_watch_idle_stops_when_update_ended(live, monkeypatch):
     srv.updater.state = "ended"
     threading.Thread(target=srv.watch_idle, daemon=True).start()
     assert stopped.wait(5)
+
+
+def test_update_info_skips_a_broken_workspace(live, monkeypatch, capsys):
+    from factory import state
+    good = SimpleNamespace(id="good", error=None, ctx="good")
+    bad = SimpleNamespace(id="bad", error=None, ctx="bad")
+    monkeypatch.setattr(live.server, "reload_if_changed", lambda: None)
+    monkeypatch.setattr(live.server, "snapshot", lambda: [bad, good])
+
+    def list_tasks(ctx):
+        if ctx == "bad":
+            raise ValueError("broken state")
+        return [{"status": "active"}, {"status": "finished"}]
+    monkeypatch.setattr(state, "list_tasks", list_tasks)
+    status, body = request(live.info, "GET", "/api/update")
+    assert status == 200 and body["running_tasks"] == 1
+    assert "running task count failed for bad: broken state" in capsys.readouterr().err
+
+
+def test_update_info_when_reload_fails(live, monkeypatch):
+    def broken():
+        raise OSError("no list")
+    monkeypatch.setattr(live.server, "reload_if_changed", broken)
+    status, body = request(live.info, "GET", "/api/update")
+    assert status == 200 and body["running_tasks"] == 0

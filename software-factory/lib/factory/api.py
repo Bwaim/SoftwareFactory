@@ -109,10 +109,22 @@ def job(server, job_id, query, body):
 
 
 def running_tasks(server):
-    from . import state, update
-    server.reload_if_changed()
-    tasks = [t for ws in server.snapshot() if not ws.error for t in state.list_tasks(ws.ctx)]
-    return sum(1 for t in tasks if t["status"] in update.RUNNING_STATUSES)
+    from . import server as server_mod, state, update
+    try:
+        server.reload_if_changed()
+        snapshot = server.snapshot()
+    except Exception as e:
+        server_mod.log(f"running task count failed: {e}")
+        return 0
+    count = 0
+    for ws in snapshot:
+        if ws.error:
+            continue
+        try:
+            count += sum(1 for t in state.list_tasks(ws.ctx) if t["status"] in update.RUNNING_STATUSES)
+        except Exception as e:
+            server_mod.log(f"running task count failed for {ws.id}: {e}")
+    return count
 
 
 @route("GET", "/api/update", scope="global")
