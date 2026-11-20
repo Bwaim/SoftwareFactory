@@ -197,6 +197,17 @@ def test_close_stops_claude_and_removes_the_tab_config(warp_env, origin_repo):
     assert adapter.close(handle) == []
 
 
+def test_folder_task_in_a_plain_folder_runs_there_and_close_leaves_the_folder(warp_env, plain):
+    _, calls, configs = warp_env
+    adapter = WarpAdapter(repo.load_ctx(cwd=plain))
+    handle = adapter.start_session("t1", plain, "p", ARGS)
+    new = tmux_calls(calls, "new-session")[0]
+    assert new[new.index("-c") + 1] == str(plain)
+    assert f'directory = "{plain}"' in (configs / "captn-t1.toml").read_text()
+    assert adapter.close(handle) == []
+    assert not adapter.exists(handle) and plain.is_dir()
+
+
 def test_notify_goes_through_the_captn_app(warp_env, monkeypatch):
     adapter, calls, _ = warp_env
     sent = []
