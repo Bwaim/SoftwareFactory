@@ -52,7 +52,7 @@ def test_commit_adds_changed_library_factory_yaml(inited):
     root = inited.library.parent
     git("add", "-A", cwd=root)
     git("commit", "-m", "library", cwd=root)
-    (inited.library / "factory.yaml").write_text("version: 3\n")
+    (inited.library / "factory.yaml").write_text("version: 2\n")
     (inited.library / "steps" / "b.md").write_text("b\n")
     inited.factory("library", "commit", "Factory library: add step b", inited.library / "steps" / "b.md")
     committed = git("show", "--name-only", "--format=", "HEAD", cwd=root).splitlines()
