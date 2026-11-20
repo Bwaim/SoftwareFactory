@@ -8,6 +8,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
@@ -26,6 +27,13 @@ STATIC = {
     "/static/xterm.css": ("vendor/xterm/xterm.css", "text/css; charset=utf-8"),
     "/static/addon-fit.js": ("vendor/xterm/addon-fit.js", "text/javascript; charset=utf-8"),
 }
+UPDATE_ALLOWED = ("/api/update/run", "/api/update/close")
+UPDATE_RUNNING = "An update is running."
+
+
+class UpdateRunning(FactoryError):
+    def __init__(self):
+        super().__init__(UPDATE_RUNNING)
 
 
 def info_path():
@@ -63,6 +71,9 @@ class Server:
         self.runtimes = {}
         self.library_commits = {}
         self.list_mtime = None
+        self.updating = False
+        self.active = 0
+        self.idle = threading.Condition()
         try:
             self.reload()
         except Exception as e:
@@ -158,18 +169,48 @@ class Server:
             if self.wake.wait(interval):
                 self.wake.clear()
                 continue
-            self.poll_all()
+            if self.updating:
+                continue
+            try:
+                self.poll_all()
+            except UpdateRunning:
+                pass
 
     def reschedule(self):
+        if not self.updating:
+            self.wake.set()
+
+    @contextmanager
+    def activity(self):
+        with self.idle:
+            if self.updating:
+                raise UpdateRunning()
+            self.active += 1
+        try:
+            yield
+        finally:
+            with self.idle:
+                self.active -= 1
+                self.idle.notify_all()
+
+    def pause_for_update(self, timeout=None):
+        with self.idle:
+            self.updating = True
+            self.idle.wait_for(lambda: self.active == 0, timeout)
+
+    def resume_after_update(self):
+        with self.idle:
+            self.updating = False
         self.wake.set()
 
     def poll_all(self):
-        try:
-            self.reload()
-        except Exception as e:
-            log(f"workspace list failed: {e}")
-        for ws in self.snapshot():
-            self.poll_one(ws)
+        with self.activity():
+            try:
+                self.reload()
+            except Exception as e:
+                log(f"workspace list failed: {e}")
+            for ws in self.snapshot():
+                self.poll_one(ws)
 
     def poll_one(self, ws):
         from . import engine, rename
@@ -277,6 +318,8 @@ def make_handler(server):
             if not self.token_ok():
                 return self.reply(401, {"error": "Missing or wrong token."})
             server.last = time.time()
+            if method == "POST" and server.updating and url.path not in UPDATE_ALLOWED:
+                return self.reply(409, {"error": UPDATE_RUNNING})
             try:
                 body = self.read_body() if method == "POST" else {}
                 result = api.dispatch(server, method, url.path, parse_qs(url.query), body)
@@ -287,7 +330,7 @@ def make_handler(server):
                 self.reply(404, {"error": "Not found."})
             except KeyError as e:
                 self.reply(400, {"error": f"Missing field: {e.args[0]}."})
-            except ExistsError as e:
+            except (ExistsError, UpdateRunning) as e:
                 self.reply(409, {"error": str(e)})
             except FactoryError as e:
                 self.reply(400, {"error": str(e), **getattr(e, "details", {})})
@@ -326,27 +369,28 @@ def running():
 
 
 def ensure_server():
-    home = workspaces.home()
     with fsio.locked(info_path()):
-        info = running()
-        if info:
+        return running() or spawn_server([sys.executable, str(repo.PLUGIN_ROOT / "bin" / "factory"), "serve"])
+
+
+def spawn_server(argv):
+    old_pid = (read_info() or {}).get("pid")
+    env = {k: v for k, v in os.environ.items() if k != "FACTORY_DOCK_APP"}
+    home = workspaces.home()
+    home.mkdir(parents=True, exist_ok=True)
+    with open(log_path(), "a") as out:
+        child = subprocess.Popen(
+            argv, cwd=home, stdin=subprocess.DEVNULL, stdout=out, stderr=out,
+            start_new_session=True, close_fds=True, env=env,
+        )
+    deadline = time.time() + START_TIMEOUT
+    while time.time() < deadline and child.poll() is None:
+        info = read_info()
+        if info and info.get("pid") != old_pid and ping(info):
             return info
-        old_pid = (read_info() or {}).get("pid")
-        env = {k: v for k, v in os.environ.items() if k != "FACTORY_DOCK_APP"}
-        with open(log_path(), "a") as out:
-            child = subprocess.Popen(
-                [sys.executable, str(repo.PLUGIN_ROOT / "bin" / "factory"), "serve"],
-                cwd=home, stdin=subprocess.DEVNULL, stdout=out, stderr=out,
-                start_new_session=True, close_fds=True, env=env,
-            )
-        deadline = time.time() + START_TIMEOUT
-        while time.time() < deadline and child.poll() is None:
-            info = read_info()
-            if info and info.get("pid") != old_pid and ping(info):
-                return info
-            time.sleep(0.2)
-        stop_child(child)
-        raise FactoryError(f"The local server did not start. See {log_path()}.")
+        time.sleep(0.2)
+    stop_child(child)
+    raise FactoryError(f"The local server did not start. See {log_path()}.")
 
 
 def keep_polling(ctx):

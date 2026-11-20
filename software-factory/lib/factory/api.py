@@ -268,7 +268,8 @@ def pipeline_copy(server, query, body):
 @route("POST", "/api/pipelines/check")
 def pipeline_check_route(server, query, body):
     from . import pipeline_store
-    return pipeline_store.check(server.ctx, body["data"], body.get("level"))
+    with server.server.activity():
+        return pipeline_store.check(server.ctx, body["data"], body.get("level"))
 
 
 @route("POST", "/api/pipelines/keys")
@@ -385,7 +386,13 @@ def external_done(server, tid, query, body):
 def check_now(server, tid, query, body):
     from . import engine, state
     state.load(server.ctx, tid)
-    return {"job": server.start_job(lambda: engine.check_task(server.ctx, tid))}
+
+    def check():
+        with server.server.activity():
+            return engine.check_task(server.ctx, tid)
+
+    with server.server.activity():
+        return {"job": server.start_job(check)}
 
 
 @route("POST", f"/api/tasks/{TASK}/pause")
@@ -504,7 +511,8 @@ def step_form(server, query, body):
 @route("POST", "/api/steps/check")
 def step_check(server, query, body):
     from . import step_store
-    return step_store.check(server.ctx, body["manifest"], body.get("body", ""), body.get("level") or "local")
+    with server.server.activity():
+        return step_store.check(server.ctx, body["manifest"], body.get("body", ""), body.get("level") or "local")
 
 
 @route("POST", "/api/steps/preview")
