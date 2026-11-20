@@ -2,14 +2,15 @@
 
 ## What it does
 
-The Software Factory starts each task in its own git worktree, its own Herdr tab and its own named Claude session.
+The Software Factory starts each task in its own Herdr tab and its own named Claude session.
+A task gets its own git worktree when its pipeline has `worktree: true`.
 Each type of task is a pipeline. A pipeline is an ordered list of reusable steps.
 One task is one run of a pipeline.
 You start and manage tasks from one orchestrator session in the main repository.
 
 ## Concepts
 
-- **Task**: one run of a pipeline. It has a worktree, a Herdr tab and a Claude session.
+- **Task**: one run of a pipeline. It has a Herdr tab and a Claude session. It has a git worktree when its pipeline has `worktree: true`.
 - **Display name**: the ticket key of a task, when the ticket is known only after the launch. Without it, the display name is the id.
 - **Pipeline**: a YAML file with an ordered list of steps.
 - **Step**: a markdown file. The frontmatter is the manifest. The body holds the instructions.
@@ -30,7 +31,7 @@ You need:
 
 - `uv`. Install it with `brew install uv`.
 - Herdr: https://herdr.dev
-- git. Each repository can have an `origin` remote, but it is optional.
+- git, only for pipelines with `worktree: true`. Each repository can have an `origin` remote, but it is optional.
 - Claude Code.
 - Optional: `gh` or `glab`, for the forge steps of the catalog.
 
