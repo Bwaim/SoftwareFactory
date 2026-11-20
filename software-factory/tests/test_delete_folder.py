@@ -35,3 +35,12 @@ def test_delete_folder_task_git(inited):
     delete.delete(ctx, "t1")
     assert (inited.repo / "mine.txt").read_text() == "keep"
     assert (inited.fdir / "tasks" / "archive" / "t1").exists()
+
+
+def test_folder_plans_have_no_worktree_or_branch(plain, no_git):
+    ctx = repo.load_ctx(cwd=plain)
+    folder_task(ctx)
+    plan = delete.plan_cancel(ctx, "t1")
+    assert (plan["branch_commit"], plan["detached_commit"], plan["remote_branch"]) == (None, None, False)
+    for text in (delete.render_cancel_plan(plan), delete.render_plan(delete.plan_delete(ctx, "t1"))):
+        assert "Worktree" not in text and "branch" not in text.lower()
