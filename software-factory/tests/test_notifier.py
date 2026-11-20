@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from factory import notifier
+from factory import appbuild, notifier
 
 FAKE_SWIFTC = """#!/bin/sh
 echo "swiftc $*" >> "$FAKE_TOOLS_LOG"
@@ -38,7 +38,6 @@ def tools(tmp_path, monkeypatch):
     monkeypatch.setenv("FAKE_PYTHON", sys.executable)
     monkeypatch.setenv("FAKE_TOOLS_LOG", str(tools_log))
     monkeypatch.setenv("FAKE_APP_LOG", str(app_log))
-    monkeypatch.setattr(notifier, "LSREGISTER", tmp_path / "no-lsregister")
 
     def compiles():
         return sum(line.startswith("swiftc ") for line in tools_log.read_text().splitlines()) if tools_log.exists() else 0
@@ -62,9 +61,11 @@ def test_send_builds_the_app_and_shows_the_text_through_it(tools):
     app = notifier.app_path()
     assert compiles() == 1
     assert sent() == [["CAPTN Factory", 'Task "t1" is blocked', "Glass"]]
+    assert app.name == "CAPTN Dashboard Notifier.app"
+    assert info(app)["CFBundleName"] == "CAPTN Dashboard Notifier"
     assert info(app)["CFBundleIdentifier"] == "com.captn.factory.notifications"
     assert info(app)["CFBundleIconFile"] == "AppIcon"
-    assert (app / "Contents" / "Resources" / "AppIcon.icns").read_bytes() == notifier.ICON.read_bytes()
+    assert (app / "Contents" / "Resources" / "AppIcon.icns").read_bytes() == appbuild.ICON.read_bytes()
     assert not [p for p in app.parent.iterdir() if p.name.startswith(".captn-build-")]
 
 
@@ -81,14 +82,14 @@ def test_send_reuses_an_app_built_from_the_same_sources(tools):
 def test_send_rebuilds_the_app_when_its_sources_changed(tools):
     compiles, _ = tools
     notifier.send("one")
-    stale = {**info(notifier.app_path()), notifier.STAMP_KEY: "old"}
+    stale = {**info(notifier.app_path()), appbuild.STAMP_KEY: "old"}
     with open(notifier.app_path() / "Contents" / "Info.plist", "wb") as f:
         plistlib.dump(stale, f)
 
     notifier.send("two")
 
     assert compiles() == 2
-    assert notifier.is_current(notifier.app_path())
+    assert appbuild.is_current(notifier.app_path(), notifier.EXECUTABLE, notifier.stamp())
 
 
 def test_send_returns_false_when_the_app_is_not_allowed(tools, monkeypatch):

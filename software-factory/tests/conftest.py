@@ -34,7 +34,9 @@ def factory_home(tmp_path, monkeypatch):
     home = tmp_path / "factory-home"
     monkeypatch.setenv("FACTORY_HOME", str(home))
     # Never build or run the real notifier app in ~/Applications.
-    monkeypatch.setenv("FACTORY_NOTIFIER_APP", str(tmp_path / "Applications" / "CAPTN Factory.app"))
+    monkeypatch.setenv("FACTORY_NOTIFIER_APP", str(tmp_path / "Applications" / "CAPTN Dashboard Notifier.app"))
+    monkeypatch.setenv("FACTORY_DASHBOARD_APP", str(tmp_path / "Applications" / "CAPTN Dashboard.app"))
+    monkeypatch.setenv("FACTORY_LSREGISTER", "")
     return home
 
 
