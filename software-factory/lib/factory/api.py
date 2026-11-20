@@ -76,6 +76,7 @@ def info(server, query, body):
         "ticket_url": ctx.factory_yaml().get("ticket_url") or "",
         "adapter": server.adapter,
         "capabilities": server.capabilities,
+        "library_commit": server.library_commit,
     }
 
 

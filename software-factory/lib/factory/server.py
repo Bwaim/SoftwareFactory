@@ -61,6 +61,7 @@ class Server:
         self.wake = threading.Event()
         self.lock = threading.Lock()
         self.runtimes = {}
+        self.library_commits = {}
         self.list_mtime = None
         try:
             self.reload()

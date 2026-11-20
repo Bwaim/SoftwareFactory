@@ -91,6 +91,8 @@ a:hover, .link:hover { color: var(--link-hover); }
 .rename-error { color: var(--err); font-size: 12px; margin: 2px 0; }
 #error { display: none; flex: none; z-index: 20; background: var(--accent); color: #FFFFFF; font-weight: 600; padding: 10px 24px; }
 #banner { background: var(--yellow); color: #1A1110; font-weight: 600; padding: 10px 24px; }
+#migration { background: var(--yellow); color: #1A1110; padding: 10px 24px; }
+#migration ul { margin: 4px 0; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
 button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-height: 1; }
 .toolbar > button.launch { min-height: 40px; padding: 0 18px; font-size: 14px; }
@@ -279,6 +281,7 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
 <body>
 <div id="error"></div>
 <div id="banner" hidden></div>
+<div id="migration" hidden></div>
 <svg width="0" height="0" style="position: absolute" aria-hidden="true"><defs>
   <symbol id="captain-bot" viewBox="0 0 120 120">
     <rect x="18" y="68" width="8" height="18" rx="4" fill="#C4005E"/><rect x="94" y="68" width="8" height="18" rx="4" fill="#C4005E"/>
@@ -500,6 +503,17 @@ function deliveryBlock(t) {
   return el("div", { class: "delivery" }, el("span", {}, state.deliveryErrors.get(t.id)),
     button("Dismiss", () => { state.deliveryErrors.delete(t.id); render(); }));
 }
+function renderMigration() {
+  const box = byId("migration");
+  const offer = state.info.library_commit;
+  box.hidden = !offer;
+  if (!offer) return box.replaceChildren();
+  box.replaceChildren(
+    el("div", {}, "The factory migrated the library. These files are not committed:"),
+    el("ul", {}, ...offer.files.map((f) => el("li", {}, f))),
+    el("div", {}, `Commit message: ${offer.message}`),
+    button("Commit to library", action(() => api("/api/library/commit", { message: offer.message, paths: offer.paths }))));
+}
 function adapterDown() { return !state.info.adapter.ok; }
 function can(cap) { return state.info.adapter.ok && state.info.capabilities.includes(cap); }
 
@@ -555,6 +569,7 @@ function render() {
   const banner = byId("banner");
   banner.hidden = !adapterDown();
   banner.textContent = adapterDown() ? state.info.adapter.message : "";
+  renderMigration();
   byId("tab-tasks").classList.toggle("on", state.view === "tasks");
   byId("tab-backlog").classList.toggle("on", state.view === "backlog");
   byId("updated").textContent = "Updated " + new Date().toLocaleTimeString();
