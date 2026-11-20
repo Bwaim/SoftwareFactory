@@ -38,7 +38,6 @@ def is_current(app, executable, stamp):
 
 
 def build(app, source, executable, plist):
-    """Compile `source` in a temporary folder next to `app`, sign it ad hoc, then move it in place."""
     app.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=app.parent, prefix=".captn-build-") as work:
         bundle = Path(work) / app.name
