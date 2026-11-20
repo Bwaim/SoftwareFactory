@@ -201,3 +201,47 @@ def test_dashboard_opens_app_when_rebuild_fails(dash, monkeypatch):
 
     assert calls.count(("install",)) == 1
     assert calls == [("install",), ("app", "http://127.0.0.1:1/dashboard")]
+
+
+def swiftc_found():
+    try:
+        return subprocess.run(["xcrun", "--find", "swiftc"], capture_output=True).returncode == 0
+    except OSError:
+        return False
+
+
+@pytest.mark.skipif(not swiftc_found(), reason="needs swiftc")
+def test_swift_source_compiles():
+    r = subprocess.run(["xcrun", "swiftc", "-typecheck", str(dockapp.SOURCE)], capture_output=True, text=True)
+
+    assert r.returncode == 0, r.stderr
+
+
+APP_TEXTS = [
+    "Starting the factory…",
+    '"Server stopped"',
+    '"Start"',
+    '"Try again"',
+    '"Quitting CAPTN Dashboard stops the factory server."',
+    '"Quit"',
+    '"Cancel"',
+    '"Don\'t show again"',
+    '"Tasks wait on a done check: \\(ids). Quitting stops their done checks."',
+    'joined(separator: ", ")',
+    '"Cannot list the waiting tasks."',
+    '"Stop"',
+    '"Keep server running"',
+    '"captn"',
+    '"unreachable"',
+    '"skipQuitWarning"',
+    '"FACTORY_DOCK_APP"',
+    '"Dashboard: "',
+    '"X-Factory-Token"',
+    '"CAPTNUv"',
+    '"CAPTNFactory"',
+]
+
+
+@pytest.mark.parametrize("text", APP_TEXTS)
+def test_swift_texts(text):
+    assert text in dockapp.SOURCE.read_text()
