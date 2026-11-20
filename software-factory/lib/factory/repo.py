@@ -23,14 +23,14 @@ def git(args, cwd, check=True, input=None):
     try:
         r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, input=input)
     except FileNotFoundError:
-        raise FactoryError(GIT_MISSING)
+        raise FactoryError(GIT_MISSING if not git_installed() else f"The folder {cwd} does not exist.")
     if check and r.returncode != 0:
         raise FactoryError(f"git {' '.join(args)} failed: {(r.stderr or r.stdout).strip()}")
     return r
 
 
 def in_git(path):
-    return git_installed() and git(["rev-parse", "--git-common-dir"], path, check=False).returncode == 0
+    return git_installed() and Path(path).is_dir() and git(["rev-parse", "--git-common-dir"], path, check=False).returncode == 0
 
 
 def has_origin(cwd):

@@ -14,6 +14,14 @@ def test_git_missing_error(no_git, tmp_path):
     assert repo.has_origin(tmp_path) is False
 
 
+def test_missing_folder_is_not_git_missing(tmp_path):
+    gone = tmp_path / "gone"
+    with pytest.raises(FactoryError) as e:
+        repo.git(["status"], gone, check=False)
+    assert str(e.value) == f"The folder {gone} does not exist."
+    assert repo.in_git(gone) is False
+
+
 def test_plain_root_lookup(plain):
     deep = plain / "a" / "b"
     deep.mkdir(parents=True)
