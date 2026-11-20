@@ -470,7 +470,7 @@ Card buttons. Send prompt, Pause and Cancel are in the "⋯" menu.
 #### Task details
 
 Two columns sit on the right of the board: **Details**, then **Terminal**. Each column has a vertical tab on its left edge. A tab opens or closes only its own column; a closed column shows only its tab. The browser remembers which columns are open.
-The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns. When the narrower board would hide the card's column, the board scrolls sideways just enough to show it.
+The board always has a selected task, shown with a pink outline: the task in the address (`#task=<id>`), else the last task you opened in this workspace, else the first task of the leftmost column. Click a card, or its name, to select it: this opens both columns. Click the selected card again to close them; a third click opens them again. When the narrower board would hide the card's column, the board scrolls sideways just enough to show it.
 By default, the two open columns together cover about a third of the page; one open column alone also covers about a third. A width you drag stays.
 Click a column's tab, or press Escape outside the terminal for the details, to close it; the task stays selected.
 Below 900 px, an open column fills the page.
@@ -478,8 +478,8 @@ The details refresh every 3 seconds while their column is open. They show:
 
 - The name, the ticket, the description, the status and the same buttons as the card.
 - **Pipeline**: every step of the pipeline. Done steps have a check, the current step says "now" and the loop count.
-- **Timeline**: the events of the task, newest first, from `events.jsonl`. It shows the last 200 events.
 - **Details**: pipeline, ticket, MR, branch, base, worktree, created and updated times, the values of the task state and the artifacts.
+- **Timeline**: the events of the task, newest first, from `events.jsonl`. It shows the last 200 events. "Step done" shows how long the step took. A step that starts and ends in the same second shows only its "Step done" line. A finished step ends a block: the factory logs "Unblocked" before it.
 
 #### Task terminal
 
@@ -489,7 +489,7 @@ Drag the left edge of the details or of the terminal to change its width. The ar
 The terminal is a real terminal, attached to the session:
 
 - The server runs the adapter's attach command (`herdr agent attach <agent>`, or `tmux -L captn attach-session -t <name>` with Warp) in a pseudo-terminal and streams it to the page. The page shows it with xterm.js, served by the local server from `lib/factory/web/vendor/xterm` (no CDN).
-- Click in the terminal and type: every key goes to the session as you press it. The key buttons (Esc, Tab, the arrows, Backspace, Space, Enter, Ctrl+C) send the same keys.
+- Click in the terminal and type: every key goes to the session as you press it.
 - The terminal follows the size of its column.
 - One terminal per task is shared by every open page. A new page gets the last 256 KB of output first.
 - A terminal nobody watches closes after 30 seconds. At most 8 are open at once.
