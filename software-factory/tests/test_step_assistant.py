@@ -1,8 +1,5 @@
-import pytest
-
 from conftest import fake_calls, make_task, task_from_pipeline, write_pipeline, write_step
 from factory import repo, session
-from factory.errors import FactoryError
 from factory.registry import Registry
 
 
