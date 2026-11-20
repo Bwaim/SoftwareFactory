@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+import subprocess
 import stat
 
 import pytest
@@ -49,7 +51,7 @@ def test_start_runs_claude_in_tmux_and_opens_a_warp_tab(warp_env, origin_repo):
     assert new[new.index("claude") + 1:] == [*ARGS, "--", prompt]
     text = (configs / "captn-t1-task.toml").read_text()
     assert 'title = "t1-task"' in text and f'directory = "{origin_repo / "wt"}"' in text
-    assert "exec " in text and "-L captn attach-session -t =t1-task" in text
+    assert "exec " in text and "-L captn attach-session -t '=t1-task'" in text
     assert ["open", "warp://tab_config/captn-t1-task"] in calls()
 
 
@@ -152,6 +154,14 @@ def test_focus_reopens_the_tab_when_the_user_closed_it(warp_env, origin_repo):
     (configs / "captn-t1.toml").unlink()
     adapter.focus(handle)
     assert calls()[-1] == ["open", "warp://tab_config/captn-t1"] and (configs / "captn-t1.toml").exists()
+
+
+@pytest.mark.skipif(not shutil.which("zsh"), reason="zsh is not installed")
+@pytest.mark.parametrize("shell", ["zsh", "sh"])
+def test_tab_command_keeps_every_argument_in_the_user_shell(shell):
+    argv = ["env", "-u", "TMUX", "/a b/tmux", "-L", "captn", "attach-session", "-t", "=t1", "=it's"]
+    out = subprocess.run([shell, "-c", 'printf "%s\\n" ' + warp.shell_join(argv)], capture_output=True, text=True, check=True)
+    assert out.stdout.splitlines() == argv
 
 
 def test_attach_command_uses_the_captn_socket(warp_env, origin_repo):

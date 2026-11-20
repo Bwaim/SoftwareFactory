@@ -37,6 +37,12 @@ def toml_string(text):
     return '"' + str(text).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
 
 
+def shell_join(argv):
+    """shlex.join for the user's shell, zsh included. shlex leaves a leading "=" bare, and zsh expands a bare "=word" to the
+    path of the command `word`: the tmux target "=name" then fails with "zsh: name not found"."""
+    return " ".join("'" + arg.replace("'", "'\\''") + "'" if arg.startswith("=") else shlex.quote(arg) for arg in argv)
+
+
 def clean_env():
     """The environment for tmux. The factory often runs from a Claude session, and the tmux server keeps the environment it
     starts with: Claude's own variables would make every task's claude believe it runs nested in another one. TMUX would make
@@ -147,7 +153,7 @@ class WarpAdapter(Adapter):
         folder = tab_config_dir()
         folder.mkdir(parents=True, exist_ok=True)
         # exec: when the tmux session ends, the shell ends too, so Warp closes the tab instead of leaving an empty shell.
-        command = "exec " + shlex.join(self.attach_argv(handle))
+        command = "exec " + shell_join(self.attach_argv(handle))
         text = (
             f"name = {toml_string(name)}\n"
             f"title = {toml_string(handle['agent'])}\n\n"
