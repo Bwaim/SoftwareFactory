@@ -2,7 +2,7 @@ import subprocess
 import sys
 import uuid
 
-from . import adapters, config, events, exclusive, state
+from . import adapters, config, events, exclusive, fsio, state
 from .adapters.base import AdapterError
 from .errors import FactoryError
 
@@ -40,10 +40,22 @@ def new_session_id():
     return str(uuid.uuid4())
 
 
+def task_settings_path(ctx, task):
+    return state.task_dir(ctx, task["id"]) / "claude-settings.json"
+
+
+def write_task_settings(ctx, task):
+    settings = fsio.read_json(ctx.fdir / "claude-settings.json", {})
+    settings["env"] = {**settings.get("env", {}), "FACTORY_TASK": task["id"]}
+    path = task_settings_path(ctx, task)
+    fsio.write_json(path, settings)
+    return path
+
+
 def claude_args(ctx, task, resume=False):
     args = ["--name", state.display_name(task)]
     args += ["--resume", task["session_id"]] if resume else ["--session-id", task["session_id"]]
-    args += ["--settings", str(ctx.fdir / "claude-settings.json")]
+    args += ["--settings", str(task_settings_path(ctx, task))]
     args += ["--add-dir", str(state.task_dir(ctx, task["id"]) / "artifacts")]
     claude = task.get("claude") or {}
     if claude.get("model"):
@@ -54,9 +66,13 @@ def claude_args(ctx, task, resume=False):
 
 
 def start(ctx, task, prompt, resume=False):
-    if not task.get("worktree"):
-        raise FactoryError(f"Task {task['id']} has no worktree. Every task runs in its own worktree.")
-    return adapters.get_adapter(ctx).start_session(state.display_name(task), task["worktree"], prompt, claude_args(ctx, task, resume))
+    from .engine import task_cwd
+
+    write_task_settings(ctx, task)
+    cwd = task_cwd(ctx, task)
+    if task.get("worktree") and not cwd.exists():
+        raise FactoryError(f"The worktree {cwd} of task {task['id']} does not exist.")
+    return adapters.get_adapter(ctx).start_session(state.display_name(task), str(cwd), prompt, claude_args(ctx, task, resume))
 
 
 def notify(ctx, text):

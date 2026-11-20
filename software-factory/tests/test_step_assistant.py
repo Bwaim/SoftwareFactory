@@ -1,6 +1,6 @@
 import pytest
 
-from conftest import make_task, task_from_pipeline, write_pipeline, write_step
+from conftest import fake_calls, make_task, task_from_pipeline, write_pipeline, write_step
 from factory import repo, session
 from factory.errors import FactoryError
 from factory.registry import Registry
@@ -18,8 +18,8 @@ def test_next_never_prints_task_flag(inited):
     assert "--task" not in inited.factory("next", "--task", "t1").stdout
 
 
-def test_task_without_worktree_cannot_start(inited):
+def test_task_without_worktree_starts_in_main(inited):
     ctx = repo.load_ctx(cwd=inited.repo)
     task = make_task(ctx, tid="nowt")
-    with pytest.raises(FactoryError, match="has no worktree"):
-        session.start(ctx, task, "hi")
+    session.start(ctx, task, "hi")
+    assert fake_calls(inited.fdir)[-1]["cwd"] == str(ctx.main)
