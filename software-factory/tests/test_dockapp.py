@@ -295,6 +295,10 @@ APP_TEXTS = [
     '"X-Factory-Token"',
     '"CAPTNUv"',
     '"CAPTNFactory"',
+    '["-l", "-c", "env"]',
+    '"/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.local/bin"',
+    "var environment = LoginEnvironment.values",
+    "isElementFullscreenEnabled = true",
 ]
 
 

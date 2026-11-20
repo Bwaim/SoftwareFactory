@@ -9,6 +9,7 @@ let skipQuitWarningKey = "skipQuitWarning"
 let pingSeconds = 60.0
 let quitCommandSeconds = 10.0
 let dashboardCommandSeconds = 300.0
+let loginShellSeconds = 10.0
 let brandPurple = NSColor(srgbRed: 0x67 / 255.0, green: 0x38 / 255.0, blue: 0x88 / 255.0, alpha: 1)
 
 struct CommandResult {
@@ -41,21 +42,12 @@ final class PipeReader {
     }
 }
 
-enum Factory {
-    static var uv: String { infoString("CAPTNUv") }
-    static var script: String { infoString("CAPTNFactory") }
-
-    static func infoString(_ key: String) -> String {
-        Bundle.main.object(forInfoDictionaryKey: key) as? String ?? ""
-    }
-
-    static func run(_ arguments: [String], timeout: TimeInterval) -> CommandResult? {
+enum Command {
+    static func run(_ executable: String, _ arguments: [String], environment: [String: String], timeout: TimeInterval) -> CommandResult? {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: uv)
-        process.arguments = ["run", "--script", script] + arguments
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
         process.currentDirectoryURL = URL(fileURLWithPath: NSHomeDirectory())
-        var environment = ProcessInfo.processInfo.environment
-        environment["FACTORY_DOCK_APP"] = "1"
         process.environment = environment
         process.standardInput = FileHandle.nullDevice
         let output = PipeReader()
@@ -67,7 +59,7 @@ enum Factory {
         do {
             try process.run()
         } catch {
-            return CommandResult(status: -1, output: "", error: "\(uv): \(error.localizedDescription)")
+            return CommandResult(status: -1, output: "", error: "\(executable): \(error.localizedDescription)")
         }
         output.start()
         errors.start()
@@ -76,6 +68,66 @@ enum Factory {
             return nil
         }
         return CommandResult(status: process.terminationStatus, output: output.text(), error: errors.text())
+    }
+}
+
+enum LoginEnvironment {
+    static let values: [String: String] = withUTF8(load())
+    static let dropped: Set<String> = ["_", "SHLVL", "PWD", "OLDPWD"]
+
+    static func load() -> [String: String] {
+        let current = ProcessInfo.processInfo.environment
+        let shell = current["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
+        let result = Command.run(shell, ["-l", "-c", "env"], environment: current, timeout: loginShellSeconds)
+        guard let output = result?.output else { return fallback(current) }
+        let parsed = parse(output)
+        return parsed["PATH"] == nil ? fallback(current) : parsed
+    }
+
+    static func parse(_ text: String) -> [String: String] {
+        var values: [String: String] = [:]
+        for line in text.split(whereSeparator: \.isNewline) {
+            guard let equals = line.firstIndex(of: "=") else { continue }
+            let key = String(line[..<equals])
+            guard isName(key), !dropped.contains(key) else { continue }
+            values[key] = String(line[line.index(after: equals)...])
+        }
+        return values
+    }
+
+    static func isName(_ key: String) -> Bool {
+        guard let first = key.unicodeScalars.first, !CharacterSet.decimalDigits.contains(first) else { return false }
+        return key.unicodeScalars.allSatisfy { $0 == "_" || ($0.isASCII && CharacterSet.alphanumerics.contains($0)) }
+    }
+
+    static func fallback(_ current: [String: String]) -> [String: String] {
+        var values = current
+        let extra = ["/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.local/bin"]
+        values["PATH"] = (extra + [current["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"]).joined(separator: ":")
+        return values
+    }
+
+    static func withUTF8(_ environment: [String: String]) -> [String: String] {
+        let locale = ["LC_ALL", "LC_CTYPE", "LANG"].contains { !(environment[$0] ?? "").isEmpty }
+        guard !locale else { return environment }
+        var values = environment
+        values["LANG"] = "en_US.UTF-8"
+        return values
+    }
+}
+
+enum Factory {
+    static var uv: String { infoString("CAPTNUv") }
+    static var script: String { infoString("CAPTNFactory") }
+
+    static func infoString(_ key: String) -> String {
+        Bundle.main.object(forInfoDictionaryKey: key) as? String ?? ""
+    }
+
+    static func run(_ arguments: [String], timeout: TimeInterval) -> CommandResult? {
+        var environment = LoginEnvironment.values
+        environment["FACTORY_DOCK_APP"] = "1"
+        return Command.run(uv, ["run", "--script", script] + arguments, environment: environment, timeout: timeout)
     }
 
     static func runInBackground(_ arguments: [String], timeout: TimeInterval, then finish: @escaping (CommandResult?) -> Void) {
@@ -418,6 +470,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             options: .userInitiatedAllowingIdleSystemSleep,
             reason: "Keep the factory server alive"
         )
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = LoginEnvironment.values
+        }
         pingTimer = Timer.scheduledTimer(withTimeInterval: pingSeconds, repeats: true) { [weak self] _ in
             self?.checkServer(confirmations: 2)
         }
@@ -432,10 +487,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         guard dashboard == nil else { return true }
-        if serverStopped {
-            showServerStopped()
-        } else if starting {
+        if starting {
             showStarting()
+        } else if serverStopped {
+            showServerStopped()
         } else if let base {
             showDashboard().load(base)
         } else {
@@ -527,6 +582,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let configuration = WKWebViewConfiguration()
         configuration.processPool = processPool
         configuration.userContentController.add(relay, name: messageHandlerName)
+        configuration.preferences.isElementFullscreenEnabled = true
         return configuration
     }
 
