@@ -1,7 +1,7 @@
 """macOS notifications with the CAPTN icon.
 
 `osascript` notifications always show the Script Editor icon. A notification shows the icon of the app that sends it, so the
-factory builds a small app, "CAPTN Factory.app", from main.swift and AppIcon.icns next to this file, and sends through it.
+factory builds a small app, "CAPTN Factory.app", from main.swift next to this file and appicon/AppIcon.icns, and sends through it.
 The release has no compiled app (it is built on any OS), so the app is compiled here, with swiftc, the first time it is
 needed, and again when its sources change. Without swiftc, or until the user allows the app's notifications, `send`
 returns False and the caller falls back to osascript.
@@ -24,7 +24,7 @@ EXECUTABLE = "captn-notify"
 STAMP_KEY = "CAPTNBuildStamp"
 SOURCES = Path(__file__).resolve().parent
 SWIFT_SOURCE = SOURCES / "main.swift"
-ICON = SOURCES / "AppIcon.icns"
+ICON = SOURCES.parent / "appicon" / "AppIcon.icns"
 BUILD_TIMEOUT_SECONDS = 300
 # Above the app's own 10 second limit, so a hang cannot hold the factory longer than this.
 SEND_TIMEOUT_SECONDS = 15
