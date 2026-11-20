@@ -11,6 +11,7 @@ from .step_format import STEP_ID_RE, is_valid_id, validate
 
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.S)
 CREATE_WORKTREE = "create-worktree"
+NEEDS_GIT = "This workspace is not in a git repository. The pipeline `{id}` needs a worktree. Set `worktree: false`, or use a git workspace."
 
 
 def parse_step_text(text, path):
@@ -123,6 +124,10 @@ class Pipeline:
     def start_column(self):
         return self.data.get("start_column")
 
+    @property
+    def worktree(self):
+        return self.data.get("worktree")
+
 
 def level_roots(ctx):
     roots = [("builtin", PLUGIN_ROOT / "builtin")]
@@ -202,7 +207,7 @@ class Registry:
 
     def expand(self, pipeline):
         entries = pipeline.entries
-        if not entries or entries[0].get("id") != CREATE_WORKTREE:
+        if pipeline.worktree is True and (not entries or entries[0].get("id") != CREATE_WORKTREE):
             entries = [{"id": CREATE_WORKTREE}] + entries
         snapshot = []
         for entry in entries:

@@ -1,6 +1,7 @@
 id: plan-and-build
 description: Brainstorm a spec, write a plan, build it, and follow review and QA
 start_column: Discovery
+worktree: true
 steps:
   - brainstorm
   - id: user-validation

@@ -180,6 +180,7 @@ def write_pipeline(root, data):
     d = Path(root) / "pipelines"
     d.mkdir(parents=True, exist_ok=True)
     full = {"description": f"Pipeline {data['id']}", **data}
+    full.setdefault("worktree", True)
     (d / f"{data['id']}.yaml").write_text(yaml.safe_dump(full, sort_keys=False))
     return d / f"{data['id']}.yaml"
 

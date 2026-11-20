@@ -200,7 +200,7 @@ function clear(node) { node.replaceChildren(); return node; }
 function guard(fn) { return (...a) => fn(...a).catch(() => {}); }
 
 function emptyModel() {
-  return { id: "", description: "", model: "", effort: "", start_column: "", inputs: [], steps: [], extra: {} };
+  return { id: "", description: "", model: "", effort: "", start_column: "", worktree: null, inputs: [], steps: [], extra: {} };
 }
 function isMap(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
 function loopOf(raw) {
@@ -220,10 +220,10 @@ function entryOf(raw) {
 }
 function modelOf(data) {
   const claude = data.claude || {};
-  const known = new Set(["id", "description", "claude", "start_column", "inputs", "steps"]);
+  const known = new Set(["id", "description", "claude", "start_column", "worktree", "inputs", "steps"]);
   const extra = Object.fromEntries(Object.entries(data).filter(([k]) => !known.has(k) && !k.startsWith("_")));
   return { id: data.id || "", description: data.description || "", model: claude.model || "", effort: claude.effort || "",
-    start_column: data.start_column || "",
+    start_column: data.start_column || "", worktree: typeof data.worktree === "boolean" ? data.worktree : null,
     inputs: Object.entries(data.inputs || {}).map(([key, v]) => ({ key, type: (v && v.type) || "text", description: (v && v.description) || "" })),
     steps: (data.steps || []).map(entryOf), extra };
 }
@@ -234,6 +234,7 @@ function parseValue(text) {
 function dataOf(m) {
   const data = { ...m.extra, id: m.id, description: m.description, claude: { model: m.model, effort: m.effort },
     start_column: m.start_column, inputs: {}, steps: [] };
+  if (typeof m.worktree === "boolean") data.worktree = m.worktree;
   for (const r of m.inputs) if (r.key) data.inputs[r.key] = { type: r.type, description: r.description };
   for (const s of m.steps) {
     const w = {};
@@ -298,6 +299,7 @@ function renderForm() {
     field("model", textInput(m.model, (v) => { m.model = v; changed(); }, "session model")),
     field("effort", textInput(m.effort, (v) => { m.effort = v; changed(); }, "session effort")),
     field("start_column", selectInput(["", ...state.columns], m.start_column, (v) => { m.start_column = v; changed(); })),
+    field("worktree", selectInput(["", "true", "false"], m.worktree === null ? "" : String(m.worktree), (v) => { m.worktree = v === "" ? null : v === "true"; changed(); })),
     field("inputs", inputRows(m.inputs)));
 }
 

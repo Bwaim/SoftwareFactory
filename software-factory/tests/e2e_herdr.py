@@ -21,7 +21,7 @@ LIVE_STATUSES = {"idle", "working", "done", "blocked"}
 STEP_ONE = "---\nid: e2e-one\ndescription: Write one.txt\ncategory: test\ntype: command\ndone_when: one.txt exists\n---\n\nbash \"$FACTORY_STEP_DIR/e2e-one.sh\"\n"
 STEP_HOLD = "---\nid: e2e-hold\ndescription: Wait for the test\ncategory: test\ntype: ai\ndone_when: The test marks it done.\nwait_external: true\n---\n\nRun `factory wait`. Then stop and wait for a message.\n"
 STEP_TWO = "---\nid: e2e-two\ndescription: Write two.txt\ncategory: test\ntype: command\ndone_when: two.txt exists\n---\n\nbash \"$FACTORY_STEP_DIR/e2e-two.sh\"\n"
-PIPELINE = "id: e2e\ndescription: End-to-end test pipeline\nsteps:\n  - e2e-one\n  - e2e-hold\n  - e2e-two\n"
+PIPELINE = "id: e2e\ndescription: End-to-end test pipeline\nworktree: true\nsteps:\n  - e2e-one\n  - e2e-hold\n  - e2e-two\n"
 
 
 class TrustDialog(Exception):
