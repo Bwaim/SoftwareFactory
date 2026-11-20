@@ -101,6 +101,11 @@ button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-h
 .column h3 .side { display: flex; gap: 6px; align-items: center; }
 .column h3 button { min-height: 28px; font-size: 12px; padding: 0 10px; }
 .column .none { margin: 8px 4px; text-align: center; }
+/* A column without tasks keeps only its header, as wide as its name, so the columns with tasks get the room. No box under it:
+   an empty box looks like a place to drop cards, and tasks move by themselves. Not `.empty`: that is the empty board. */
+.column.no-tasks { flex: 0 0 auto; min-width: 104px; min-height: 0; padding: 0; background: none; }
+.column.no-tasks h3 { background: var(--column); border-radius: 16px; padding: 14px 14px 12px; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.column.no-tasks .count { background: none; color: var(--muted); }
 .count { font-size: 12px; font-weight: 700; min-width: 22px; height: 22px; border-radius: 11px; background: var(--raised); color: var(--soft); display: inline-grid; place-items: center; padding: 0 6px; box-sizing: border-box; }
 .card { background: var(--panel); border: 1px solid var(--panel-line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; word-break: break-word; }
 .card.s-finished { background: var(--done); }
@@ -818,12 +823,13 @@ function tasksView() {
   for (const name of allColumns()) {
     if (state.hidden.includes(name)) continue;
     const tasks = state.tasks.filter((x) => !state.removed.has(x.id) && columnOf(x) === name);
+    const empty = !tasks.length;
     const side = el("span", { class: "side" }, el("span", { class: "count" }, tasks.length));
-    if (name === "Done") side.append(button("Clean", openClean));
+    if (name === "Done" && !empty) side.append(button("Clean", openClean));
     const head = el("h3", {}, el("span", {}, name), side);
-    const col = el("section", { class: "column", "aria-label": name }, head);
+    const col = el("section", { class: "column" + (empty ? " no-tasks" : ""), "aria-label": name }, head);
     for (const t of tasks) col.append(taskCard(t));
-    if (!tasks.length) col.append(el("p", { class: "muted none" }, "No tasks here"));
+    if (empty) col.append(el("p", { class: "visually-hidden" }, "No tasks here"));
     board.append(col);
   }
   root.append(toolbar, board);
