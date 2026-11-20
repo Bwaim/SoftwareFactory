@@ -710,7 +710,7 @@ When `factory.yaml` or `config.yaml` is not valid YAML, every command prints `Er
 
 ## Troubleshooting
 
-- **Terminal check failed.** Start Claude inside a Herdr pane. The pane sets `HERDR_ENV=1`. If `herdr` is missing, install it.
+- **Terminal check failed.** Herdr must be running. Open Herdr, then try again. A server started outside a Herdr pane, for example by the Dock app, works when Herdr runs. If `herdr` is missing, install it.
 - **Data version mismatch.**
   - Older data: start the orchestrator. It runs the migration.
   - Newer data: update the plugin.

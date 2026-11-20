@@ -121,11 +121,31 @@ def test_state_gone(herdr_env, monkeypatch):
     assert adapter.state({"agent": "t1", "tab": "w9:t1"}) == "gone"
 
 
-def test_check_outside_herdr(herdr_env, monkeypatch):
+def test_check_outside_herdr_when_herdr_runs(herdr_env, monkeypatch):
+    adapter, calls = herdr_env
+    monkeypatch.delenv("HERDR_ENV")
+    assert adapter.check() == (True, "Herdr is available.")
+    assert calls() == [["workspace", "list"]]
+
+
+def test_check_outside_herdr_when_herdr_is_not_running(herdr_env, monkeypatch):
     adapter, _ = herdr_env
     monkeypatch.setenv("HERDR_ENV", "0")
+    monkeypatch.setenv("FAKE_HERDR_LIST_FAILS", "1")
+    assert adapter.check() == (False, "Herdr is not running. Open Herdr, then try again.")
+
+
+def test_check_inside_herdr_pane_skips_the_call(herdr_env, tmp_path):
+    adapter, _ = herdr_env
+    assert adapter.check() == (True, "Herdr is available.")
+    assert not (tmp_path / "herdr.log").exists()
+
+
+def test_check_herdr_missing(herdr_env, monkeypatch):
+    adapter, _ = herdr_env
+    monkeypatch.setenv("PATH", "/nonexistent")
     ok, message = adapter.check()
-    assert not ok and "Herdr" in message
+    assert not ok and message == "The `herdr` command is not installed. Install Herdr from https://herdr.dev."
 
 
 @pytest.mark.parametrize("output", ["not json", "{}", '{"result": {}}'])
