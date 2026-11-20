@@ -178,7 +178,7 @@ def plan_launch(ctx, pipeline_id, description, inputs, task_id=None, from_backlo
         report["task_id"] = unique_id(ctx, base)
     if pipeline.worktree is True and not ctx.git:
         report["errors"].append(NEEDS_GIT.format(id=pipeline.id))
-    elif pipeline.worktree is not False:
+    elif pipeline.worktree is True:
         plan_worktree(ctx, reg, pipeline, report, inputs)
     report["ok"] = not report["errors"] and not report["missing_inputs"] and not report["missing_config"]
     return report

@@ -54,6 +54,15 @@ def test_task_settings_env(inited):
     assert data["env"] == {"FACTORY_TASK": task["id"]}
 
 
+def test_missing_worktree_key_in_plain_gives_check_error(plain, no_git):
+    write_step(plain / ".factory", "work", {})
+    path = write_pipeline(plain / ".factory", {"id": "nokey", "steps": ["work"]})
+    path.write_text(path.read_text().replace("worktree: true\n", ""))
+    report = launch.plan_launch(repo.load_ctx(cwd=plain), "nokey", "Do it", {})
+    assert report["errors"] == ["The pipeline has no `worktree` key. Set `worktree: true` or `worktree: false`."]
+    assert report["missing_config"] == []
+
+
 @pytest.mark.parametrize("text, message", [
     ("{not json", "is not valid JSON"),
     ("[1, 2]", "must hold a JSON object"),
