@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-from .. import session_activity
+from .. import notifier, session_activity
 from .base import Adapter, AdapterError, herdr_name
 
 SOCKET = "captn"
@@ -252,7 +252,10 @@ class WarpAdapter(Adapter):
             time.sleep(WAIT_POLL_SECONDS)
 
     def notify(self, text):
-        script = 'on run argv\ndisplay notification (item 1 of argv) with title "CAPTN Factory" sound name "Glass"\nend run'
+        if notifier.send(text):
+            return
+        script = (f'on run argv\ndisplay notification (item 1 of argv) with title "{notifier.TITLE}" '
+                  f'sound name "{notifier.SOUND}"\nend run')
         subprocess.run(["osascript", "-e", script, text], capture_output=True)
 
 

@@ -108,7 +108,8 @@ Warp adapter:
 - `tmux -L captn new-session`, `has-session`, `kill-session`, `rename-session`
 - `tmux -L captn capture-pane`, `send-keys`, `load-buffer`, `paste-buffer`, `list-clients`, `display-message`, `attach-session`
 - `open warp://tab_config/<name>`, `open -a Warp`, `open -Ra Warp`
-- `osascript` (`display notification`)
+- `~/Applications/CAPTN Factory.app/Contents/MacOS/captn-notify <title> <body> <sound>`, and to build that app: `swiftc`, `codesign --sign -`, `lsregister -f`
+- `osascript` (`display notification`), when the CAPTN Factory app cannot be used
 
 ## Terminal: Herdr or Warp
 
@@ -123,6 +124,9 @@ With **Warp** (macOS only):
 - Working or idle comes from the factory's Claude hooks (`Stop` and `UserPromptSubmit`), saved in `.factory/session-activity/`.
 - Close, pause and delete stop Claude and end the tmux session. The Warp tab then closes, and the tab config file is removed.
 - To look at a session by hand: `tmux -L captn ls`, then `tmux -L captn attach -t <name>`.
+- Notifications show the CAPTN icon. macOS shows the icon of the app that sends a notification, so the factory sends through its own small app, `~/Applications/CAPTN Factory.app`. The first notification builds it with `swiftc` (from the Xcode command line tools) and signs it for this Mac only. It is built again when its sources change.
+- The first time, macOS asks whether CAPTN Factory may show notifications. Click **Allow**. If you closed the question or clicked **Don't Allow**, turn it on in **System Settings → Notifications → CAPTN Factory**: macOS does not ask again.
+- Until the app is allowed, or without `swiftc`, notifications still come, through `osascript`, with the Script Editor icon.
 
 ## Tutorial
 

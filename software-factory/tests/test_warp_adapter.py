@@ -197,11 +197,20 @@ def test_close_stops_claude_and_removes_the_tab_config(warp_env, origin_repo):
     assert adapter.close(handle) == []
 
 
-def test_notify_passes_the_text_as_an_argument(warp_env):
+def test_notify_goes_through_the_captn_app(warp_env, monkeypatch):
     adapter, calls, _ = warp_env
+    sent = []
+    monkeypatch.setattr(warp.notifier, "send", lambda text: sent.append(text) or True)
+    adapter.notify('Task "t1" is blocked')
+    assert sent == ['Task "t1" is blocked'] and not [c for c in calls() if c[0] == "osascript"]
+
+
+def test_notify_falls_back_to_osascript_and_passes_the_text_as_an_argument(warp_env, monkeypatch):
+    adapter, calls, _ = warp_env
+    monkeypatch.setattr(warp.notifier, "send", lambda text: False)
     adapter.notify('Task "t1" is blocked')
     call = calls()[-1]
-    assert call[0] == "osascript" and call[-1] == 'Task "t1" is blocked'
+    assert call[0] == "osascript" and call[-1] == 'Task "t1" is blocked' and 'with title "CAPTN Factory"' in call[2]
 
 
 def test_check_needs_tmux(warp_env, monkeypatch):
