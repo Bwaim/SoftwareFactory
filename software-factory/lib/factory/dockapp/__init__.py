@@ -63,6 +63,13 @@ def current(uv):
     return appbuild.is_current(app_path(), EXECUTABLE, stamp(uv))
 
 
+def build_output(error):
+    if isinstance(error, subprocess.CalledProcessError):
+        output = error.stderr or error.stdout or b""
+        return output.decode(errors="replace") if isinstance(output, bytes) else output
+    return str(error)
+
+
 def install():
     if sys.platform != "darwin":
         raise FactoryError("The dashboard app needs macOS.")
@@ -77,8 +84,9 @@ def install():
             if not current(uv):
                 try:
                     appbuild.build(app, SOURCE, EXECUTABLE, info_plist(uv))
-                except (OSError, subprocess.SubprocessError):
-                    raise FactoryError("The dashboard app did not build. See the error above.")
+                except (OSError, subprocess.SubprocessError) as e:
+                    print(build_output(e), file=sys.stderr)
+                    raise FactoryError("The dashboard app did not build. See the error above.") from e
     return app
 
 

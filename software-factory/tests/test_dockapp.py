@@ -97,12 +97,15 @@ def test_install_needs_macos(tools, monkeypatch):
         dockapp.install()
 
 
-def test_failed_build_reports_it(tools, mac, monkeypatch):
+def test_failed_build_shows_the_compiler_output(tools, mac, monkeypatch, capsys):
     monkeypatch.setenv("UV", "/opt/uv/bin/uv")
     monkeypatch.setenv("FAKE_SWIFTC_EXIT", "1")
+    monkeypatch.setenv("FAKE_SWIFTC_STDERR", "boom")
 
     with pytest.raises(FactoryError, match="did not build"):
         dockapp.install()
+
+    assert "boom" in capsys.readouterr().err
 
 
 def test_refresh_does_nothing_when_not_installed(tools, mac, monkeypatch):

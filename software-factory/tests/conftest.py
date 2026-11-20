@@ -257,6 +257,7 @@ def silent(r):
 
 FAKE_SWIFTC = """#!/bin/sh
 echo "swiftc $*" >> "$FAKE_TOOLS_LOG"
+[ -z "$FAKE_SWIFTC_STDERR" ] || echo "$FAKE_SWIFTC_STDERR" >&2
 [ "${FAKE_SWIFTC_EXIT:-0}" = 0 ] || exit "$FAKE_SWIFTC_EXIT"
 while [ "$1" != "-o" ]; do shift; done
 cat > "$2" <<'APP'
@@ -281,7 +282,6 @@ def tools(tmp_path, monkeypatch):
         exe.write_text(text)
         exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
     tools_log, app_log = tmp_path / "tools.log", tmp_path / "app.log"
-    # /usr/bin holds the real swiftc and codesign, so PATH leaves it out.
     monkeypatch.setenv("PATH", f"{bindir}:/bin")
     monkeypatch.setenv("FAKE_PYTHON", sys.executable)
     monkeypatch.setenv("FAKE_TOOLS_LOG", str(tools_log))
