@@ -166,3 +166,18 @@ def test_add_and_rename_refuse_non_string(dash):
 def test_host(dash):
     _, i = dash
     assert request(i, "GET", "/api/host")[1] == {"folder_picker": api.sys.platform == "darwin"}
+
+
+def test_add_plain_folder(inited):
+    env = {"GIT_CEILING_DIRECTORIES": str(inited.work)}
+    inited.factory("dashboard", env=env)
+    try:
+        i = info()
+        other = inited.work / "folder"
+        other.mkdir()
+        status, entry = request(i, "POST", "/api/workspaces/add", {"path": str(other), "init": True})
+        assert status == 200 and entry["path"] == str(other)
+        assert rows(i)[entry["id"]]["git"] is False
+        assert rows(i)["repo"]["git"] is True
+    finally:
+        inited.factory("server", "stop", check=False)

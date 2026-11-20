@@ -32,6 +32,7 @@ def read(ctx):
         "hidden_steps": hidden.ids(ctx),
         "steps": {WORKTREE_STEP: {k: str(config.get_value(ctx, WORKTREE_STEP, k) or "") for k in STEP_KEYS}},
         "open_tasks": open_count(ctx),
+        "git": ctx.git,
     }
 
 

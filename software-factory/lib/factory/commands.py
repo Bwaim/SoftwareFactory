@@ -727,7 +727,8 @@ def pipeline_keys_cmd(args):
 def pipeline_list_cmd(args):
     from . import pipeline_store
     from .registry import Registry
-    rows = pipeline_store.list_pipelines(Registry.load(ctx_of(args)))
+    ctx = ctx_of(args)
+    rows = pipeline_store.list_pipelines(Registry.load(ctx), git=ctx.git)
     if args.json:
         cli.emit(rows, True)
         return
