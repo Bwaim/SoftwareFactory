@@ -323,3 +323,20 @@ def test_folder_task_plain_creates_workspace(herdr_env, plain):
     assert create[create.index("--cwd") + 1] == str(plain)
     assert "--no-focus" in create
     assert not [c for c in calls() if c[:2] in (["worktree", "open"], ["tab", "create"])]
+
+
+def test_folder_task_git_without_main_workspace_shares_new_workspace(herdr_env, origin_repo):
+    adapter, calls = herdr_env
+    handle = adapter.start_session("t1", origin_repo, "p", [])
+    assert handle == {"agent": "t1", "tab": "w7:t1", "extra_workspaces": ["w7"]}
+    assert json.loads(adapter.shared_record().read_text()) == ["w7"]
+    adapter.close(handle)
+    assert ["tab", "close", "w7:t1"] in calls()
+    assert closed(calls()) == []
+
+
+def test_folder_task_plain_closes_its_workspace(herdr_env, plain):
+    _, calls = herdr_env
+    adapter = HerdrAdapter(repo.load_ctx(cwd=plain))
+    adapter.close(adapter.start_session("t1", plain, "p", []))
+    assert closed(calls()) == ["w7"]

@@ -92,8 +92,12 @@ class HerdrAdapter(Adapter):
             return self.create_tab(handle, ids[0], cwd)
         result = parse(run(["workspace", "create", "--cwd", str(cwd), "--label", handle["agent"], "--no-focus"]))["result"]
         pane = result["root_pane"]
-        handle["workspace"] = pane["workspace_id"]
         handle["tab"] = pane["tab_id"]
+        if self.ctx.git:
+            handle["extra_workspaces"] = [pane["workspace_id"]]
+            self.record_shared(handle["extra_workspaces"])
+        else:
+            handle["workspace"] = pane["workspace_id"]
         return pane["pane_id"]
 
     def find_extra_workspaces(self, before, handle):
