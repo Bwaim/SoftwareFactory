@@ -67,6 +67,18 @@ def test_snapshot_positions(inited):
         {"entry": "g", "back_to": "g", "first": 2, "last": 3, "while": "k", "max": 3, "jumps": 0}]
 
 
+def test_snapshot_positions_without_worktree(inited):
+    for sid in ("a", "b", "c"):
+        write_step(inited.fdir, sid, {})
+    steps = ["a", {"id": "b", "loop": loop("a", "k", 2)}, "c"]
+    write_pipeline(inited.fdir, {"id": "folder", "worktree": False, "steps": steps})
+    write_pipeline(inited.fdir, {"id": "tree", "steps": steps})
+    reg = Registry.load(repo.load_ctx(cwd=inited.repo))
+    spans = lambda pid: [(l["first"], l["last"]) for l in loops.snapshot(reg, reg.pipeline(pid))]
+    assert spans("folder") == [(0, 1)]
+    assert spans("tree") == [(1, 2)]
+
+
 def check_messages(inited, pid, steps):
     write_pipeline(inited.fdir, {"id": pid, "steps": steps})
     r = inited.factory("pipeline", "check", pid, "--json", check=False)

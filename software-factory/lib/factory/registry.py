@@ -113,6 +113,13 @@ class Pipeline:
         return [normalize_entry(e) for e in self.data.get("steps") or []]
 
     @property
+    def run_entries(self):
+        entries = self.entries
+        if self.worktree is True and (not entries or entries[0].get("id") != CREATE_WORKTREE):
+            entries = [{"id": CREATE_WORKTREE}] + entries
+        return entries
+
+    @property
     def inputs(self):
         return dict(self.data.get("inputs") or {})
 
@@ -206,11 +213,8 @@ class Registry:
         return out
 
     def expand(self, pipeline):
-        entries = pipeline.entries
-        if pipeline.worktree is True and (not entries or entries[0].get("id") != CREATE_WORKTREE):
-            entries = [{"id": CREATE_WORKTREE}] + entries
         snapshot = []
-        for entry in entries:
+        for entry in pipeline.run_entries:
             for i, path in enumerate(self.leaves(entry["id"])):
                 snapshot.append({
                     "id": path[-1],

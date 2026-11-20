@@ -17,15 +17,8 @@ def back_index(entries, i, back_to):
     return None
 
 
-def run_entries(data):
-    entries = [normalize_entry(e) for e in data.get("steps") or []]
-    if not entries or entries[0].get("id") != CREATE_WORKTREE:
-        entries = [{"id": CREATE_WORKTREE}] + entries
-    return entries
-
-
 def snapshot(reg, pipeline):
-    entries = run_entries(pipeline.data)
+    entries = pipeline.run_entries
     starts, ends, position = [], [], 0
     for entry in entries:
         starts.append(position)
