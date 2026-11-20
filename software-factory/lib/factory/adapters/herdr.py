@@ -318,7 +318,7 @@ class HerdrAdapter(Adapter):
         return bool(self.require_owned(handle).get("focused"))
 
     def notify(self, text):
-        run(["notification", "show", "Software factory", "--body", text, "--sound", "request"], check=False)
+        run(["notification", "show", "CAPTN Factory", "--body", text, "--sound", "request"], check=False)
 
 
 ADAPTER = HerdrAdapter

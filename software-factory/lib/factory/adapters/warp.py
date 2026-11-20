@@ -246,7 +246,7 @@ class WarpAdapter(Adapter):
             time.sleep(WAIT_POLL_SECONDS)
 
     def notify(self, text):
-        script = 'on run argv\ndisplay notification (item 1 of argv) with title "Software factory" sound name "Glass"\nend run'
+        script = 'on run argv\ndisplay notification (item 1 of argv) with title "CAPTN Factory" sound name "Glass"\nend run'
         subprocess.run(["osascript", "-e", script, text], capture_output=True)
 
 
