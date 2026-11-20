@@ -48,6 +48,11 @@ header nav { display: flex; gap: 4px; align-self: stretch; align-items: flex-end
 .brand .wordmark em { font-style: normal; color: var(--brand-pink); }
 .brand .tagline { font-size: 11px; color: var(--muted-strong); letter-spacing: .02em; }
 #updated { color: var(--muted-strong); }
+.icon-button { width: 36px; padding: 0; border-radius: 50%; background: transparent; }
+.icon-button svg { width: 18px; height: 18px; }
+#fullscreen-toggle .exit, #fullscreen-toggle[aria-pressed="true"] .enter { display: none; }
+#fullscreen-toggle[aria-pressed="true"] .exit { display: block; }
+#fullscreen-toggle[aria-pressed="true"] { color: var(--brand-pink); }
 .workspace { flex: 1; display: flex; min-height: 0; min-width: 0; }
 .layout { flex: 1; display: flex; min-height: 0; }
 #main, #sidebar, #detail-main, #live-host .xterm-viewport { overscroll-behavior: contain; }
@@ -322,6 +327,10 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
   <span class="grow"></span>
   <span id="offline" hidden title="The dashboard cannot reach the factory server. The board may be out of date.">Offline</span>
   <span id="updated" class="muted"></span>
+  <button type="button" class="icon-button" id="fullscreen-toggle" aria-pressed="false" aria-label="Enter full screen" title="Enter full screen">
+    <svg class="enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    <svg class="exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+  </button>
 </header>
 <div class="layout">
   <div id="lcol-ws">
@@ -1325,6 +1334,22 @@ byId("main").addEventListener("wheel", (e) => {
   e.preventDefault();
   board.scrollLeft += dx;
 }, { passive: false });
+const fullscreenButton = byId("fullscreen-toggle");
+function updateFullscreenButton() {
+  const on = !!document.fullscreenElement;
+  const label = on ? "Exit full screen" : "Enter full screen";
+  fullscreenButton.setAttribute("aria-pressed", on ? "true" : "false");
+  fullscreenButton.setAttribute("aria-label", label);
+  fullscreenButton.title = label;
+}
+/** The browser can refuse full screen (an iframe without permission, an old browser): then the button is hidden or does nothing. */
+fullscreenButton.hidden = !document.fullscreenEnabled;
+fullscreenButton.addEventListener("click", () => {
+  const change = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  change.catch(() => {});
+});
+document.addEventListener("fullscreenchange", updateFullscreenButton);
+updateFullscreenButton();
 const THEME_KEY = "factory.theme";
 /** On by default: selecting a task opens its terminal next to its details, as before this setting existed. */
 const TERM_ON_SELECT_KEY = "factory.terminalOnSelect";
