@@ -401,6 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var quitConfirmed = false
     var stopServerOnQuit = false
     var quitCheckRunning = false
+    var keepAwake: NSObjectProtocol?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = MainMenu.build(target: self)
@@ -413,6 +414,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        keepAwake = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep,
+            reason: "Keep the factory server alive"
+        )
         pingTimer = Timer.scheduledTimer(withTimeInterval: pingSeconds, repeats: true) { [weak self] _ in
             self?.checkServer(confirmations: 2)
         }
@@ -427,7 +432,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         guard dashboard == nil else { return true }
-        if let base {
+        if serverStopped {
+            showServerStopped()
+        } else if starting {
+            showStarting()
+        } else if let base {
             showDashboard().load(base)
         } else {
             startFactory()
@@ -460,10 +469,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !starting else { return }
         starting = true
         let request = loadCount
-        showDashboard().screen.show(title: "Starting the factory…")
+        showStarting()
         Factory.runInBackground(["dashboard"], timeout: dashboardCommandSeconds) { [weak self] result in
             self?.factoryStarted(result, request: request)
         }
+    }
+
+    func showStarting() {
+        showDashboard().screen.show(title: "Starting the factory…")
     }
 
     func factoryStarted(_ result: CommandResult?, request: Int) {
@@ -561,6 +574,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         checkingServer = false
         guard !up, checked == base, !starting else { return }
         serverStopped = true
+        showServerStopped()
+    }
+
+    func showServerStopped() {
         showDashboard().screen.show(title: "Server stopped", button: "Start") { [weak self] in
             self?.startFactory()
         }
@@ -616,8 +633,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func checkBeforeQuit(then decide: @escaping (QuitChoice) -> Void) {
-        guard let base else { return decide(.quit(stopServer: false)) }
         quitCheckRunning = true
+        guard let base else {
+            DispatchQueue.main.async { [weak self] in
+                self?.quitCheckRunning = false
+                decide(.quit(stopServer: false))
+            }
+            return
+        }
         ServerAddress.ping(base) { [weak self] up in
             guard up else {
                 self?.quitCheckRunning = false
