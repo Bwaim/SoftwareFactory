@@ -208,12 +208,9 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
 #detail-term .tstatus { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 #detail-term .tstatus i { width: 8px; height: 8px; border-radius: 50%; background: var(--paused-dot); display: block; }
 #detail-term .tstatus.live i { background: var(--active-dot); }
-#live-host { flex: 1; min-height: 0; margin: 0 16px; background: #0E0908; border: 1px solid #2E2322; border-radius: 8px; padding: 6px 4px 6px 8px; overflow: hidden; }
+#live-host { flex: 1; min-height: 0; margin: 0 16px 16px; background: #0E0908; border: 1px solid #2E2322; border-radius: 8px; padding: 6px 4px 6px 8px; overflow: hidden; }
 #live-host .xterm, #live-host .xterm-viewport { background-color: #0E0908 !important; }
 #detail-term .reconnect { min-height: 28px; font-size: 12px; padding: 0 10px; }
-#detail-term .tinput { padding: 10px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
-#detail-term .keys { display: flex; gap: 4px; flex-wrap: wrap; }
-#detail-term .keys button { min-height: 28px; min-width: 32px; font-size: 12px; padding: 0 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 #detail .dhead { display: flex; gap: 8px; align-items: flex-start; }
 #detail .dhead .names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 #detail .dhead .ticket { font-size: 13px; font-weight: 700; }
@@ -336,20 +333,6 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
           <button type="button" class="reconnect" id="term-reconnect" hidden>Reconnect</button>
         </div>
         <div id="live-host" aria-label="Live terminal of the session"></div>
-        <div class="tinput">
-          <div class="keys" role="group" aria-label="Keys to press">
-            <button type="button" data-key="esc" aria-label="Press Escape">Esc</button>
-            <button type="button" data-key="tab" aria-label="Press Tab">Tab</button>
-            <button type="button" data-key="up" aria-label="Press up arrow">↑</button>
-            <button type="button" data-key="down" aria-label="Press down arrow">↓</button>
-            <button type="button" data-key="left" aria-label="Press left arrow">←</button>
-            <button type="button" data-key="right" aria-label="Press right arrow">→</button>
-            <button type="button" data-key="backspace" aria-label="Press Backspace">⌫</button>
-            <button type="button" data-key="space" aria-label="Press Space">Space</button>
-            <button type="button" data-key="enter" aria-label="Press Enter">Enter</button>
-            <button type="button" data-key="ctrl+c" class="danger" aria-label="Press Control C">Ctrl+C</button>
-          </div>
-        </div>
       </div>
       </div>
     </aside>
@@ -908,12 +891,12 @@ function taskCard(t) {
   const card = el("div", { class: "card task s-" + (t.attention ? "blocked" : t.status) + (selected ? " selected" : ""), "data-task": t.id });
   card.addEventListener("click", (e) => {
     if (e.target.closest("button, a, .link, details, pre, input, textarea, select") || String(window.getSelection())) return;
-    selectTask(t.id);
+    toggleTask(t.id);
   });
   const top = el("div", { class: "row" });
   const ticket = ticketNode(t);
   if (ticket) top.append(ticket);
-  top.append(el("button", { type: "button", class: "name-link", "aria-label": `Show details of ${t.display_name}`, "aria-expanded": selected && state.panel.details ? "true" : "false", onclick: () => selectTask(t.id) }, t.display_name));
+  top.append(el("button", { type: "button", class: "name-link", "aria-label": `Show details of ${t.display_name}`, "aria-expanded": selected && state.panel.details ? "true" : "false", onclick: () => toggleTask(t.id) }, t.display_name));
   if (t.display_name !== t.id) top.append(el("span", { class: "muted" }, t.id));
   card.append(top, el("div", { class: "title" }, t.description), el("div", { class: "muted" }, `${t.pipeline} › ${t.step}${loopText(t)}`));
   card.append(...statusPills(t));
@@ -1323,12 +1306,12 @@ const EVENT_LABELS = {
   config_asked: "Asked for a config value", migrated: "Migrated", approval_requested: "Approval requested",
   exclusive_wait: "Waiting for a shared resource", exclusive_start: "Started with a shared resource",
   exclusive_released: "Released a shared resource", exclusive_forced: "Shared resource released by force",
-  terminal_attached: "Opened the live terminal",
+  terminal_attached: "Opened the live terminal", step_skipped: "Step skipped",
 };
 const EVENT_TONES = {
   step_done: "ok", task_finished: "ok", approved: "ok", task_unblocked: "ok", task_resumed: "ok",
   task_blocked: "bad", done_check_failed: "bad", prompt_failed: "bad", hook_failed: "bad", rename_failed: "bad", loop_limit: "bad", task_cancelled: "bad", attention: "bad",
-  waiting_started: "wait", changes_requested: "wait", task_paused: "wait", loop_back: "wait", approval_requested: "wait", exclusive_wait: "wait",
+  waiting_started: "wait", step_skipped: "wait", changes_requested: "wait", task_paused: "wait", loop_back: "wait", approval_requested: "wait", exclusive_wait: "wait",
   exclusive_forced: "bad",
 };
 const EXTRA_MAX = 300;
@@ -1371,6 +1354,17 @@ function selectTask(id) {
   saveFlag(TERM_KEY, true);
   render();
   revealTaskColumn(id);
+}
+/** A click on the selected task closes the right columns that the click on it opened; on any other task, or when both are closed, it selects and opens them. */
+function toggleTask(id) {
+  if (state.detail && state.detail.id === id && (state.panel.details || state.term.open)) {
+    state.panel.details = state.term.open = false;
+    saveFlag(DETAILS_KEY, false);
+    saveFlag(TERM_KEY, false);
+    render();
+    return;
+  }
+  selectTask(id);
 }
 /** Opening the right columns narrows the board, which can push the selected task's column out of view; scroll the board just enough to show it again. */
 function revealTaskColumn(id) {
@@ -1434,10 +1428,21 @@ function eventTime(iso) {
   const today = at.toDateString() === new Date().toDateString();
   return today ? at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : at.toLocaleDateString([], { day: "numeric", month: "short" });
 }
+/** Fields the timeline does not show: the header already has the description, the label carries the column move, and run_in says nothing to the reader. */
+const EVENT_HIDDEN_FIELDS = { task_created: ["description"], step_started: ["run_in"], column_changed: ["from", "to"], task_unblocked: ["reason"] };
+const NOT_A_STEP = "(finished)";
+function eventLabel(ev) {
+  if (ev.type === "column_changed" && ev.to) return `Moved to ${ev.to}`;
+  if (ev.type === "task_unblocked" && ev.reason === "step_done") return "Unblocked: the step finished";
+  return EVENT_LABELS[ev.type] || ev.type.replace(/_/g, " ");
+}
 function eventExtra(ev) {
   const parts = [];
+  if (ev.type === "column_changed" && ev.from) parts.push(`from ${ev.from}`);
+  if (ev.duration) parts.push(`took ${ev.duration}`);
+  const hidden = EVENT_HIDDEN_FIELDS[ev.type] || [];
   for (const [k, v] of Object.entries(ev)) {
-    if (["ts", "type", "step"].includes(k) || v === null || v === undefined || v === "") continue;
+    if (["ts", "type", "step", "duration"].includes(k) || hidden.includes(k) || v === null || v === undefined || v === "") continue;
     parts.push(typeof v === "object" ? `${k}: ${JSON.stringify(v)}` : `${k}: ${v}`);
   }
   const text = parts.join(" · ");
@@ -1454,12 +1459,34 @@ function stepsSection(d) {
   const done = d.data.steps.filter((s) => s.state === "done").length;
   return el("section", {}, el("h3", {}, "Pipeline", el("span", { class: "muted" }, `${done} of ${d.data.steps.length} steps done`)), list);
 }
+function durationText(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} s`;
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+/** Oldest first in, newest first out. A step that starts and ends in the same second (like create-worktree) keeps only its "Step done" line; other "Step done" lines get the step's duration. */
+function timelineEvents(events) {
+  const started = {}, out = [];
+  events.forEach((ev, i) => {
+    const next = events[i + 1];
+    if (ev.type === "step_started" && next && next.type === "step_done" && next.step === ev.step && next.ts === ev.ts) return;
+    if (ev.type === "step_started") started[ev.step] = ev.ts;
+    if (ev.type === "step_done" && started[ev.step]) {
+      const ms = new Date(ev.ts) - new Date(started[ev.step]);
+      delete started[ev.step];
+      if (ms >= 1000) ev = { ...ev, duration: durationText(ms) };
+    }
+    out.push(ev);
+  });
+  return out.reverse();
+}
 function timelineSection(d) {
   const list = el("ol", { class: "timeline" });
-  const evs = [...d.data.events].reverse();
+  const evs = timelineEvents(d.data.events);
   for (const ev of evs) {
     const extra = eventExtra(ev);
-    const what = el("span", {}, el("span", { class: "what" }, EVENT_LABELS[ev.type] || ev.type.replace(/_/g, " ")), ev.step ? el("span", { class: "muted" }, " · " + ev.step) : "");
+    const what = el("span", {}, el("span", { class: "what" }, eventLabel(ev)), ev.step && ev.step !== NOT_A_STEP ? el("span", { class: "muted" }, " · " + ev.step) : "");
     if (extra) what.append(el("span", { class: "extra" }, extra));
     list.append(el("li", { class: EVENT_TONES[ev.type] || "" }, el("time", { datetime: ev.ts, title: new Date(ev.ts).toLocaleString() }, eventTime(ev.ts)), el("i", { "aria-hidden": "true" }), what));
   }
@@ -1533,7 +1560,7 @@ function renderDetail() {
   if (row.status === "waiting_external" && row.wait_has_check) aside.append(checkBlock(row));
   aside.append(taskButtons(row));
   if (!d.data) { aside.append(el("div", { class: "muted" }, "Loading…")); return; }
-  aside.append(stepsSection(d), timelineSection(d), infoSection(d));
+  aside.append(stepsSection(d), infoSection(d), timelineSection(d));
   for (const s of aside.querySelectorAll(".facts details summary")) if (openValues.has(s.textContent)) s.parentElement.open = true;
   aside.scrollTop = scroll;
 }
@@ -1546,7 +1573,6 @@ window.addEventListener("hashchange", () => { const id = detailHashId(); if (id 
 setInterval(() => { if (state.detail && state.panel.details && !document.hidden) loadDetail(); }, DETAIL_REFRESH_MS);
 
 const TERM_KEY = "factory.terminal";
-const LIVE_KEYS = { esc: "\x1b", tab: "\t", up: "\x1b[A", down: "\x1b[B", right: "\x1b[C", left: "\x1b[D", backspace: "\x7f", space: " ", enter: "\r", "ctrl+c": "\x03" };
 const LIVE_INPUT_MAX = 8000;
 const LIVE_FIT_DELAY_MS = 150;
 const LIVE_THEME = {
@@ -1571,9 +1597,6 @@ function setTermStatus(live, text) {
   status.classList.toggle("live", live);
   status.querySelector(".tstatus-text").textContent = text;
 }
-function updateTypeControls() {
-  for (const b of document.querySelectorAll("#detail-term .keys button")) b.disabled = !state.live.connected;
-}
 
 state.live = { id: null, term: null, fit: null, abort: null, observer: null, queue: "", sending: false, connected: false, size: "", fitTimer: null };
 let xtermLoading = null;
@@ -1592,7 +1615,6 @@ function liveEnded(reason) {
   L.connected = false;
   setTermStatus(false, reason);
   byId("term-reconnect").hidden = false;
-  updateTypeControls();
 }
 async function startLive() {
   const d = state.detail, L = state.live;
@@ -1600,7 +1622,6 @@ async function startLive() {
   L.id = d.id;
   byId("term-reconnect").hidden = true;
   setTermStatus(false, "Connecting…");
-  updateTypeControls();
   try { await loadXterm(); } catch (e) { return liveEnded(e.message); }
   if (state.live.id !== d.id || L.term) return;
   const term = new window.Terminal({ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, cursorBlink: true, scrollback: 5000, theme: LIVE_THEME });
@@ -1635,7 +1656,6 @@ async function streamLive(id, term) {
   }
   L.connected = true;
   setTermStatus(true, "Live");
-  updateTypeControls();
   term.focus();
   const reader = res.body.getReader(), decoder = new TextDecoder();
   let pending = "";
@@ -1752,10 +1772,6 @@ byId("term-tab").addEventListener("click", () => setPanelOpen("terminal", !state
 restorePaneWidths();
 byId("ws-tab").addEventListener("click", () => setWorkspacesOpen(!state.panel.workspaces));
 renderWorkspacePanel();
-for (const b of document.querySelectorAll("#detail-term .keys button")) b.addEventListener("click", () => {
-  queueLive(LIVE_KEYS[b.dataset.key]);
-  if (state.live.term) state.live.term.focus();
-});
 byId("term-reconnect").addEventListener("click", () => { stopLive(); renderTerminalShell(); });
 function setView(view) { state.view = view; render(); }
 byId("tab-tasks").addEventListener("click", () => setView("tasks"));

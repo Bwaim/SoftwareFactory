@@ -220,8 +220,9 @@ def test_server_serves_the_vendored_terminal_files(inited):
 
 
 def test_dashboard_page_has_the_live_terminal():
-    for text in ('id="live-host"', "/static/xterm.js", "/attach/stream`", "/attach/input`", "/attach/resize`", "LIVE_KEYS", 'data-key="ctrl+c"'):
+    for text in ('id="live-host"', "/static/xterm.js", "/attach/stream`", "/attach/input`", "/attach/resize`", "toggleTask("):
         assert text in PAGE
+    assert 'class="keys"' not in PAGE and "data-key=" not in PAGE
 
 
 def test_dashboard_page_has_the_terminal_tab_and_resize_handles():

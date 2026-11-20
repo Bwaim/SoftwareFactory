@@ -278,6 +278,8 @@ def move(ctx, tid, event_type, position, statuses, first_event, decide=None):
         info.update(kind="step", column=t["column"], path=state.step_path_str(t))
         if first_event:
             first_event()
+        if t["status"] == "blocked":
+            events.log(ctx, tid, "task_unblocked", info["path"], reason=event_type)
         events.log(ctx, tid, event_type, info["path"])
         if decide:
             decide(t, info)
