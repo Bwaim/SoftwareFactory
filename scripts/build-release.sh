@@ -12,6 +12,12 @@ if [ "$version" != "$cli_version" ]; then
   exit 1
 fi
 
+plugin_version=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$sf/.claude-plugin/plugin.json")
+if [ "$version" != "$plugin_version" ]; then
+  printf 'build-release: version %s differs from plugin.json version %s.\n' "$version" "$plugin_version" >&2
+  exit 1
+fi
+
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/software-factory"
