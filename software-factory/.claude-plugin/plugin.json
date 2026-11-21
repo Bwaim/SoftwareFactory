@@ -1,5 +1,5 @@
 {
   "name": "software-factory",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Run each task in its own worktree, Herdr tab and Claude session, through pipelines of reusable steps."
 }
