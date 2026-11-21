@@ -179,6 +179,13 @@ enum ServerAddress {
         return parts.url ?? url
     }
 
+    static func withoutNotice(_ url: URL) -> URL {
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        let items = (parts.queryItems ?? []).filter { !["updated", "warn"].contains($0.name) }
+        parts.queryItems = items.isEmpty ? nil : items
+        return parts.url ?? url
+    }
+
     static func isFactoryPage(_ url: URL) -> Bool {
         ["http", "https"].contains(url.scheme) && url.host == localHost
     }
@@ -609,6 +616,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func pageSaid(_ message: String) {
         if message == "unreachable" {
             serverMayBeDown()
+        } else if message.hasPrefix("navigate:") {
+            guard let url = URL(string: String(message.dropFirst("navigate:".count))),
+                  ServerAddress.isFactoryPage(url) else { return }
+            loadDashboard(url)
+            base = ServerAddress.withoutNotice(url)
+            for page in pages where page !== dashboard {
+                page.reload(base: base)
+            }
         }
     }
 

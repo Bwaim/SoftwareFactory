@@ -54,3 +54,9 @@ def test_version_mismatch_fails(work):
     assert r.returncode == 1
     assert "build-release: version 9.9.9 differs from cli.VERSION 0.2.0." in r.stderr
     assert not list(work.glob("software-factory.tar.gz*"))
+
+
+def test_release_workflow_attaches_install_script():
+    text = (PROJECT_ROOT / ".github" / "workflows" / "release.yml").read_text()
+    line = next(l for l in text.splitlines() if "gh release create" in l)
+    assert "dist/software-factory.tar.gz.sha256 install.sh" in line

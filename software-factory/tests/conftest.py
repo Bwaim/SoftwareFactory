@@ -38,6 +38,7 @@ def factory_home(tmp_path, monkeypatch):
     monkeypatch.setenv("FACTORY_NOTIFIER_APP", str(tmp_path / "Applications" / "CAPTN Dashboard Notifier.app"))
     monkeypatch.setenv("FACTORY_DASHBOARD_APP", str(tmp_path / "Applications" / "CAPTN Dashboard.app"))
     monkeypatch.setenv("FACTORY_LSREGISTER", "")
+    monkeypatch.setenv("FACTORY_NO_UPDATE_CHECK", "1")
     return home
 
 

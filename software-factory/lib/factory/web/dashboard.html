@@ -100,6 +100,9 @@ a:hover, .link:hover { color: var(--link-hover); }
 #error { display: none; flex: none; z-index: 20; background: var(--accent); color: #FFFFFF; font-weight: 600; padding: 10px 24px; }
 #banner { background: var(--yellow); color: #1A1110; font-weight: 600; padding: 10px 24px; }
 #migration { background: var(--yellow); color: #1A1110; padding: 10px 24px; }
+#update-banner { flex: none; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--yellow); color: #1A1110; font-weight: 600; padding: 10px 24px; }
+#update-banner[hidden] { display: none; }
+#update-banner pre { flex-basis: 100%; max-height: 40vh; overflow: auto; color: var(--fg); font-weight: 400; }
 #migration ul { margin: 4px 0; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
 button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-height: 1; }
@@ -297,6 +300,7 @@ body.resizing iframe, body.resizing .xterm { pointer-events: none; }
 <body>
 <div id="error"></div>
 <div id="banner" hidden></div>
+<div id="update-banner" hidden></div>
 <div id="migration" hidden></div>
 <svg width="0" height="0" style="position: absolute" aria-hidden="true"><defs>
   <symbol id="captain-bot" viewBox="0 0 120 120">
@@ -384,9 +388,11 @@ const DETAILS_KEY = "factory.details";
 const REVEAL_MARGIN = 16;
 const SELECTED_PREFIX = "factory.selectedTask.";
 const JOB_POLL_MS = 1000;
+const UPDATE_CHECK_MS = 3600000;
+const UPDATED_NOTICE_MS = 10000;
 const HIDDEN_PREFIX = "factory.hiddenColumns.";
 const WORKSPACE_KEY = "factory.workspace";
-const GLOBAL_API = /^\/api\/(ping|shutdown|jobs\/|workspaces|host|server-settings)/;
+const GLOBAL_API = /^\/api\/(ping|shutdown|jobs\/|workspaces|host|server-settings|update)/;
 const ADAPTER_BUTTONS = "Needs the terminal adapter. See the banner.";
 const state = { generation: 0, view: "tasks", ws: new URLSearchParams(location.search).get("ws"), workspaces: [], renaming: null, info: emptyInfo(), tasks: [], backlog: [], hidden: loadHidden(new URLSearchParams(location.search).get("ws")), pausing: new Set(), checking: new Set(), deliveryErrors: new Map(), dragging: false, dragId: null, lastKey: null, modalStart: new WeakMap(), pollFailed: false, removed: new Set(), detail: null, panel: { details: loadFlag(DETAILS_KEY, true), workspaces: loadFlag("factory.workspaces", true) } };
 const byId = (id) => document.getElementById(id);
@@ -421,6 +427,64 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 function clear(node) { node.replaceChildren(); return node; }
+let updateBusy = false;
+function setUpdateBanner(...children) {
+  const b = clear(byId("update-banner"));
+  b.append(...children);
+  b.hidden = !children.length;
+}
+function runningTasksText(n) {
+  return n === 1 ? "1 task is running. It continues, and its next steps use the new version. Update now?" : `${n} tasks are running. They continue, and their next steps use the new version. Update now?`;
+}
+async function checkUpdate() {
+  if (updateBusy) return;
+  let info;
+  try { info = await api("/api/update", undefined, true, true); } catch (e) { return; }
+  if (updateBusy || updatedNotice(info)) return;
+  if (!info.latest || info.dismissed) return setUpdateBanner();
+  setUpdateBanner(el("span", {}, `New version ${info.latest} is available (you have ${info.installed}).`),
+    button("Update", askUpdate, { cls: "primary" }),
+    button("Later", async () => { await api("/api/update/dismiss", {}); setUpdateBanner(); }));
+}
+function updatedNotice(info) {
+  const url = new URL(location.href);
+  const version = url.searchParams.get("updated");
+  if (!version) return false;
+  const warn = url.searchParams.get("warn") === "1" ? ` install.sh reported an error. See ${info.log}.` : "";
+  setUpdateBanner(el("span", {}, `CAPTN is updated to ${version}.${warn}`));
+  url.searchParams.delete("updated");
+  url.searchParams.delete("warn");
+  history.replaceState(null, "", url);
+  updateBusy = true;
+  setTimeout(() => { updateBusy = false; setUpdateBanner(); checkUpdate(); }, UPDATED_NOTICE_MS);
+  return true;
+}
+async function askUpdate() {
+  const info = await api("/api/update", undefined, true);
+  if (!info.running_tasks) return startUpdate();
+  choice("Update CAPTN", runningTasksText(info.running_tasks), [["Update", async () => { closeModal(); await startUpdate(); }]]);
+}
+async function startUpdate() {
+  updateBusy = true;
+  setUpdateBanner(el("span", {}, "Updating…"), el("button", { class: "primary", disabled: true }, "Update"), el("button", { disabled: true }, "Later"));
+  let job;
+  try { job = await waitUpdate((await api("/api/update/run", { ws: state.ws })).job); } catch (e) { updateBusy = false; return checkUpdate(); }
+  if (job.status === "done") return moveToServer(job.result.url);
+  setUpdateBanner(el("span", {}, job.error || "The update failed."), el("pre", {}, job.output || ""), button("Close", closeUpdate));
+}
+async function waitUpdate(id) {
+  for (;;) {
+    const job = await api(`/api/jobs/${id}`, undefined, true);
+    if (job.status !== "running") return job;
+    await new Promise((r) => setTimeout(r, JOB_POLL_MS));
+  }
+}
+async function closeUpdate() {
+  try { await api("/api/update/close", {}); } finally { updateBusy = false; setUpdateBanner(); }
+}
+function moveToServer(url) {
+  if (window.webkit?.messageHandlers?.captn) tellApp("navigate:" + url); else location.assign(url);
+}
 function loadHidden(id) {
   if (!id) return [];
   try { const v = JSON.parse(localStorage.getItem(HIDDEN_PREFIX + id) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
@@ -1864,6 +1928,8 @@ byId("tab-backlog").addEventListener("click", () => setView("backlog"));
 byId("tab-settings").addEventListener("click", () => setView("settings"));
 refresh(true);
 setInterval(refresh, REFRESH_MS);
+checkUpdate();
+setInterval(checkUpdate, UPDATE_CHECK_MS);
 setInterval(() => { for (const n of document.querySelectorAll("[data-next-check]")) n.textContent = countdownText(n.dataset.nextCheck); }, 1000);
 </script>
 </body>

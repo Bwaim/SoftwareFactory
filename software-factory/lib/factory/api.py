@@ -19,6 +19,8 @@ PICKER_SCRIPT = [
 
 ROUTES = {"global": [], "workspace": []}
 WORKSPACE_PATH = re.compile(r"^/api/w/([a-z0-9-]{1,40})(/.*)$")
+WORKSPACE_ID = re.compile(r"[a-z0-9-]{1,40}")
+BAD_WORKSPACE_ID = "The workspace id is not valid."
 
 
 class NotFound(Exception):
@@ -100,7 +102,64 @@ def shutdown(server, query, body):
 def job(server, job_id, query, body):
     if job_id not in server.jobs:
         raise NotFound(job_id)
-    return server.jobs[job_id]
+    job = server.jobs[job_id]
+    if job["status"] != "running":
+        server.updater.job_read(job_id)
+    return job
+
+
+def running_tasks(server):
+    from . import server as server_mod, state, update
+    try:
+        server.reload_if_changed()
+        snapshot = server.snapshot()
+    except Exception as e:
+        server_mod.log(f"running task count failed: {e}")
+        return 0
+    count = 0
+    for ws in snapshot:
+        if ws.error:
+            continue
+        try:
+            count += sum(1 for t in state.list_tasks(ws.ctx) if t["status"] in update.RUNNING_STATUSES)
+        except Exception as e:
+            server_mod.log(f"running task count failed for {ws.id}: {e}")
+    return count
+
+
+@route("GET", "/api/update", scope="global")
+def update_info(server, query, body):
+    from . import cli, update
+    latest = server.checker.latest
+    return {
+        "installed": cli.VERSION,
+        "latest": latest,
+        "dismissed": latest is not None and update.dismissed() == latest,
+        "running_tasks": running_tasks(server),
+        "log": str(workspaces.home() / "update.log"),
+    }
+
+
+@route("POST", "/api/update/dismiss", scope="global")
+def update_dismiss(server, query, body):
+    from . import update
+    if server.checker.latest is not None:
+        update.dismiss(server.checker.latest)
+    return {"ok": True}
+
+
+@route("POST", "/api/update/run", scope="global")
+def update_run(server, query, body):
+    ws = body.get("ws")
+    if ws is not None and not (isinstance(ws, str) and WORKSPACE_ID.fullmatch(ws)):
+        raise FactoryError(BAD_WORKSPACE_ID)
+    return {"job": server.updater.run(ws)}
+
+
+@route("POST", "/api/update/close", scope="global")
+def update_close(server, query, body):
+    server.updater.close()
+    return {"ok": True}
 
 
 def workspace_row(server, entry):
@@ -268,7 +327,8 @@ def pipeline_copy(server, query, body):
 @route("POST", "/api/pipelines/check")
 def pipeline_check_route(server, query, body):
     from . import pipeline_store
-    return pipeline_store.check(server.ctx, body["data"], body.get("level"))
+    with server.server.activity():
+        return pipeline_store.check(server.ctx, body["data"], body.get("level"))
 
 
 @route("POST", "/api/pipelines/keys")
@@ -385,7 +445,13 @@ def external_done(server, tid, query, body):
 def check_now(server, tid, query, body):
     from . import engine, state
     state.load(server.ctx, tid)
-    return {"job": server.start_job(lambda: engine.check_task(server.ctx, tid))}
+
+    def check():
+        with server.server.activity():
+            return engine.check_task(server.ctx, tid)
+
+    with server.server.activity():
+        return {"job": server.start_job(check)}
 
 
 @route("POST", f"/api/tasks/{TASK}/pause")
@@ -504,7 +570,8 @@ def step_form(server, query, body):
 @route("POST", "/api/steps/check")
 def step_check(server, query, body):
     from . import step_store
-    return step_store.check(server.ctx, body["manifest"], body.get("body", ""), body.get("level") or "local")
+    with server.server.activity():
+        return step_store.check(server.ctx, body["manifest"], body.get("body", ""), body.get("level") or "local")
 
 
 @route("POST", "/api/steps/preview")

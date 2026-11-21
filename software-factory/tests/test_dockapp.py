@@ -314,3 +314,14 @@ def test_swift_callbacks_avoid_the_main_dispatch_queue():
 
     assert "DispatchQueue.main" not in source
     assert "RunLoop.main.perform(inModes: [.common, .modalPanel]" in source
+
+
+def test_swift_navigate_checks_factory_page():
+    src = dockapp.SOURCE.read_text()
+    assert 'hasPrefix("navigate:")' in src
+    block = src.split('hasPrefix("navigate:")')[1].split("\n    }\n")[0]
+    assert "ServerAddress.isFactoryPage(" in block and "loadDashboard(" in block and "reload(base:" in block
+    assert "base = ServerAddress.withoutNotice(url)" in block
+    assert block.index("loadDashboard(url)") < block.index("base = ServerAddress.withoutNotice(url)")
+    helper = src.split("static func withoutNotice(")[1].split("\n    }\n")[0]
+    assert '["updated", "warn"]' in helper

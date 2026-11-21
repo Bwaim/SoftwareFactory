@@ -162,3 +162,30 @@ def test_dashboard_pings_while_a_popup_is_open():
     assert "if (!force && (state.dragging || modalOpen())) return pingServer();" in PAGE
     assert 'try { await api("/api/ping", undefined, true, true); tellApp("reachable"); } catch (e) { serverUnreachable(); }' in PAGE
     assert 'function serverUnreachable() { state.pollFailed = true; byId("offline").hidden = false; tellApp("unreachable"); }' in PAGE
+
+
+def test_update_banner_texts():
+    assert '<div id="update-banner" hidden></div>' in PAGE
+    assert "New version ${" in PAGE and "is available (you have ${" in PAGE
+    assert "tasks are running. They continue, and their next steps use the new version. Update now?" in PAGE
+    assert "1 task is running. It continues, and its next steps use the new version. Update now?" in PAGE
+    assert "Updating…" in PAGE and "The update failed." in PAGE and "CAPTN is updated to ${" in PAGE
+    assert "install.sh reported an error. See ${" in PAGE
+
+
+def test_updated_notice_leaves_the_url():
+    assert "history.replaceState" in PAGE
+    block = PAGE.split("history.replaceState")[0].rsplit("\nfunction ", 1)[1]
+    assert '"updated"' in block and '"warn"' in block
+
+
+def test_update_banner_calls():
+    assert "/api/update/run" in PAGE and "/api/update/dismiss" in PAGE and "/api/update/close" in PAGE
+    assert "UPDATE_CHECK_MS = 3600000" in PAGE and "UPDATED_NOTICE_MS = 10000" in PAGE
+    assert 'tellApp("navigate:" + url)' in PAGE and "location.assign(url)" in PAGE
+    assert "|update" in PAGE.split("const GLOBAL_API")[1].split("\n")[0]
+
+
+def test_update_confirm_is_not_a_browser_dialog():
+    block = PAGE.split("function checkUpdate")[1].split("\nfunction ")[0]
+    assert "confirm(" not in block and "alert(" not in block
