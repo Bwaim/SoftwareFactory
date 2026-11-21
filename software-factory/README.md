@@ -58,7 +58,9 @@ curl -fsSL https://raw.githubusercontent.com/Bwaim/SoftwareFactory/main/install.
 
 First, the script asks which multi-terminal tool you already have: Herdr, Warp (macOS, with tmux), or none. With none, it asks which one to use. On Linux, it uses Herdr.
 
-Then the script shows the list of tools, with the use of each one. `[x]` means that the script installs the tool. Missing mandatory tools are selected. A tool that is already installed shows `(found)`.
+If you ran the script before and Herdr or Warp is installed, the script keeps your previous choice and does not ask.
+
+Then, if a mandatory tool is missing, the script shows the list of missing tools, with the use of each one. `[x]` means that the script installs the tool. Missing mandatory tools are selected. If only optional tools are missing, the script shows no list.
 
 - Type one or more numbers, separated by spaces, to change the selection. Press Enter to install.
 - The script installs the selected tools in list order. The Homebrew install asks for your password. After `xcode-select --install`, finish the install in its window, then press Enter.
