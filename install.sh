@@ -176,11 +176,15 @@ build_list() {
     mandatory_items="clt brew uv claude $terminal_items"
     optional_items="gh glab"
   fi
+  shown_mandatory=""
+  shown_optional=""
   for key in $mandatory_items; do
     if item_fixed "$key"; then eval "sel_$key=0"; else eval "sel_$key=1"; fi
+    item_found "$key" || shown_mandatory="$shown_mandatory $key"
   done
   for key in $optional_items; do
     eval "sel_$key=0"
+    item_found "$key" || shown_optional="$shown_optional $key"
   done
 }
 
@@ -188,26 +192,23 @@ show_item() {
   box="[ ]"
   if is_selected "$2"; then box="[x]"; fi
   reason=$(item_blocked "$2")
-  if item_found "$2"; then
-    tag=" (found)"
-  elif [ -n "$reason" ]; then
-    tag=" ($reason)"
-  else
-    tag=""
-  fi
+  tag=""
+  [ -z "$reason" ] || tag=" ($reason)"
   printf '  %s) %s %s%s: %s\n' "$1" "$box" "$(item_name "$2")" "$tag" "$(item_use "$2")"
 }
 
 show_list() {
   printf '\nCAPTN needs these tools. [x] means that the script installs it.\n'
   number=0
-  printf 'Mandatory\n'
-  for key in $mandatory_items; do
-    number=$((number + 1))
-    show_item "$number" "$key"
-  done
-  printf 'Optional\n'
-  for key in $optional_items; do
+  show_group Mandatory $shown_mandatory
+  show_group Optional $shown_optional
+}
+
+show_group() {
+  [ $# -gt 1 ] || return 0
+  printf '%s\n' "$1"
+  shift
+  for key in "$@"; do
     number=$((number + 1))
     show_item "$number" "$key"
   done
@@ -215,7 +216,7 @@ show_list() {
 
 item_at() {
   position=0
-  for key in $mandatory_items $optional_items; do
+  for key in $shown_mandatory $shown_optional; do
     position=$((position + 1))
     if [ "$position" = "$1" ]; then
       printf '%s\n' "$key"
@@ -240,6 +241,7 @@ toggle_item() {
 }
 
 choose_items() {
+  [ -n "$shown_mandatory" ] || return 0
   while :; do
     show_list
     ask "Type numbers to change, Enter to install: " ""
@@ -327,17 +329,28 @@ ask_terminal() {
 }
 
 save_terminal() {
-  config_dir=${FACTORY_HOME:-$HOME/.config/software-factory}
   mkdir -p "$config_dir"
   printf '%s\n' "$terminal" > "$config_dir/terminal"
   printf 'CAPTN will use %s in new repositories. A repository keeps its own choice in .factory/factory.yaml (terminal:).\n' "$terminal"
+}
+
+saved_terminal() {
+  has_herdr || has_warp || return 0
+  saved=$(cat "$config_dir/terminal" 2>/dev/null || true)
+  case "$saved" in
+    herdr) echo herdr ;;
+    warp) if on_macos; then echo warp; fi ;;
+  esac
 }
 
 choose_terminal() {
   terminal=${FACTORY_INSTALL_TERMINAL:-}
   case "$terminal" in
     herdr | warp) ;;
-    "") if [ "$interactive" = 1 ]; then ask_terminal; fi ;;
+    "")
+      terminal=$(saved_terminal)
+      if [ -z "$terminal" ] && [ "$interactive" = 1 ]; then ask_terminal; fi
+      ;;
     *) fail "FACTORY_INSTALL_TERMINAL must be herdr or warp." ;;
   esac
 }
@@ -376,6 +389,7 @@ main() {
   dir=${FACTORY_INSTALL_DIR:-$HOME/.local/share/software-factory}
   link_dir=${FACTORY_LINK_DIR:-$HOME/.local/bin}
   link="$link_dir/factory"
+  config_dir=${FACTORY_HOME:-$HOME/.config/software-factory}
 
   user_path=$PATH
   platform_init

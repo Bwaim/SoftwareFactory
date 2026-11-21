@@ -214,6 +214,27 @@ def test_asks_and_keeps_the_warp_already_installed(release, env, work):
     assert saved_terminal(env) == "warp" and "needed for tasks" not in r.stderr
 
 
+def save_terminal_choice(env, terminal):
+    path = Path(env["HOME"]) / ".config/software-factory/terminal"
+    path.parent.mkdir(parents=True)
+    path.write_text(terminal + "\n")
+
+
+def test_saved_choice_is_kept_without_asking(release, env, work):
+    save_terminal_choice(env, "warp")
+    write_stub(work / "fake bin/herdr", "exit 0")
+    r = run_with_answers(env, work, "")
+    assert r.returncode == 0, r.stderr
+    assert "Which one do you already have?" not in r.stdout
+    assert "  2) [x] Warp: shows each task in a tab\n" in r.stdout and saved_terminal(env) == "warp"
+
+
+def test_saved_choice_asks_again_when_herdr_and_warp_are_missing(release, env, work):
+    save_terminal_choice(env, "herdr")
+    r = run_with_answers(env, work, "3", "2", "")
+    assert "Which one do you already have?" in r.stdout and saved_terminal(env) == "warp"
+
+
 def test_none_installed_asks_which_to_install(release, env, work):
     r = run_with_answers(env, work, "3", "2", "")
     assert r.returncode == 0, r.stderr
@@ -225,25 +246,23 @@ def test_list_apple_silicon_herdr(release, env, work):
     r = run_with_answers(env, work, "1", "")
     assert "CAPTN needs these tools. [x] means that the script installs it." in r.stdout
     assert ("Mandatory\n"
-            "  1) [ ] Xcode Command Line Tools (found): git, and swiftc for Warp notifications\n"
-            "  2) [x] Homebrew: installs the other tools\n"
-            "  3) [ ] uv (found): runs the factory (Python)\n"
-            "  4) [ ] Claude Code (found): runs each task\n"
-            "  5) [x] Herdr: shows each task in a tab\n"
+            "  1) [x] Homebrew: installs the other tools\n"
+            "  2) [x] Herdr: shows each task in a tab\n"
             "Optional\n"
-            "  6) [ ] gh: GitHub steps of the catalog\n"
-            "  7) [ ] glab: GitLab steps of the catalog\n") in r.stdout
+            "  3) [ ] gh: GitHub steps of the catalog\n"
+            "  4) [ ] glab: GitLab steps of the catalog\n"
+            "Type numbers") in r.stdout
 
 
 def test_list_warp_has_warp_and_tmux(release, env, work):
     r = run_with_answers(env, work, "2", "")
-    assert "  5) [x] Warp: shows each task in a tab\n  6) [x] tmux: keeps each task session running\n" in r.stdout
+    assert "  2) [x] Warp: shows each task in a tab\n  3) [x] tmux: keeps each task session running\n" in r.stdout
 
 
 def test_list_intel_herdr_moves_homebrew_to_optional(release, env, work):
     r = run_with_answers({**env, "FACTORY_INSTALL_ARM64": "0"}, work, "1", "")
-    assert "  4) [x] Herdr: shows each task in a tab\nOptional\n  5) [ ] Homebrew: installs the other tools\n" in r.stdout
-    assert "  6) [ ] gh: GitHub steps of the catalog (brew builds it from source)\n" in r.stdout
+    assert "Mandatory\n  1) [x] Herdr: shows each task in a tab\nOptional\n  2) [ ] Homebrew: installs the other tools\n" in r.stdout
+    assert "  3) [ ] gh: GitHub steps of the catalog (brew builds it from source)\n" in r.stdout
 
 
 def test_list_linux_without_git(release, env, work):
@@ -253,25 +272,26 @@ def test_list_linux_without_git(release, env, work):
     for tool in Path("/usr/bin").iterdir():
         if tool.name != "git":
             (usr / tool.name).symlink_to(tool)
-    r = run_with_answers({**env, "FACTORY_INSTALL_OS": "Linux", "PATH": env["PATH"].replace("/usr/bin", str(usr))}, work, "")
+    r = run_with_answers({**env, "FACTORY_INSTALL_OS": "Linux", "PATH": env["PATH"].replace("/usr/bin", str(usr))}, work, "1", "")
     assert "Which one do you already have?" not in r.stdout
+    assert "Item 1 cannot be changed." in r.stdout
     assert "  1) [ ] git (install it with your package manager): task worktrees\n" in r.stdout
     assert "  2) [ ] Homebrew (needs git): installs the other tools\n" in r.stdout
     assert "Warp" not in r.stdout and "Xcode" not in r.stdout
 
 
 def test_toggle_numbers(release, env, work):
-    r = run_with_answers(env, work, "1", "6 2", "")
-    assert "  2) [ ] Homebrew: installs the other tools\n" in r.stdout
-    assert "  6) [x] gh: GitHub steps of the catalog\n" in r.stdout
+    r = run_with_answers(env, work, "1", "3 1", "")
+    assert "  1) [ ] Homebrew: installs the other tools\n" in r.stdout
+    assert "  3) [x] gh: GitHub steps of the catalog\n" in r.stdout
 
 
 def test_same_number_twice_keeps_the_state(release, env, work):
-    r = run_with_answers(env, work, "1", "6 6", "")
-    assert r.stdout.count("  6) [ ] gh: GitHub steps of the catalog\n") == 2
+    r = run_with_answers(env, work, "1", "3 3", "")
+    assert r.stdout.count("  3) [ ] gh: GitHub steps of the catalog\n") == 2
 
 
-@pytest.mark.parametrize("bad", ["abc", "0", "99", "1"])
+@pytest.mark.parametrize("bad", ["abc", "0", "5"])
 def test_bad_or_found_number_refused(release, env, work, bad):
     r = run_with_answers(env, work, "1", bad, "")
     assert f"Item {bad} cannot be changed." in r.stdout
@@ -285,7 +305,7 @@ def test_end_of_answers_confirms_the_list(release, env, work):
 
 def test_terminal_from_the_environment_still_shows_the_list(release, env, work):
     r = run_with_answers({**env, "FACTORY_INSTALL_TERMINAL": "herdr"}, work, "")
-    assert "Which one do you already have?" not in r.stdout and "  5) [x] Herdr" in r.stdout
+    assert "Which one do you already have?" not in r.stdout and "  2) [x] Herdr" in r.stdout
 
 
 def brew_stub(work):
@@ -311,7 +331,7 @@ def hide_command(work, name):
 
 def test_selected_brew_items_install_in_order(release, env, work):
     brew = brew_stub(work)
-    r = run_with_answers({**env, "FACTORY_INSTALL_BREW_PATHS": str(brew)}, work, "2", "7", "")
+    r = run_with_answers({**env, "FACTORY_INSTALL_BREW_PATHS": str(brew)}, work, "2", "3", "")
     assert r.returncode == 0, r.stderr
     assert brew_log(work) == ["install --cask warp", "install tmux", "install gh"]
 
@@ -322,7 +342,7 @@ def test_homebrew_install_runs_the_official_script(release, env, work):
 
 
 def test_brew_items_without_homebrew_print_install_later(release, env, work):
-    r = run_with_answers(env, work, "1", "2", "")
+    r = run_with_answers(env, work, "1", "1", "")
     assert "Install Herdr later: brew install herdr" in r.stdout
     assert saved_terminal(env) == "herdr"
 
@@ -359,7 +379,7 @@ def test_command_line_tools_install_waits_for_enter(release, env, work):
 
 def test_unselected_uv_stops_before_the_factory(release, env, work):
     hide_command(work, "uv")
-    r = run_with_answers(env, work, "1", "3", "")
+    r = run_with_answers(env, work, "1", "2", "")
     assert r.returncode == 1 and "factory install: uv is required." in r.stderr
 
 
@@ -368,8 +388,16 @@ def test_everything_found_installs_nothing(release, env, work):
     for name in ("herdr", "gh", "glab"):
         write_stub(work / f"fake bin/{name}", "exit 0")
     r = run_with_answers({**env, "FACTORY_INSTALL_BREW_PATHS": str(brew)}, work, "1", "")
-    assert ") [x]" not in r.stdout and brew_log(work) == []
-    assert not (work / "curl.log").exists()
+    assert "CAPTN needs these tools" not in r.stdout and "Type numbers" not in r.stdout
+    assert brew_log(work) == [] and not (work / "curl.log").exists()
+
+
+def test_only_optional_missing_shows_no_list(release, env, work):
+    brew = brew_stub(work)
+    write_stub(work / "fake bin/herdr", "exit 0")
+    r = run_with_answers({**env, "FACTORY_INSTALL_BREW_PATHS": str(brew)}, work, "1", "")
+    assert r.returncode == 0, r.stderr
+    assert "CAPTN needs these tools" not in r.stdout and "gh:" not in r.stdout
 
 
 def test_brew_path_line_when_brew_is_not_on_path(release, env, work):
@@ -390,7 +418,7 @@ def test_second_run_finds_tools_off_the_user_path(release, env, work):
     r = run_with_answers({**env, "FACTORY_INSTALL_BREW_PATHS": str(brew)}, work, "", "")
     assert r.returncode == 0, r.stderr
     assert "1) Herdr (found)" in r.stdout
-    assert "  3) [ ] uv (found)" in r.stdout and "  4) [ ] Claude Code (found)" in r.stdout
+    assert "CAPTN needs these tools" not in r.stdout
     assert brew_log(work) == []
 
 
