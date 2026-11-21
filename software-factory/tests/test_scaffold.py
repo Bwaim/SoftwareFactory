@@ -4,12 +4,13 @@ import subprocess
 import uuid
 
 from conftest import BIN, PROJECT_ROOT, SF, VERIF
+from factory.cli import VERSION
 
 
 def test_version_prints():
     r = subprocess.run(["uv", "run", "--script", str(BIN), "--version"], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
-    assert "factory 0.2.0" in r.stdout
+    assert f"factory {VERSION}" in r.stdout
 
 
 def test_uv_installs_dependencies_on_first_run(tmp_path_factory):
@@ -27,3 +28,4 @@ def test_marketplace_points_to_plugin():
     assert (PROJECT_ROOT / data["plugins"][0]["source"]).resolve() == SF
     plugin = json.loads((SF / ".claude-plugin" / "plugin.json").read_text())
     assert plugin["name"] == "software-factory"
+    assert plugin["version"] == VERSION

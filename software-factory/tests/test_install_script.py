@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from conftest import PROJECT_ROOT
+from factory.cli import VERSION
 
 INSTALL = PROJECT_ROOT / "install.sh"
 BUILD = PROJECT_ROOT / "scripts" / "build-release.sh"
@@ -36,7 +37,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 @pytest.fixture
 def release(work):
     folder = work / "dl"
-    r = subprocess.run(["sh", str(BUILD), "0.2.0", str(folder)], capture_output=True, text=True)
+    r = subprocess.run(["sh", str(BUILD), VERSION, str(folder)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     handler = functools.partial(QuietHandler, directory=str(folder))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
@@ -122,9 +123,9 @@ def test_fresh_install(release, env, work):
     assert r.returncode == 0, r.stderr
     assert (target / ".installed-by-script").exists()
     assert os.readlink(home / ".local/bin/factory") == str(target / "bin/factory")
-    assert f"Installed factory 0.2.0 in {target}." in r.stdout
+    assert f"Installed factory {VERSION} in {target}." in r.stdout
     v = subprocess.run([str(home / ".local/bin/factory"), "--version"], capture_output=True, text=True, env=env)
-    assert "factory 0.2.0" in v.stdout
+    assert f"factory {VERSION}" in v.stdout
     if sys.platform == "darwin":
         assert f"Dashboard app: {work / 'CAPTN Dashboard.app'}" in r.stdout
         assert (work / "CAPTN Dashboard.app").is_dir()
@@ -149,7 +150,7 @@ def test_install_through_pipe(release, env):
     r = subprocess.run(["/bin/sh"], input=script, env=env, capture_output=True, text=True, start_new_session=True)
     assert r.returncode == 0, r.stderr
     assert (Path(env["HOME"]) / ".local/share/software-factory/.installed-by-script").exists()
-    assert "Installed factory 0.2.0" in r.stdout
+    assert f"Installed factory {VERSION}" in r.stdout
 
 
 def test_missing_claude_stops(release, env, work):
