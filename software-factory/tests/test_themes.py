@@ -97,3 +97,63 @@ def test_editor_applies_the_stored_theme_before_the_stylesheet():
 def test_editor_follows_theme_changes_from_other_tabs():
     page = (WEB / "editor.html").read_text()
     assert 'window.addEventListener("storage", (e) => { if (e.key === THEME_KEY || e.key === "factory.palette") { applyStoredTheme(); themeLabel(); } });' in page
+
+
+NEW = ["greyscale", "monochrome", "retropunk", "wachovsky"]
+
+
+def theme_blocks():
+    b = blocks()
+    for name in NEW:
+        yield name, "dark", b[f'[data-palette="{name}"]']
+        yield name, "light", b[f'[data-palette="{name}"][data-theme="light"]']
+
+
+def test_new_themes_define_every_token():
+    for name, mode, t in theme_blocks():
+        assert set(TOKENS) <= set(t), (name, mode, set(TOKENS) - set(t))
+        assert t["color-scheme"] == mode
+
+
+def test_new_themes_use_the_approved_values():
+    b = blocks()
+    g, gl = b['[data-palette="greyscale"]'], b['[data-palette="greyscale"][data-theme="light"]']
+    assert (g["bg"], g["accent"], gl["bg"], gl["accent"]) == ("#16181B", "#8A939D", "#F3F4F6", "#4A525B")
+    m, ml = b['[data-palette="monochrome"]'], b['[data-palette="monochrome"][data-theme="light"]']
+    assert (m["bg"], m["accent"], m["accent-fg"], ml["accent"], ml["accent-fg"]) == ("#000000", "#FFFFFF", "#000000", "#000000", "#FFFFFF")
+    assert (m["switch-track-off"], ml["switch-track-off"]) == ("#595959", "#8C8C8C")
+    r, rl = b['[data-palette="retropunk"]'], b['[data-palette="retropunk"][data-theme="light"]']
+    assert (r["bg"], r["accent"], rl["link"]) == ("#1A1612", "#B5823C", "#8A4F0E")
+    w, wl = b['[data-palette="wachovsky"]'], b['[data-palette="wachovsky"][data-theme="light"]']
+    assert (w["accent"], w["accent-fg"], wl["accent"]) == ("#2FB58A", "#06100D", "#177A5C")
+
+
+def test_new_themes_status_pills_are_neutral():
+    for name, mode, t in theme_blocks():
+        assert len({t[f"pill-{s}-bg"] for s in ("active", "approval", "attn", "wait")}) == 1
+        assert all(t[f"pill-{s}-fg"] == t["fg"] for s in ("active", "approval", "attn", "wait"))
+
+
+def test_contrast_rules():
+    for name, mode, t in theme_blocks():
+        for fg in ("fg", "muted", "link"):
+            for bg in ("bg", "top", "column", "panel"):
+                assert contrast(t[fg], t[bg]) >= 4.5, (name, mode, fg, bg)
+        for bg in ("accent", "accent-hover"):
+            assert contrast(t["accent-fg"], t[bg]) >= 4.5, (name, mode, bg)
+        assert contrast(t["banner-fg"], t["yellow"]) >= 4.5, (name, mode)
+        assert contrast(t["pill-active-fg"], t["pill-active-bg"]) >= 4.5, (name, mode)
+        assert contrast(t["check-fg"], t["active-dot"]) >= 3, (name, mode)
+        # Every other text color, on every surface it can sit on (spec: "checks every remaining pair").
+        for fg in ("muted-strong", "soft", "neutral-fg", "link-hover", "tab-on", "brand-pink", "err", "ok"):
+            for bg in ("bg", "top", "column", "panel", "raised"):
+                assert contrast(t[fg], t[bg]) >= 4.5, (name, mode, fg, bg)
+        for fg, bg in (("err", "err-bg"), ("active-fg", "active-bg"), ("approval-fg", "approval-bg"),
+                       ("attn-fg", "attn-bg"), ("wait-fg", "wait-bg"), ("fg", "raised"), ("fg", "done"), ("fg", "err-bg")):
+            assert contrast(t[fg], t[bg]) >= 4.5, (name, mode, fg, bg)
+        # Terminal text (#E6DFDC) stays readable on the selection, composited over the terminal background.
+        assert contrast("#E6DFDC", blend(t["term-selection"], t["term-bg"])) >= 4.5, (name, mode)
+    b = blocks()
+    for name, mode, t in [*theme_blocks(), ("nextorian", "dark", b[NEXTORIAN_DARK]), ("nextorian", "light", b[NEXTORIAN_LIGHT])]:
+        assert contrast(t["switch-knob-off"], t["switch-track-off"]) >= 3, (name, mode)
+        assert contrast(t["switch-knob-on"], t["accent"]) >= 3, (name, mode)
