@@ -210,7 +210,7 @@ def test_server_serves_the_vendored_terminal_files(inited):
     try:
         i = info(inited.fdir)
         conn = http.client.HTTPConnection("127.0.0.1", i["port"], timeout=WAIT_SECONDS)
-        for path, kind in [("/static/xterm.js", "text/javascript"), ("/static/xterm.css", "text/css"), ("/static/addon-fit.js", "text/javascript")]:
+        for path, kind in [("/static/xterm.js", "text/javascript"), ("/static/xterm.css", "text/css"), ("/static/addon-fit.js", "text/javascript"), ("/static/themes.css", "text/css")]:
             conn.request("GET", path, headers={"Host": f"127.0.0.1:{i['port']}"})
             res = conn.getresponse()
             body = res.read()
@@ -268,7 +268,8 @@ def test_board_and_panels_scroll_on_their_own():
 
 def test_open_column_tabs_have_a_purple_title():
     assert '.rail-tab[aria-expanded="true"] { box-shadow: inset 3px 0 0 var(--accent); color: var(--tab-on);' in PAGE
-    assert "--tab-on: #C9A2E6;" in PAGE and "--tab-on: #673888;" in PAGE
+    css = (SF / "lib" / "factory" / "web" / "themes.css").read_text()
+    assert "--tab-on: #C9A2E6;" in css and "--tab-on: #673888;" in css
 
 
 def test_column_titles_share_one_style():
