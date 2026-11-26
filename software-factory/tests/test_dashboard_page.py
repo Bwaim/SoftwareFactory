@@ -66,6 +66,9 @@ def test_settings_tab_holds_theme_and_terminal_switches():
     assert 'class: "swatch", "data-palette": name' in PAGE
     assert "Use the dark version of the theme. The pipeline editor follows these choices." in PAGE
     assert "if (state.live.term) state.live.term.options.theme = liveTheme();" in PAGE
+    # Keyboard focus on the checked option must not hide under its outline: a separate ring outside it.
+    assert ".palette-option:has(input:focus-visible) { box-shadow: 0 0 0 5px var(--bg), 0 0 0 7px var(--fg); }" in PAGE
+    assert ".palette-option:has(input:checked) { outline: 2px solid var(--brand-pink); outline-offset: 1px; }" in PAGE
     assert "state.term.open = true;" in select and "state.panel.details = state.term.open = true;" not in select
 
 
