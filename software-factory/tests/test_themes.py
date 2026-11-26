@@ -54,3 +54,33 @@ def test_nextorian_keeps_todays_values():
     assert dark["banner-fg"] == light["banner-fg"] == "#1A1110"
     assert dark["term-bg"] == light["term-bg"] == "#0E0908" and dark["term-cursor"] == "#FF5AA5"
     assert dark["check-fg"] == light["check-fg"] == "#FFFFFF"
+
+
+PRE_PAINT = """<script>
+function applyStoredTheme() {
+  var d = document.documentElement, t = null, p = null;
+  try { t = localStorage.getItem("factory.theme"); p = localStorage.getItem("factory.palette"); } catch (e) {}
+  if (t === "light") d.dataset.theme = "light"; else delete d.dataset.theme;
+  if (["greyscale", "monochrome", "retropunk", "wachovsky"].indexOf(p) >= 0) d.dataset.palette = p; else delete d.dataset.palette;
+}
+applyStoredTheme();
+</script>
+<link rel="stylesheet" href="/static/themes.css">"""
+
+
+def test_dashboard_applies_the_stored_theme_before_the_stylesheet():
+    page = (WEB / "dashboard.html").read_text()
+    head = page[:page.index("</head>")]
+    assert PRE_PAINT in head and head.index(PRE_PAINT) < head.index("<style>")
+
+
+def test_dashboard_has_no_inline_tokens_or_hard_coded_theme_colors():
+    page = (WEB / "dashboard.html").read_text()
+    assert ":root {" not in page and ':root[data-theme="light"]' not in page and "--bg:" not in page
+    for rule in ["color: #FFFFFF", "color: #1A1110", "background: #FFFFFF", "border: solid #FFFFFF", "#0E0908", "#2E2322;"]:
+        assert rule not in page.split("<style>")[1].split("</style>")[0], rule
+    for text in ["color: var(--accent-fg)", "color: var(--banner-fg)", "background: var(--switch-knob-off)",
+                 "background: var(--switch-track-off)", "background: var(--switch-knob-on)", "border: solid var(--check-fg)",
+                 "background: var(--term-bg)", "var(--pill-active-bg)", "var(--pill-wait-fg)", "theme: liveTheme()"]:
+        assert text in page, text
+    assert "const LIVE_THEME" not in page
