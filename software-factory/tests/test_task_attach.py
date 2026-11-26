@@ -210,7 +210,7 @@ def test_server_serves_the_vendored_terminal_files(inited):
     try:
         i = info(inited.fdir)
         conn = http.client.HTTPConnection("127.0.0.1", i["port"], timeout=WAIT_SECONDS)
-        for path, kind in [("/static/xterm.js", "text/javascript"), ("/static/xterm.css", "text/css"), ("/static/addon-fit.js", "text/javascript")]:
+        for path, kind in [("/static/xterm.js", "text/javascript"), ("/static/xterm.css", "text/css"), ("/static/addon-fit.js", "text/javascript"), ("/static/themes.css", "text/css")]:
             conn.request("GET", path, headers={"Host": f"127.0.0.1:{i['port']}"})
             res = conn.getresponse()
             body = res.read()
