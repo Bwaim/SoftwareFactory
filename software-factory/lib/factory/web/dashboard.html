@@ -112,6 +112,20 @@ button.launch::before { content: "+"; font-size: 1.4em; font-weight: 600; line-h
 .page-title { margin: 0 0 12px; font-size: 20px; font-weight: 800; }
 .settings { max-width: 640px; }
 .settings > .muted { margin: 0 0 8px; }
+.theme-picker { border: 0; margin: 0; padding: 16px 0; border-bottom: 1px solid var(--panel-line); min-width: 0; }
+.theme-picker legend { padding: 0; font-weight: 700; font-size: 15px; }
+.theme-picker p { margin: 2px 0 12px; font-size: 13px; }
+.palette-options { display: flex; flex-wrap: wrap; gap: 12px; }
+.palette-option { position: relative; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 10px; width: 120px; box-sizing: border-box; border: 1px solid var(--panel-line); border-radius: 10px; background: var(--panel); cursor: pointer; font-size: 13px; }
+.palette-option input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.palette-option:has(input:checked) { outline: 2px solid var(--brand-pink); outline-offset: 1px; }
+.palette-option:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--link); }
+.swatch { display: inline-flex; gap: 4px; padding: 6px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+.swatch i { display: block; width: 16px; height: 16px; border-radius: 50%; }
+.swatch i:nth-child(1) { background: var(--panel); border: 1px solid var(--line); box-sizing: border-box; }
+.swatch i:nth-child(2) { background: var(--accent); }
+.swatch i:nth-child(3) { background: var(--active-dot); }
+.swatch i:nth-child(4) { background: var(--fg); }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--panel-line); }
 .switch-row label { font-weight: 700; font-size: 15px; cursor: pointer; }
 .switch-row p { margin: 2px 0 0; font-size: 13px; }
@@ -1408,9 +1422,34 @@ const THEME_KEY = "factory.theme";
 /** On by default: selecting a task opens its terminal next to its details, as before this setting existed. */
 const TERM_ON_SELECT_KEY = "factory.terminalOnSelect";
 function isLight() { return document.documentElement.dataset.theme === "light"; }
+const PALETTE_KEY = "factory.palette";
+const PALETTES = [["nextorian", "Nextorian"], ["greyscale", "Greyscale"], ["monochrome", "Monochrome"], ["retropunk", "Retropunk"], ["wachovsky", "Wachovsky"]];
+function currentPalette() { return document.documentElement.dataset.palette || "nextorian"; }
 function setTheme(light) {
   if (light) document.documentElement.dataset.theme = "light"; else delete document.documentElement.dataset.theme;
   try { localStorage.setItem(THEME_KEY, light ? "light" : "dark"); } catch (e) {}
+  refreshThemeViews();
+}
+function setPalette(name) {
+  if (name === "nextorian") delete document.documentElement.dataset.palette; else document.documentElement.dataset.palette = name;
+  try { localStorage.setItem(PALETTE_KEY, name); } catch (e) {}
+  refreshThemeViews();
+}
+/** The swatches show the mode in use, and an open live terminal takes the new colors at once. */
+function refreshThemeViews() {
+  for (const s of document.querySelectorAll(".swatch")) {
+    if (isLight()) s.dataset.theme = "light"; else delete s.dataset.theme;
+  }
+  if (state.live.term) state.live.term.options.theme = liveTheme();
+}
+function themePicker() {
+  return el("fieldset", { class: "theme-picker" },
+    el("legend", {}, "Theme"),
+    el("p", { class: "muted" }, "Colors of the dashboard and the pipeline editor."),
+    el("div", { class: "palette-options" }, ...PALETTES.map(([name, label]) => el("label", { class: "palette-option" },
+      el("input", { type: "radio", name: "palette", value: name, checked: name === currentPalette(), onchange: () => setPalette(name) }),
+      el("span", { class: "swatch", "data-palette": name, "data-theme": isLight() ? "light" : false }, el("i"), el("i"), el("i"), el("i")),
+      el("span", {}, label)))));
 }
 function switchRow(id, label, hint, checked, onChange) {
   const input = el("input", { type: "checkbox", role: "switch", id, checked, onchange: (e) => onChange(e.target.checked) });
@@ -1420,7 +1459,8 @@ function settingsView() {
   return el("div", { class: "settings" },
     el("h2", { class: "page-title" }, "Settings"),
     el("p", { class: "muted" }, "Saved in this browser, for every workspace."),
-    switchRow("set-dark", "Dark mode", "Use the dark theme. The pipeline editor follows this choice.", !isLight(), (on) => setTheme(!on)),
+    themePicker(),
+    switchRow("set-dark", "Dark mode", "Use the dark version of the theme. The pipeline editor follows these choices.", !isLight(), (on) => setTheme(!on)),
     switchRow("set-term", "Open the terminal with the details", "When you select a task, open its live terminal next to its details.",
       loadFlag(TERM_ON_SELECT_KEY, true), (on) => saveFlag(TERM_ON_SELECT_KEY, on)));
 }
