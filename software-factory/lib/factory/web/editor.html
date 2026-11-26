@@ -6,30 +6,17 @@
 <title>Pipeline editor · CAPTN Factory</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='17 17 86 90'%3E%3Crect x='18' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E%3Crect x='94' y='68' width='8' height='18' rx='4' fill='%23C4005E'/%3E %3Crect x='26' y='50' width='68' height='56' rx='18' fill='%23673888'/%3E %3Cpath d='M30 48 L22 28 Q60 10 98 28 L90 48 Z' fill='%23C4005E'/%3E %3Crect x='20' y='44' width='80' height='11' rx='5.5' fill='%231A1110'/%3E %3Ccircle cx='60' cy='32' r='7' fill='%23FECD40'/%3E %3Ccircle cx='46' cy='76' r='8' fill='%23FFFFFF'/%3E%3Ccircle cx='47.5' cy='77' r='3.5' fill='%231A1110'/%3E %3Cline x1='66' y1='64' x2='94' y2='58' stroke='%231A1110' stroke-width='3' stroke-linecap='round'/%3E %3Ccircle cx='74' cy='76' r='9' fill='%231A1110'/%3E %3Cpath d='M50 92 Q60 99 70 92' fill='none' stroke='%23FFFFFF' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
+<script>
+function applyStoredTheme() {
+  var d = document.documentElement, t = null, p = null;
+  try { t = localStorage.getItem("factory.theme"); p = localStorage.getItem("factory.palette"); } catch (e) {}
+  if (t === "light") d.dataset.theme = "light"; else delete d.dataset.theme;
+  if (["greyscale", "monochrome", "retropunk", "wachovsky"].indexOf(p) >= 0) d.dataset.palette = p; else delete d.dataset.palette;
+}
+applyStoredTheme();
+</script>
+<link rel="stylesheet" href="/static/themes.css">
 <style>
-:root { color-scheme: dark;
-  --bg: #1A1110; --top: #000000; --fg: #FFFFFF; --muted: #B3A8A4; --muted-strong: #CFC7C3; --soft: #E6DFDC;
-  --column: #241A19; --panel: #2E2322; --panel-line: #3D302F; --line: #4A3B39; --raised: #3A2E2D; --done: #261C1B;
-  --accent: #C4005E; --accent-hover: #A8004F; --link: #FF7AB6; --link-hover: #FFA8CF; --brand-pink: #FF5AA5;
-  --yellow: #FECD40; --err: #FF8AC0; --err-line: #6E2A4A; --err-bg: #3A1A29; --ok: #B5E07F;
-  --active-bg: #283A16; --active-fg: #B5E07F; --active-dot: #7CC63A;
-  --approval-bg: #423410; --approval-fg: #FECD40; --approval-dot: #FECD40;
-  --attn-bg: #4A1430; --attn-fg: #FF9CC8; --attn-dot: #FF5AA5; --attn-line: #5C2441;
-  --wait-bg: #352448; --wait-fg: #D6BCEB; --wait-dot: #B98BDB;
-  --neutral-fg: #D8D0CC; --paused-dot: #A99E9A;
-  --shadow: rgba(0, 0, 0, 0.5); --bot-band: #FFFFFF; --bot-eye: #1A1110;
-  --font: "Nextory Sans", Figtree, Roboto, Arial, sans-serif; }
-:root[data-theme="light"] { color-scheme: light;
-  --bg: #F9F5F2; --top: #FFFFFF; --fg: #1A1110; --muted: #6B5F5B; --muted-strong: #5A4E4A; --soft: #3D302F;
-  --column: #F1ECE8; --panel: #FFFFFF; --panel-line: #E4DDD8; --line: #D6CDC8; --raised: #EEE7E3; --done: #F7F3F0;
-  --link: #B0005A; --link-hover: #8A0047; --brand-pink: #C4005E;
-  --err: #B0004F; --err-line: #F0B3CE; --err-bg: #FDEBF3; --ok: #3E7A12;
-  --active-bg: #E6F4D7; --active-fg: #2F6110; --active-dot: #5DA21E;
-  --approval-bg: #FFF3CC; --approval-fg: #6E5100; --approval-dot: #E0A800;
-  --attn-bg: #FDE3EF; --attn-fg: #A3004E; --attn-dot: #E0337F; --attn-line: #F5C2D9;
-  --wait-bg: #EFE6F7; --wait-fg: #5B2D80; --wait-dot: #8A55B5;
-  --neutral-fg: #4A3F3B; --paused-dot: #8C817D;
-  --shadow: rgba(26, 17, 16, 0.15); --bot-band: #1A1110; --bot-eye: #FFFFFF; }
 body { margin: 0; font: 14px/1.45 var(--font); background: var(--bg); color: var(--fg); min-height: 100vh; }
 [hidden] { display: none !important; }
 header { background: var(--top); border-bottom: 1px solid var(--panel-line); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
@@ -55,7 +42,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); padding: 
 button { cursor: pointer; font-size: 13px; font-weight: 600; min-height: 32px; padding: 0 14px; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 button:hover:not(:disabled) { background: var(--raised); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
-button.primary { background: var(--accent); color: #FFFFFF; border-color: var(--accent); min-height: 36px; }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); min-height: 36px; }
 button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 button.danger { color: var(--err); border-color: var(--err-line); }
 .card { border: 1px solid var(--panel-line); border-radius: 12px; padding: 12px; margin: 8px 0; background: var(--panel); cursor: grab; word-break: break-word; }
@@ -65,7 +52,7 @@ button.danger { color: var(--err); border-color: var(--err-line); }
 .card > button { min-height: 26px; font-size: 12px; padding: 0 10px; margin-left: 4px; }
 .card .muted { margin-top: 4px; }
 .muted { color: var(--muted); font-size: 12px; }
-#error { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: var(--accent); color: #FFFFFF; font-weight: 600; padding: 10px 24px; }
+#error { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: var(--accent); color: var(--accent-fg); font-weight: 600; padding: 10px 24px; }
 .problem { font-size: 13px; margin: 4px 0; }
 .problem.error { color: var(--err); }
 .problem.warning { color: var(--approval-fg); }
@@ -989,6 +976,7 @@ byId("theme-toggle").addEventListener("click", () => {
   try { localStorage.setItem(THEME_KEY, light ? "light" : "dark"); } catch (e) {}
   themeLabel();
 });
+window.addEventListener("storage", (e) => { if (e.key === THEME_KEY || e.key === "factory.palette") { applyStoredTheme(); themeLabel(); } });
 themeLabel();
 init().catch(() => {});
 </script>

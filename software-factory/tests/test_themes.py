@@ -84,3 +84,16 @@ def test_dashboard_has_no_inline_tokens_or_hard_coded_theme_colors():
                  "background: var(--term-bg)", "var(--pill-active-bg)", "var(--pill-wait-fg)", "theme: liveTheme()"]:
         assert text in page, text
     assert "const LIVE_THEME" not in page
+
+
+def test_editor_applies_the_stored_theme_before_the_stylesheet():
+    page = (WEB / "editor.html").read_text()
+    head = page[:page.index("</head>")]
+    assert PRE_PAINT in head and head.index(PRE_PAINT) < head.index("<style>")
+    assert ":root {" not in page and "--bg:" not in page and "color: #FFFFFF" not in page
+    assert "color: var(--accent-fg)" in page
+
+
+def test_editor_follows_theme_changes_from_other_tabs():
+    page = (WEB / "editor.html").read_text()
+    assert 'window.addEventListener("storage", (e) => { if (e.key === THEME_KEY || e.key === "factory.palette") { applyStoredTheme(); themeLabel(); } });' in page
