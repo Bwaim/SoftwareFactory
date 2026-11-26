@@ -157,3 +157,9 @@ def test_contrast_rules():
     for name, mode, t in [*theme_blocks(), ("nextorian", "dark", b[NEXTORIAN_DARK]), ("nextorian", "light", b[NEXTORIAN_LIGHT])]:
         assert contrast(t["switch-knob-off"], t["switch-track-off"]) >= 3, (name, mode)
         assert contrast(t["switch-knob-on"], t["accent"]) >= 3, (name, mode)
+
+
+def test_current_step_mark_differs_from_done_and_approval_dots():
+    # The current step is filled with --brand-pink, done steps with --active-dot (dashboard .steps).
+    for name, mode, t in theme_blocks():
+        assert t["brand-pink"] not in (t["active-dot"], t["approval-dot"]), (name, mode)
